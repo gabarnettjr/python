@@ -2,18 +2,27 @@ import numpy as np
 import scipy as sp
 import matplotlib.pyplot as plt
 import scipy.interpolate as interpolate
+import time
+from scipy import spatial
+import rbffd
 
 def trueFunction( x, y ) :
     z = np.cos( np.pi * x ) * np.sin( np.pi * y )
     return z
 
-d = 1/1;
+useGlobalRbfs = 0;
+useLocalRbfs  = 1;
+rbfParam = 5;
+polyorder = 2;
+stencilSize = 16;
 
-n = 12
+d = 2/1
+
+n = 21
 x = d * np.linspace( -1, 1, n )
 y = d * np.linspace( -1, 1, n )
 
-N = 101
+N = 213
 X = d * np.linspace( -1, 1, N )
 Y = d * np.linspace( -1, 1, N )
 
@@ -26,23 +35,104 @@ z = trueFunction( x, y )
 
 ###########################################################################
 
-phi = interpolate.Rbf( x, y, z \
-    # , function='cubic' \
-    # , epsilon=1 \
-    , smooth=.00001 \
-    # , norm = euclidean_norm \
+X,Y = np.meshgrid( X, Y )
+
+if useGlobalRbfs == 1 :
+    start_time = time.clock()
+    phi = interpolate.Rbf( x, y, z \
+#    , function='thin_plate' \
+#    , epsilon=1 \
+#    , smooth=.00001 \
+#    , norm = euclidean_norm \
     )
-X,Y = np.meshgrid( X, Y );
-Z = phi( X, Y );
+    Z = phi( X, Y )
+    print( time.clock() - start_time, "seconds" )
+elif useLocalRbfs == 1 :
+    start_time = time.clock()
+    mn = rbffd.getMN()
+    numPoly = np.int( ( polyorder + 1 ) * ( polyorder + 2 ) / 2 );
+    pts = np.transpose( np.vstack((x,y)) )
+    tree = spatial.cKDTree(pts)
+    PTS = np.transpose( np.vstack((X.flatten(),Y.flatten())) )
+    idx = tree.query( PTS, stencilSize )
+    rad = idx[0]
+    rad = rad[:,stencilSize-1]
+    idx = idx[1]
+    #the fast way:
+    X = X.flatten()
+    Y = Y.flatten()
+    Xn = np.zeros((len(X),1,stencilSize))
+    Xn[:,0,:] = x[idx]
+    Yn = np.zeros((len(Y),1,stencilSize))
+    Yn[:,0,:] = y[idx]
+    f = np.zeros((len(X),stencilSize+numPoly,1))
+    f[:,0:stencilSize,0] = z[idx]
+    b = np.zeros(( np.shape(f) ))
+    b[:,stencilSize,:] = 1;
+    A = np.zeros(( len(X), stencilSize+numPoly, stencilSize+numPoly ));
+    for i in range(stencilSize) :
+        for j in range(stencilSize) :
+            A[:,i,j] = rbffd.phi( rad, Xn[:,0,i]-Xn[:,0,j], \
+            Yn[:,0,i]-Yn[:,0,j], rbfParam )
+            if j < numPoly :
+                tmp = Xn[:,0,i]**mn[j,0] * Yn[:,0,i]**mn[j,1] \
+                / rad**(mn[j,0]+mn[j,1])
+                A[:,i,stencilSize+j] = tmp
+                A[:,stencilSize+j,i] = tmp
+        #b[] = rbffd.phi( rad[i],  )
+    lam = np.linalg.solve( A, f )
+    ##the slow way:
+    #print( np.shape(tmp) )
+    #Xn = x[idx]
+    #Yn = y[idx]
+    #Zn = z[idx];
+    #A = np.zeros( ( stencilSize+numPoly, stencilSize+numPoly ) )
+    #f = np.zeros( stencilSize+numPoly )
+    #b = np.zeros( stencilSize+numPoly )
+    #b[stencilSize] = 1;
+    #X = X.flatten();
+    #Y = Y.flatten();
+    #Z = np.zeros( np.shape(X) )
+    #for i in range( len(X) ) :
+    #    xn = Xn[i,:] - X[i]
+    #    yn = Yn[i,:] - Y[i]
+    #    xx,xx = np.meshgrid( xn, xn )
+    #    yy,yy = np.meshgrid( yn, yn )
+    #    A[0:stencilSize,0:stencilSize] = \
+    #        rbffd.phi( rad[i], np.transpose(xx)-xx \
+    #        , np.transpose(yy)-yy, rbfParam )
+    #    for j in range(numPoly) :
+    #        tmp = xn**mn[j,0] * yn**mn[j,1] / rad[i]**(mn[j,0]+mn[j,1])
+    #        A[ 0:stencilSize, stencilSize+j ] = tmp
+    #        A[ stencilSize+j, 0:stencilSize ] = tmp
+    #    f[0:stencilSize] = Zn[i,:]
+    #    lam = np.linalg.solve( A, f )
+    #    b[0:stencilSize] = rbffd.phi(rad[i],0-xn,0-yn,rbfParam)
+    #    Z[i] = np.dot( b, lam )
+    #X = np.reshape( X, (N,N) )
+    #Y = np.reshape( Y, (N,N) )
+    #Z = np.reshape( Z, (N,N) )
+    #print( time.clock() - start_time, "seconds" )
+    #plt.figure(4)
+    #for i in range(len(X.flatten())) :
+    #    ind = idx[i,:];
+    #    plt.plot( x, y, '.' )
+    #    plt.plot( x[ind], y[ind], 'o' )
+    #    plt.plot( X.flatten()[i], Y.flatten()[i], '*' )
+    #    plt.show()
+else :
+    pts = np.transpose( np.vstack((x,y)) )
+    start_time = time.clock()
+    Z = interpolate.griddata( pts, z, (X,Y) \
+        , method='cubic' \
+        , fill_value=np.nan \
+        , rescale=False \
+        );
+    print( time.clock() - start_time, "seconds" )
 
-# pts = np.transpose( np.vstack((x,y)) )
-# X,Y = np.meshgrid( X, Y )
-# Z = interpolate.griddata( pts, z, (X,Y) \
-    # , method='linear' \
-    # , fill_value=np.nan \
-    # , rescale=False \
-    # );
 
+# #THERE IS A BUG IN THIS BUILT-IN IMPLEMENTATION:
+# start_time = time.clock();
 # phi = interpolate.interp2d( x, y, z \
     # , kind='cubic' \
     # # , copy=True \
@@ -50,18 +140,23 @@ Z = phi( X, Y );
     # # , fill_value=np.nan \
     # )
 # Z = phi( X, Y );
+# print( time.clock() - start_time, "seconds" )
 # X,Y = np.meshgrid( X, Y )
 
 ###########################################################################
 
+#plot the results and the error:
+
 Zexact = trueFunction( X, Y )
 
+contourVector = np.linspace( -1.2, 1.2, 13 )
+
 plt.figure(1)
-plt.contourf( X, Y, Zexact, np.linspace(-1.2,1.2,9) )
+plt.contourf( X, Y, Zexact, contourVector )
 plt.colorbar()
 
 plt.figure(2)
-plt.contourf( X, Y, Z, np.linspace(-1.2,1.2,9) )
+plt.contourf( X, Y, Z, contourVector )
 plt.colorbar()
 
 plt.figure(3)
