@@ -18,11 +18,11 @@ stencilSize = 4;
 
 d = 2/1
 
-n = 81
+n = 23
 x = d * np.linspace( -1, 1, n )
 y = d * np.linspace( -1, 1, n )
 
-N = 327
+N = 101
 X = d * np.linspace( -1, 1, N )
 Y = d * np.linspace( -1, 1, N )
 

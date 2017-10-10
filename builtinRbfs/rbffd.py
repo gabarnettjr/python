@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.special import xlogy
 
 def getMN() :
     mn = np.array( \
@@ -16,6 +17,10 @@ def getMN() :
     return mn
 
 def phi( rad, x, y, rbfParam ) :
-    z = ( x**2 + y**2 ) ** (rbfParam/2)
+    if np.mod( rbfParam, 2 ) == 0 :
+        z = np.sqrt( x*x + y*y );
+        z = xlogy( z**rbfParam, z );
+    else :
+        z = ( x**2 + y**2 ) ** (rbfParam/2)
     z = z / rad**rbfParam
     return z
