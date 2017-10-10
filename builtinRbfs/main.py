@@ -11,10 +11,10 @@ def trueFunction( x, y ) :
     return z
 
 useGlobalRbfs = 0;
-useLocalRbfs  = 1;
-rbfParam = 3;
-polyorder = 1;
-stencilSize = 4;
+useLocalRbfs  = 0;
+rbfParam = 5;
+polyorder = 2;
+stencilSize = 16;
 
 d = 2/1
 
@@ -144,20 +144,21 @@ else :
 #plot the approximation and the error:
 
 Zexact = trueFunction( X, Y )
+print( np.max( np.max( np.abs( Z - Zexact ) ) ) )
 
-contourVector = np.linspace( -1.2, 1.2, 13 )
+# contourVector = np.linspace( -1.2, 1.2, 13 )
 
 #plt.figure(1)
 #plt.contourf( X, Y, Zexact, contourVector )
 #plt.colorbar()
 
-plt.figure(2)
-plt.contourf( X, Y, Z, contourVector )
-plt.colorbar()
+# plt.figure(2)
+# plt.contourf( X, Y, Z, contourVector )
+# plt.colorbar()
 
-plt.figure(3)
-plt.contourf( X, Y, Z-Zexact )
-plt.colorbar()
-#plt.plot( x, y, 'k.' )
+# plt.figure(3)
+# plt.contourf( X, Y, Z-Zexact )
+# plt.colorbar()
+# #plt.plot( x, y, 'k.' )
 
-plt.show()
+# plt.show()
