@@ -1,3 +1,5 @@
+#rbffd.py
+
 import numpy as np
 from scipy.special import xlogy
 
@@ -32,6 +34,6 @@ def phi( rad, x, y, rbfParam ) :
         z = np.sqrt( x*x + y*y );
         z = xlogy( z**rbfParam, z );
     else :
-        z = ( x**2 + y**2 ) ** (rbfParam/2)
+        z = ( x*x + y*y ) ** (rbfParam/2)
     z = z / rad**rbfParam
     return z
