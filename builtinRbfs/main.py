@@ -8,21 +8,22 @@ import rbffd
 
 def trueFunction( x, y ) :
     z = np.cos( np.pi * x ) * np.sin( np.pi * y )
+    #z = np.exp( -5 * ( (x-.1)**2 + (y-np.pi/6)**2 ) )
     return z
 
-useGlobalRbfs = 0;
-useLocalRbfs  = 0;
-rbfParam = 5;
-polyorder = 2;
-stencilSize = 16;
+useGlobalRbfs = 0
+useLocalRbfs  = 1
+rbfParam = 4
+polyorder = 2
+stencilSize = 16
 
 d = 2/1
 
-n = 23
+n = 27
 x = d * np.linspace( -1, 1, n )
 y = d * np.linspace( -1, 1, n )
 
-N = 101
+N = 201
 X = d * np.linspace( -1, 1, N )
 Y = d * np.linspace( -1, 1, N )
 
@@ -37,8 +38,9 @@ z = trueFunction( x, y )
 
 X,Y = np.meshgrid( X, Y )
 
+start_time = time.clock()
+
 if useGlobalRbfs == 1 :
-    start_time = time.clock()
     phi = interpolate.Rbf( x, y, z \
 #    , function='thin_plate' \
 #    , epsilon=1 \
@@ -46,9 +48,7 @@ if useGlobalRbfs == 1 :
 #    , norm = euclidean_norm \
     )
     Z = phi( X, Y )
-    print( time.clock() - start_time, "seconds" )
 elif useLocalRbfs == 1 :
-    start_time = time.clock()
     mn = rbffd.getMN()
     numPoly = np.int( ( polyorder + 1 ) * ( polyorder + 2 ) / 2 );
     pts = np.transpose( np.vstack((x,y)) )
@@ -57,34 +57,33 @@ elif useLocalRbfs == 1 :
     Y = Y.flatten()
     PTS = np.transpose( np.vstack((X,Y)) )
     idx = tree.query( PTS, stencilSize )
-    print( time.clock() - start_time, "seconds" )
     rad = idx[0]
     rad = rad[:,stencilSize-1]
     idx = idx[1]
     #the fast way:
-    Xn = np.zeros(( len(X), 1, stencilSize ))
-    Xn[:,0,:] = x[idx] - np.transpose( np.tile( X, (stencilSize,1) ) )
-    Yn = np.zeros(( len(Y), 1, stencilSize ))
-    Yn[:,0,:] = y[idx] - np.transpose( np.tile( Y, (stencilSize,1) ) )
+    Xn = x[idx] - np.transpose( np.tile( X, (stencilSize,1) ) )
+    Yn = y[idx] - np.transpose( np.tile( Y, (stencilSize,1) ) )
     f = np.zeros(( len(X), stencilSize+numPoly, 1 ))
     f[ :, 0:stencilSize, 0 ] = z[idx]
-    b = np.zeros( np.shape(f) )
-    b[:,stencilSize,0] = 1;
+    b = np.zeros(( len(X), stencilSize+numPoly ))
+    b[:,stencilSize] = 1;
     A = np.zeros(( len(X), stencilSize+numPoly, stencilSize+numPoly ));
     for i in range(stencilSize) :
-        for j in range(stencilSize) :
-            A[:,i,j] = rbffd.phi( rad, Xn[:,0,i]-Xn[:,0,j], Yn[:,0,i]-Yn[:,0,j], rbfParam )
-            if j < numPoly :
-                tmp = Xn[:,0,i]**mn[j,0] * Yn[:,0,i]**mn[j,1] / rad**(mn[j,0]+mn[j,1])
-                A[ :, i, stencilSize+j ] = tmp
-                A[ :, stencilSize+j, i ] = tmp
-        b[:,i,0] = rbffd.phi( rad, 0-Xn[:,0,i], 0-Yn[:,0,i], rbfParam )
+        for j in range(numPoly) :
+            A[:,i,j] = rbffd.phi( rad, Xn[:,i]-Xn[:,j], Yn[:,i]-Yn[:,j], rbfParam )
+            tmp = Xn[:,i]**mn[j,0] * Yn[:,i]**mn[j,1] / rad**(mn[j,0]+mn[j,1])
+            A[ :, i, stencilSize+j ] = tmp
+            A[ :, stencilSize+j, i ] = tmp
+        for j in np.arange( numPoly, stencilSize ) :
+            A[:,i,j] = rbffd.phi( rad, Xn[:,i]-Xn[:,j], Yn[:,i]-Yn[:,j], rbfParam )
+    rad = np.transpose( np.tile( rad, ( stencilSize, 1 ) ) )
+    b[:,0:stencilSize] = rbffd.phi( rad, 0-Xn, 0-Yn, rbfParam )
     lam = np.linalg.solve( A, f )
+    lam = np.reshape( lam, (len(X),stencilSize+numPoly) )
     Z = np.sum( b*lam, axis=1 )
     X = np.reshape( X, (N,N) )
     Y = np.reshape( Y, (N,N) )
     Z = np.reshape( Z, (N,N) )
-    print( time.clock() - start_time, "seconds" )
 #    #the slow way:
 #    Xn = x[idx]
 #    Yn = y[idx]
@@ -115,17 +114,15 @@ elif useLocalRbfs == 1 :
 #    X = np.reshape( X, (N,N) )
 #    Y = np.reshape( Y, (N,N) )
 #    Z = np.reshape( Z, (N,N) )
-#    print( time.clock() - start_time, "seconds" )
 else :
-    start_time = time.clock()
     pts = np.transpose( np.vstack((x,y)) )
     Z = interpolate.griddata( pts, z, (X,Y) \
         , method='cubic' \
         , fill_value=np.nan \
         , rescale=False \
         );
-    print( time.clock() - start_time, "seconds" )
 
+print( time.clock() - start_time, "seconds" )
 
 # #THERE IS A BUG IN THIS BUILT-IN IMPLEMENTATION:
 # start_time = time.clock();
@@ -146,19 +143,19 @@ else :
 Zexact = trueFunction( X, Y )
 print( np.max( np.max( np.abs( Z - Zexact ) ) ) )
 
-# contourVector = np.linspace( -1.2, 1.2, 13 )
+contourVector = np.linspace( -1.1, 1.1, 23 )
 
 #plt.figure(1)
 #plt.contourf( X, Y, Zexact, contourVector )
 #plt.colorbar()
 
-# plt.figure(2)
-# plt.contourf( X, Y, Z, contourVector )
-# plt.colorbar()
+plt.figure(2)
+plt.contourf( X, Y, Z, contourVector )
+plt.colorbar()
 
-# plt.figure(3)
-# plt.contourf( X, Y, Z-Zexact )
-# plt.colorbar()
-# #plt.plot( x, y, 'k.' )
+plt.figure(3)
+plt.contourf( X, Y, Z-Zexact )
+plt.colorbar()
+#plt.plot( x, y, 'k.' )
 
-# plt.show()
+plt.show()
