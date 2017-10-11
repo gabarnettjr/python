@@ -69,8 +69,6 @@ elif useLocalRbfs == 1 :
     rad = rad[:,stencilSize-1]
     idx = idx[1]
     
-    #######################################################################
-    
     if useFastMethod == 1 :
     
         Xn = x[idx] - np.transpose( np.tile( X, (stencilSize,1) ) )
@@ -152,6 +150,8 @@ else :
         );
 
 print( time.clock() - start_time, "seconds" )
+
+###########################################################################
 
 # #THERE IS A BUG IN THIS BUILT-IN IMPLEMENTATION:
 # start_time = time.clock();
