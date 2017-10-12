@@ -12,6 +12,13 @@ def trueFunction( x, y ) :
     z = np.cos( np.pi * x ) * np.sin( np.pi * y )
     #z = np.exp( -5 * ( (x-.1)**2 + (y-np.pi/6)**2 ) )
     return z
+def trueFunction_x( x, y ) :
+    z = -np.pi * np.sin( np.pi * x ) * np.sin( np.pi * y )
+    return z
+    
+def trueFunction_y( x, y ) :
+    z = np.pi * np.cos( np.pi * x) * np.cos( np.pi * y )
+    return z
 
 useGlobalRbfs = 0
 useLocalRbfs  = 1
@@ -22,11 +29,11 @@ useFastMethod = 1;
 
 d = 2/1
 
-n = 27
+n = 41
 x = d * np.linspace( -1, 1, n )
 y = d * np.linspace( -1, 1, n )
 
-N = 201
+N = 96
 X = d * np.linspace( -1, 1, N )
 Y = d * np.linspace( -1, 1, N )
 
@@ -103,13 +110,26 @@ elif useLocalRbfs == 1 :
         f[ :, 0:stencilSize, 0 ] = z[idx]
         lam = np.linalg.solve( A, f )
         lam = np.reshape( lam, (len(X),stencilSize+numPoly) )
+        #for interpolation:
         b = np.zeros(( len(X), stencilSize+numPoly ))
-        b[:,stencilSize] = 1;
+        b[:,stencilSize] = 1
         b[:,0:stencilSize] = rbffd.phi( rad, 0-Xn, 0-Yn, rbfParam )
+        #for first derivative in x:
+        b_x = np.zeros(( len(X), stencilSize+numPoly ))
+        b_x[:,stencilSize+1] = 1/rad[:,0]
+        b_x[:,0:stencilSize] = rbffd.phi_x( rad, 0-Xn, 0-Yn, rbfParam )
+        #for first derivative in y:
+        b_y = np.zeros(( len(X), stencilSize+numPoly ))
+        b_y[:,stencilSize+2] = 1/rad[:,0]
+        b_y[:,0:stencilSize] = rbffd.phi_y( rad, 0-Xn, 0-Yn, rbfParam )
         Z = np.sum( b*lam, axis=1 )
+        Z_x = np.sum( b_x*lam, axis=1 )
+        Z_y = np.sum( b_y*lam, axis=1 )
         X = np.reshape( X, (N,N) )
         Y = np.reshape( Y, (N,N) )
         Z = np.reshape( Z, (N,N) )
+        Z_x = np.reshape( Z_x, (N,N) )
+        Z_y = np.reshape( Z_y, (N,N) )
     
     else :
     
@@ -171,22 +191,26 @@ print( time.clock() - start_time, "seconds" )
 
 Zexact = trueFunction( X, Y )
 print( np.max( np.max( np.abs( Z - Zexact ) ) ) )
+Zexact_x = trueFunction_x( X, Y )
+print( np.max( np.max( np.abs( Z_x - Zexact_x ) ) ) )
+Zexact_y = trueFunction_y( X, Y )
+print( np.max( np.max( np.abs( Z_y - Zexact_y ) ) ) )
 
-contourVector = np.linspace( -1.1, 1.1, 23 )
+# contourVector = np.linspace( -1.1, 1.1, 23 )
 
-#plt.figure(1)
-#plt.contourf( X, Y, Zexact, contourVector )
-#plt.colorbar()
+plt.figure(1)
+plt.contourf( X, Y, Zexact-Z )
+plt.colorbar()
+plt.axis( 'equal' )
 
 plt.figure(2)
-plt.contourf( X, Y, Z, contourVector )
+plt.contourf( X, Y, Zexact_x-Z_x )
 plt.colorbar()
 plt.axis( 'equal' )
 
 plt.figure(3)
-plt.contourf( X, Y, Z-Zexact )
+plt.contourf( X, Y, Zexact_y-Z_y )
 plt.colorbar()
-plt.plot( x, y, 'k.' )
 plt.axis( 'equal' )
 
 plt.show()

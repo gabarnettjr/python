@@ -30,10 +30,20 @@ def getMN() :
     return mn
 
 def phi( rad, x, y, rbfParam ) :
-    if np.mod( rbfParam, 2 ) == 0 :
-        z = np.sqrt( x*x + y*y );
-        z = xlogy( z**rbfParam, z );
-    else :
-        z = ( x*x + y*y ) ** (rbfParam/2)
+    # if np.mod( rbfParam, 2 ) == 0 :
+        # z = np.sqrt( x*x + y*y );
+        # z = xlogy( z**rbfParam, z );
+    # else :
+    z = ( x*x + y*y ) ** (rbfParam/2)
+    z = z / rad**rbfParam
+    return z
+    
+def phi_x( rad, x, y, rbfParam ) :
+    z = rbfParam*x * ( x*x + y*y ) ** ((rbfParam-2)/2)
+    z = z / rad**rbfParam
+    return z
+    
+def phi_y( rad, x, y, rbfParam ) :
+    z = rbfParam*y * ( x*x + y*y ) ** ((rbfParam-2)/2)
     z = z / rad**rbfParam
     return z
