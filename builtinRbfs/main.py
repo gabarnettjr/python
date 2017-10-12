@@ -22,18 +22,19 @@ def trueFunction_y( x, y ) :
 
 useGlobalRbfs = 0
 useLocalRbfs  = 1
+approximateDerivatives = 1;
 rbfParam = 5
 polyorder = 2
 stencilSize = 16
 useFastMethod = 1;
 
-d = 2/1
+d = 1/1
 
-n = 41
+n = 12
 x = d * np.linspace( -1, 1, n )
 y = d * np.linspace( -1, 1, n )
 
-N = 96
+N = 301
 X = d * np.linspace( -1, 1, N )
 Y = d * np.linspace( -1, 1, N )
 
@@ -53,10 +54,10 @@ start_time = time.clock()
 if useGlobalRbfs == 1 :
 
     phi = interpolate.Rbf( x, y, z \
-#    , function='thin_plate' \
-#    , epsilon=1 \
-#    , smooth=.00001 \
-#    , norm = euclidean_norm \
+   # , function='thin_plate' \
+   # , epsilon=1 \
+   # , smooth=.00001 \
+   # , norm = euclidean_norm \
     )
     Z = phi( X, Y )
     
@@ -82,29 +83,29 @@ elif useLocalRbfs == 1 :
         Yn = y[idx] - np.transpose( np.tile( Y, (stencilSize,1) ) )
         A = np.zeros(( len(X), stencilSize+numPoly, stencilSize+numPoly ));
         
-        # #the single-for-loop way (but you have to tile things):
-        # mn = mn[ 0:numPoly, : ]
-        # mn0 = np.tile( mn[:,0], (len(X),1) )
-        # mn1 = np.tile( mn[:,1], (len(X),1) )
-        # rad = np.transpose( np.tile( rad, (stencilSize,1) ) )
-        # for i in range(stencilSize) :
-            # tmpX = np.transpose( np.tile( Xn[:,i], (stencilSize,1) ) )
-            # tmpY = np.transpose( np.tile( Yn[:,i], (stencilSize,1) ) )
-            # A[ :, i, 0:stencilSize ] = rbffd.phi( rad, tmpX-Xn, tmpY-Yn, rbfParam )
-            # tmp = tmpX[:,0:numPoly]**mn0 * tmpY[:,0:numPoly]**mn1 / rad[:,0:numPoly]**(mn0+mn1)
-            # A[ :, i, stencilSize:stencilSize+numPoly ] = tmp
-            # A[ :, stencilSize:stencilSize+numPoly, i ] = tmp
-        
-        #The double-for-loop way (but not looping over very much (seems a little faster)):
-        for i in range(stencilSize) :
-            for j in range(numPoly) :
-                A[:,i,j] = rbffd.phi( rad, Xn[:,i]-Xn[:,j], Yn[:,i]-Yn[:,j], rbfParam )
-                tmp = Xn[:,i]**mn[j,0] * Yn[:,i]**mn[j,1] / rad**(mn[j,0]+mn[j,1])
-                A[ :, i, stencilSize+j ] = tmp
-                A[ :, stencilSize+j, i ] = tmp
-            for j in range(numPoly,stencilSize) :
-                A[:,i,j] = rbffd.phi( rad, Xn[:,i]-Xn[:,j], Yn[:,i]-Yn[:,j], rbfParam )
+        #the single-for-loop way (but you have to tile things):
+        mn = mn[ 0:numPoly, : ]
+        mn0 = np.tile( mn[:,0], (len(X),1) )
+        mn1 = np.tile( mn[:,1], (len(X),1) )
         rad = np.transpose( np.tile( rad, (stencilSize,1) ) )
+        for i in range(stencilSize) :
+            tmpX = np.transpose( np.tile( Xn[:,i], (stencilSize,1) ) )
+            tmpY = np.transpose( np.tile( Yn[:,i], (stencilSize,1) ) )
+            A[ :, i, 0:stencilSize ] = rbffd.phi( rad, tmpX-Xn, tmpY-Yn, rbfParam )
+            tmp = tmpX[:,0:numPoly]**mn0 * tmpY[:,0:numPoly]**mn1 / rad[:,0:numPoly]**(mn0+mn1)
+            A[ :, i, stencilSize:stencilSize+numPoly ] = tmp
+            A[ :, stencilSize:stencilSize+numPoly, i ] = tmp
+        
+        # #The double-for-loop way (but not looping over very much (seems a little faster)):
+        # for i in range(stencilSize) :
+            # for j in range(numPoly) :
+                # A[:,i,j] = rbffd.phi( rad, Xn[:,i]-Xn[:,j], Yn[:,i]-Yn[:,j], rbfParam )
+                # tmp = Xn[:,i]**mn[j,0] * Yn[:,i]**mn[j,1] / rad**(mn[j,0]+mn[j,1])
+                # A[ :, i, stencilSize+j ] = tmp
+                # A[ :, stencilSize+j, i ] = tmp
+            # for j in range(numPoly,stencilSize) :
+                # A[:,i,j] = rbffd.phi( rad, Xn[:,i]-Xn[:,j], Yn[:,i]-Yn[:,j], rbfParam )
+        # rad = np.transpose( np.tile( rad, (stencilSize,1) ) )
         
         f = np.zeros(( len(X), stencilSize+numPoly, 1 ))
         f[ :, 0:stencilSize, 0 ] = z[idx]
@@ -114,23 +115,24 @@ elif useLocalRbfs == 1 :
         b = np.zeros(( len(X), stencilSize+numPoly ))
         b[:,stencilSize] = 1
         b[:,0:stencilSize] = rbffd.phi( rad, 0-Xn, 0-Yn, rbfParam )
-        #for first derivative in x:
-        b_x = np.zeros(( len(X), stencilSize+numPoly ))
-        b_x[:,stencilSize+1] = 1/rad[:,0]
-        b_x[:,0:stencilSize] = rbffd.phi_x( rad, 0-Xn, 0-Yn, rbfParam )
-        #for first derivative in y:
-        b_y = np.zeros(( len(X), stencilSize+numPoly ))
-        b_y[:,stencilSize+2] = 1/rad[:,0]
-        b_y[:,0:stencilSize] = rbffd.phi_y( rad, 0-Xn, 0-Yn, rbfParam )
         Z = np.sum( b*lam, axis=1 )
-        Z_x = np.sum( b_x*lam, axis=1 )
-        Z_y = np.sum( b_y*lam, axis=1 )
+        Z = np.reshape( Z, (N,N) )
+        if approximateDerivatives == 1 :
+            #for first derivative in x:
+            b_x = np.zeros(( len(X), stencilSize+numPoly ))
+            b_x[:,stencilSize+1] = 1/rad[:,0]
+            b_x[:,0:stencilSize] = rbffd.phi_x( rad, 0-Xn, 0-Yn, rbfParam )
+            #for first derivative in y:
+            b_y = np.zeros(( len(X), stencilSize+numPoly ))
+            b_y[:,stencilSize+2] = 1/rad[:,0]
+            b_y[:,0:stencilSize] = rbffd.phi_y( rad, 0-Xn, 0-Yn, rbfParam )
+            #get derivative approximations:
+            Z_x = np.sum( b_x*lam, axis=1 )
+            Z_x = np.reshape( Z_x, (N,N) )
+            Z_y = np.sum( b_y*lam, axis=1 )
+            Z_y = np.reshape( Z_y, (N,N) )
         X = np.reshape( X, (N,N) )
         Y = np.reshape( Y, (N,N) )
-        Z = np.reshape( Z, (N,N) )
-        Z_x = np.reshape( Z_x, (N,N) )
-        Z_y = np.reshape( Z_y, (N,N) )
-    
     else :
     
         Xn = x[idx]
@@ -191,26 +193,28 @@ print( time.clock() - start_time, "seconds" )
 
 Zexact = trueFunction( X, Y )
 print( np.max( np.max( np.abs( Z - Zexact ) ) ) )
-Zexact_x = trueFunction_x( X, Y )
-print( np.max( np.max( np.abs( Z_x - Zexact_x ) ) ) )
-Zexact_y = trueFunction_y( X, Y )
-print( np.max( np.max( np.abs( Z_y - Zexact_y ) ) ) )
+if approximateDerivatives == 1 :
+    Zexact_x = trueFunction_x( X, Y )
+    print( np.max( np.max( np.abs( Z_x - Zexact_x ) ) ) )
+    Zexact_y = trueFunction_y( X, Y )
+    print( np.max( np.max( np.abs( Z_y - Zexact_y ) ) ) )
 
 # contourVector = np.linspace( -1.1, 1.1, 23 )
-
 plt.figure(1)
-plt.contourf( X, Y, Zexact-Z )
+plt.contourf( X, Y, (Zexact-Z)/np.max(np.max(np.abs(Zexact))) )
 plt.colorbar()
 plt.axis( 'equal' )
 
-plt.figure(2)
-plt.contourf( X, Y, Zexact_x-Z_x )
-plt.colorbar()
-plt.axis( 'equal' )
+if approximateDerivatives == 1 :
 
-plt.figure(3)
-plt.contourf( X, Y, Zexact_y-Z_y )
-plt.colorbar()
-plt.axis( 'equal' )
+    plt.figure(2)
+    plt.contourf( X, Y, (Zexact_x-Z_x)/np.max(np.max(np.abs(Zexact_x))) )
+    plt.colorbar()
+    plt.axis( 'equal' )
+
+    plt.figure(3)
+    plt.contourf( X, Y, (Zexact_y-Z_y)/np.max(np.max(np.abs(Zexact_y))) )
+    plt.colorbar()
+    plt.axis( 'equal' )
 
 plt.show()
