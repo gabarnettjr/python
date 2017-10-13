@@ -22,7 +22,7 @@ def trueFunction_y( x, y ) :
 
 useGlobalRbfs = 0
 useLocalRbfs  = 1
-approximateDerivatives = 1;
+approximateDerivatives = 0;
 rbfParam = 5
 polyorder = 2
 stencilSize = 16
@@ -30,11 +30,11 @@ useFastMethod = 1;
 
 d = 1/1
 
-n = 12
+n = 51
 x = d * np.linspace( -1, 1, n )
 y = d * np.linspace( -1, 1, n )
 
-N = 301
+N = 101
 X = d * np.linspace( -1, 1, N )
 Y = d * np.linspace( -1, 1, N )
 
@@ -133,8 +133,9 @@ elif useLocalRbfs == 1 :
             Z_y = np.reshape( Z_y, (N,N) )
         X = np.reshape( X, (N,N) )
         Y = np.reshape( Y, (N,N) )
+        
     else :
-    
+        
         Xn = x[idx]
         Yn = y[idx]
         Zn = z[idx];
@@ -201,6 +202,7 @@ if approximateDerivatives == 1 :
 
 # contourVector = np.linspace( -1.1, 1.1, 23 )
 plt.figure(1)
+# plt.contourf( X, Y, Z )
 plt.contourf( X, Y, (Zexact-Z)/np.max(np.max(np.abs(Zexact))) )
 plt.colorbar()
 plt.axis( 'equal' )
@@ -208,11 +210,13 @@ plt.axis( 'equal' )
 if approximateDerivatives == 1 :
 
     plt.figure(2)
+    # plt.contourf( X, Y, Z_x )
     plt.contourf( X, Y, (Zexact_x-Z_x)/np.max(np.max(np.abs(Zexact_x))) )
     plt.colorbar()
     plt.axis( 'equal' )
 
     plt.figure(3)
+    # plt.contourf( X, Y, Z_y )
     plt.contourf( X, Y, (Zexact_y-Z_y)/np.max(np.max(np.abs(Zexact_y))) )
     plt.colorbar()
     plt.axis( 'equal' )
