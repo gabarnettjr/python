@@ -1,14 +1,14 @@
 import numpy as np
-from gab import phs
+from gab import phs2
 import matplotlib.pyplot as plt
 import time
 
 n = 51
-N = 187
-rbfParam = 5
-polyorder = 3
-stencilSize = 25
-op = "y"
+N = 179
+rbfParam = 3
+polyorder = 2
+stencilSize = 9
+op = "hv"
 K = 1
 plotError = 1;
 
@@ -38,6 +38,11 @@ def trueFunctionL( x, y ) :
     # z = - 2*np.pi**2 * np.cos( np.pi * x ) * np.sin( np.pi * y )
     return z
     
+def trueFunctionL2( x, y ) :
+    z = 16*k**2*(k*(a - x)**2*(k*(a - x)**2 + k*(b - y)**2 - 1) - 3*k*(a - x)**2 \
+    + k*(b - y)**2*(k*(a - x)**2 + k*(b - y)**2 - 1) - 3*k*(b - y)**2 + 2)*trueFunction(x,y)
+    return z
+    
 ###########################################################################
 
 x = np.linspace( -1, 1, n )
@@ -47,16 +52,16 @@ x = x.flatten()
 y = y.flatten()
 z = trueFunction(x,y)
 
-X = np.linspace( -1+2*h, 1-2*h, N )
+X = np.linspace( -1+1*h, 1-1*h, N )
 X, Y = np.meshgrid( X, X )
 X = X.flatten()
 Y = Y.flatten()
 
 start_time = time.clock()
 
-stencils = phs.getStencils( x, y, X, Y, stencilSize )
-A = phs.getAmatrices( stencils, rbfParam, polyorder )
-W = phs.getWeights( stencils, A, op, K )
+stencils = phs2.getStencils( x, y, X, Y, stencilSize )
+A = phs2.getAmatrices( stencils, rbfParam, polyorder )
+W = phs2.getWeights( stencils, A, op, K )
 Z = np.sum( W*z[stencils.idx], axis=1 )
 
 print( time.clock() - start_time, "seconds" )
@@ -74,7 +79,10 @@ elif op == "x" :
 elif op == "y" :
     Zexact = trueFunction_y( X, Y )
 elif op == "hv" :
-    Zexact = trueFunctionL( X, Y )
+    if K == 1 :
+        Zexact = trueFunctionL( X, Y )
+    elif K == 2 :
+        Zexact = trueFunctionL2( X, Y )
 
 plt.figure(1)
 if plotError == 1 :
