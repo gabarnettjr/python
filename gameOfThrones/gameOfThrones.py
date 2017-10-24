@@ -1,3 +1,5 @@
+#I think this only works in Python3.  Not sure why.
+
 import f
 
 print( '\nWelcome to the G A M E of T H R O N E S !' )
