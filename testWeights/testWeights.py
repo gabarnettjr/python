@@ -3,14 +3,16 @@ from gab import phs2
 import matplotlib.pyplot as plt
 import time
 
-n = 51
-N = 179
-rbfParam = 3
-polyorder = 2
-stencilSize = 9
+n = 101
+N = 99
+rbfParam = 5
+polyorder = 3
+stencilSize = 45
+e1 = [ np.sqrt(50/100), np.sqrt(50/100) ];
+e2 = [ -np.sqrt(50/100), np.sqrt(50/100) ];
 op = "hv"
-K = 1
-plotError = 1;
+K = 2
+plotError = 0;
 
 ###########################################################################
 
@@ -33,6 +35,14 @@ def trueFunction_y( x, y ) :
     # z = np.pi * np.cos( np.pi * x) * np.cos( np.pi * y )
     return z
     
+def trueFunction_1( x, y ) :
+    z = e1[0,0] * trueFunction_x(x,y) + e1[0,1]*trueFunction_y(x,y)
+    return z
+
+def trueFunction_2( x, y ) :
+    z = e2[0,0] * trueFunction_x(x,y) + e2[0,1]*trueFunction_y(x,y)
+    return z
+    
 def trueFunctionL( x, y ) :
     z = 4*k * ( k*a**2 - 2*k*a*x + k*b**2 - 2*k*b*y + k*x**2 + k*y**2 - 1 ) * trueFunction(x,y)
     # z = - 2*np.pi**2 * np.cos( np.pi * x ) * np.sin( np.pi * y )
@@ -47,7 +57,7 @@ def trueFunctionL2( x, y ) :
 
 x = np.linspace( -1, 1, n )
 h = 2/(n-1)
-x, y = np.meshgrid( x, x )
+x,y = np.meshgrid( x, x )
 x = x.flatten()
 y = y.flatten()
 z = trueFunction(x,y)
@@ -60,6 +70,9 @@ Y = Y.flatten()
 start_time = time.clock()
 
 stencils = phs2.getStencils( x, y, X, Y, stencilSize )
+e1 = np.tile( e1, (stencils.nE,1) )
+e2 = np.tile( e2, (stencils.nE,1) )
+stencils = phs2.rotateStencils( stencils, e1, e2 )
 A = phs2.getAmatrices( stencils, rbfParam, polyorder )
 W = phs2.getWeights( stencils, A, op, K )
 Z = np.sum( W*z[stencils.idx], axis=1 )
@@ -74,10 +87,10 @@ Z = np.reshape( Z, (N,N) )
 
 if op == "i" :
     Zexact = trueFunction( X, Y )
-elif op == "x" :
-    Zexact = trueFunction_x( X, Y )
-elif op == "y" :
-    Zexact = trueFunction_y( X, Y )
+elif op == "1" :
+    Zexact = trueFunction_1( X, Y )
+elif op == "2" :
+    Zexact = trueFunction_2( X, Y )
 elif op == "hv" :
     if K == 1 :
         Zexact = trueFunctionL( X, Y )
