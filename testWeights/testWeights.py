@@ -3,13 +3,14 @@ from gab import phs2
 import matplotlib.pyplot as plt
 import time
 
-n = 101
-N = 99
+kap = 6;
+n = 81
+N = n-kap;
 rbfParam = 5
 polyorder = 3
 stencilSize = 45
-e1 = [ np.sqrt(50/100), np.sqrt(50/100) ];
-e2 = [ -np.sqrt(50/100), np.sqrt(50/100) ];
+e1 = [ np.sqrt(95/100), np.sqrt(5/100) ];
+e2 = [ -np.sqrt(5/100), np.sqrt(95/100) ];
 op = "hv"
 K = 2
 plotError = 0;
@@ -62,7 +63,7 @@ x = x.flatten()
 y = y.flatten()
 z = trueFunction(x,y)
 
-X = np.linspace( -1+1*h, 1-1*h, N )
+X = np.linspace( -1+kap/2*h, 1-kap/2*h, N )
 X, Y = np.meshgrid( X, X )
 X = X.flatten()
 Y = Y.flatten()
