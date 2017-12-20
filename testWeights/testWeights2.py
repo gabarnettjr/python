@@ -12,8 +12,8 @@ stencilSize = 45
 e1 = [ np.sqrt(95/100), np.sqrt(5/100) ];
 e2 = [ -np.sqrt(5/100), np.sqrt(95/100) ];
 op = "hv"
-K = 2
-plotError = 0;
+K = 1
+plotError = 1;
 
 ###########################################################################
 
@@ -45,7 +45,7 @@ def trueFunction_2( x, y ) :
     return z
     
 def trueFunctionL( x, y ) :
-    z = 4*k * ( k*a**2 - 2*k*a*x + k*b**2 - 2*k*b*y + k*x**2 + k*y**2 - 1 ) * trueFunction(x,y)
+    z = -2*k * ( (x-a)*trueFunction_x(x,y) + (y-b)*trueFunction_y(x,y) + 2*trueFunction(x,y) );
     # z = - 2*np.pi**2 * np.cos( np.pi * x ) * np.sin( np.pi * y )
     return z
     
