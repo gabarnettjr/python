@@ -3,24 +3,25 @@ from gab import phs3
 import matplotlib.pyplot as plt
 import time
 
-nGhostLayers = 1;
-n = 41
-N = n-2*nGhostLayers;
+ng = 1;             #number of ghost node layers
+n = 21
+N = n-2*ng;
 rbfParam = 5
 polyorder = 3
-stencilSize = 100
+stencilSize = 60
 e1 = [ np.sqrt(3/3), np.sqrt(0/3), np.sqrt(0/3) ]
 e2 = [ np.sqrt(0/3), np.sqrt(3/3), np.sqrt(0/3) ]
 e3 = [ np.sqrt(0/3), np.sqrt(0/3), np.sqrt(3/3) ]
-op = "hv"
+op = "1"
 K = 1
+plotError = 1;
 
 ###########################################################################
 
 alp = 4
 a = np.exp(-1)
 b = np.pi/6
-c = .1
+c = .123
 
 def trueFunction( x, y, z ) :
     return np.exp( -alp * ( (x-a)**2 + (y-b)**2 + (z-c)**2 ) )
@@ -50,14 +51,14 @@ def trueFunctionL( x, y, z ) :
 
 x = np.linspace( -1, 1, n )
 h = 2/(n-1)
-x,y,z = np.meshgrid( x, x, x )
+y,z,x = np.meshgrid( x, x, x )
 x = x.flatten()
 y = y.flatten()
 z = z.flatten()
 v = trueFunction(x,y,z)
 
-X = np.linspace( -1+nGhostLayers*h, 1-nGhostLayers*h, N )
-X,Y,Z = np.meshgrid( X, X, X )
+X = np.linspace( -1+ng*h, 1-ng*h, N )
+Y,Z,X = np.meshgrid( X, X, X )
 X = X.flatten()
 Y = Y.flatten()
 Z = Z.flatten()
@@ -73,9 +74,11 @@ A = phs3.getAmatrices( stencils, rbfParam, polyorder )
 W = phs3.getWeights( stencils, A, op, K )
 V = np.sum( W*v[stencils.idx], axis=1 )
 
+print()
 print( time.clock() - start_time, "seconds" )
-
+print()
 print( np.max( A.cond ) )
+print()
 
 ###########################################################################
 
@@ -94,16 +97,34 @@ elif op == "3" :
     Vexact = trueFunction_3( X, Y, Z )
 elif op == "hv" :
     Vexact = trueFunctionL( X, Y, Z )
+    
+nContours = 16
+if plotError == 1 :
+    tmp = (Vexact-V) / np.max(np.abs(Vexact))
+    cv = np.linspace( np.min(tmp), np.max(tmp), nContours )
+else :
+    cv = np.linspace( np.min(V), np.max(V), nContours )
 
-# plt.figure(1)
-# if plotError == 1 :
-    # plt.contourf( X, Y, (Zexact-Z)/np.max(np.max(np.abs(Zexact))) )
-# else :
-    # plt.contourf( X, Y, Z )
-# plt.colorbar()
-# plt.axis( 'equal' )
-# plt.show()
+plt.figure( figsize=(12,9) )
+for i in range(N) :
+    x = np.reshape( X[i,:,:], (N,N) )
+    y = np.reshape( Y[i,:,:], (N,N) )
+    v = np.reshape( V[i,:,:], (N,N) )
+    ve = np.reshape( Vexact[i,:,:], (N,N) )
+    if plotError == 1 :
+        tmp = (ve-v) / np.max(np.abs(Vexact))
+        plt.contourf( x, y, tmp, cv )
+        plt.title( 'z = ' + str(Z[i,0,0]) + ', min = ' + str(np.min(tmp)) + ', max = ' + str(np.max(tmp)) )
+    else :
+        plt.contourf( x, y, v, cv )
+        plt.title( 'z = ' + str(Z[i,0,0]) + ', min = ' + str(np.min(v)) + ', max = ' + str(np.max(v)) )
+    plt.colorbar()
+    plt.axis( 'equal' )
+    plt.waitforbuttonpress()
+    plt.clf()
 
-print( np.max( np.abs( V - Vexact ) ) )
+print()
+print( np.max(np.abs(Vexact-V)) / np.max(np.abs(Vexact)) )
+print()
 
 ###########################################################################

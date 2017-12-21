@@ -7,11 +7,11 @@ kap = 6;
 n = 81
 N = n-kap;
 rbfParam = 5
-polyorder = 3
-stencilSize = 45
-e1 = [ np.sqrt(95/100), np.sqrt(5/100) ];
-e2 = [ -np.sqrt(5/100), np.sqrt(95/100) ];
-op = "hv"
+polyorder = 2
+stencilSize = 9
+e1 = [ np.sqrt(100/100), np.sqrt(0/100) ];
+e2 = [ -np.sqrt(0/100), np.sqrt(100/100) ];
+op = "1"
 K = 1
 plotError = 1;
 
@@ -78,7 +78,11 @@ A = phs2.getAmatrices( stencils, rbfParam, polyorder )
 W = phs2.getWeights( stencils, A, op, K )
 Z = np.sum( W*z[stencils.idx], axis=1 )
 
+print()
 print( time.clock() - start_time, "seconds" )
+print()
+print( [ np.min(A.cond), np.max( A.cond ) ] )
+print()
 
 ###########################################################################
 
