@@ -3,12 +3,12 @@ from gab import phs3
 import matplotlib.pyplot as plt
 import time
 
-kap = 6;
-n = 21
-N = n-kap;
-rbfParam = 3
-polyorder = 1
-stencilSize = 30
+nGhostLayers = 1;
+n = 41
+N = n-2*nGhostLayers;
+rbfParam = 5
+polyorder = 3
+stencilSize = 100
 e1 = [ np.sqrt(3/3), np.sqrt(0/3), np.sqrt(0/3) ]
 e2 = [ np.sqrt(0/3), np.sqrt(3/3), np.sqrt(0/3) ]
 e3 = [ np.sqrt(0/3), np.sqrt(0/3), np.sqrt(3/3) ]
@@ -56,7 +56,7 @@ y = y.flatten()
 z = z.flatten()
 v = trueFunction(x,y,z)
 
-X = np.linspace( -1+kap/2*h, 1-kap/2*h, N )
+X = np.linspace( -1+nGhostLayers*h, 1-nGhostLayers*h, N )
 X,Y,Z = np.meshgrid( X, X, X )
 X = X.flatten()
 Y = Y.flatten()
@@ -74,6 +74,8 @@ W = phs3.getWeights( stencils, A, op, K )
 V = np.sum( W*v[stencils.idx], axis=1 )
 
 print( time.clock() - start_time, "seconds" )
+
+print( np.max( A.cond ) )
 
 ###########################################################################
 
