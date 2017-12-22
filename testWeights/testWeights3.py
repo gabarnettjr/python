@@ -6,16 +6,16 @@ import time
 ng = 1;             #number of ghost node layers
 n = 21
 N = n-2*ng;
-rbfParam = 7
-polyorder = 3
-stencilSize = 60
+rbfParam = 5
+polyorder = 2
+stencilSize = 27
 e1 = [ np.sqrt(3/3), np.sqrt(0/3), np.sqrt(0/3) ]
 e2 = [ np.sqrt(0/3), np.sqrt(3/3), np.sqrt(0/3) ]
 e3 = [ np.sqrt(0/3), np.sqrt(0/3), np.sqrt(3/3) ]
-op = "3"
+op = "1"
 
 K = 1
-plotError = 1;
+plotError = 0;
 
 ###########################################################################
 
@@ -106,7 +106,9 @@ if plotError == 1 :
 else :
     cv = np.linspace( np.min(V), np.max(V), nContours )
 
+plt.ion()
 plt.figure( figsize=(12,9) )
+
 for i in range(N) :
     x = np.reshape( X[i,:,:], (N,N) )
     y = np.reshape( Y[i,:,:], (N,N) )
