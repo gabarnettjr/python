@@ -6,13 +6,14 @@ import time
 ng = 1;             #number of ghost node layers
 n = 21
 N = n-2*ng;
-rbfParam = 5
+rbfParam = 7
 polyorder = 3
 stencilSize = 60
 e1 = [ np.sqrt(3/3), np.sqrt(0/3), np.sqrt(0/3) ]
 e2 = [ np.sqrt(0/3), np.sqrt(3/3), np.sqrt(0/3) ]
 e3 = [ np.sqrt(0/3), np.sqrt(0/3), np.sqrt(3/3) ]
-op = "1"
+op = "3"
+
 K = 1
 plotError = 1;
 
