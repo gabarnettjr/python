@@ -80,22 +80,33 @@ dsdz = dsdz( x, z )
 sDot = np.zeros(( 3, nLev+1, nCol ))
 
 def Dx(U) :
+    c = [ 1./12., -2./3., 0., 2./3., -1./12. ]
     V = np.zeros( np.shape(U) )
     if np.shape(np.shape(U))[0] == 3 :
-        V[:,:,0] = 1./12.*U[:,:,nCol-2] - 2./3.*U[:,:,nCol-1] + 2./3.*U[:,:,1] - 1./12.*U[:,:,2]
-        V[:,:,1] = 1./12.*U[:,:,nCol-1] - 2./3.*U[:,:,0] + 2./3.*U[:,:,2] - 1./12.*U[:,:,3]
-        V[:,:,2:nCol-2] = 1./12.*U[:,:,0:nCol-4] - 2./3.*U[:,:,1:nCol-3] + 2./3.*U[:,:,3:nCol-1] - 1./12.*U[:,:,4:nCol]
-        V[:,:,nCol-2] = 1./12.*U[:,:,nCol-4] - 2./3.*U[:,:,nCol-3] + 2./3.*U[:,:,nCol-1] - 1./12.*U[:,:,0]
-        V[:,:,nCol-1] = 1./12.*U[:,:,nCol-3] - 2./3.*U[:,:,nCol-2] + 2./3.*U[:,:,0] - 1./12.*U[:,:,1]
+        V[:,:,0]        = c[0]*U[:,:,nCol-2]   + c[1]*U[:,:,nCol-1]   + c[2]*U[:,:,0]        + c[3]*U[:,:,1]        + c[4]*U[:,:,2]
+        V[:,:,1]        = c[0]*U[:,:,nCol-1]   + c[1]*U[:,:,0]        + c[2]*U[:,:,1]        + c[3]*U[:,:,2]        + c[4]*U[:,:,3]
+        V[:,:,2:nCol-2] = c[0]*U[:,:,0:nCol-4] + c[1]*U[:,:,1:nCol-3] + c[2]*U[:,:,2:nCol-2] + c[3]*U[:,:,3:nCol-1] + c[4]*U[:,:,4:nCol]
+        V[:,:,nCol-2]   = c[0]*U[:,:,nCol-4]   + c[1]*U[:,:,nCol-3]   + c[2]*U[:,:,nCol-2]   + c[3]*U[:,:,nCol-1]   + c[4]*U[:,:,0]
+        V[:,:,nCol-1]   = c[0]*U[:,:,nCol-3]   + c[1]*U[:,:,nCol-2]   + c[2]*U[:,:,nCol-1]   + c[3]*U[:,:,0]        + c[4]*U[:,:,1]
     elif np.shape(np.shape(U))[0] == 2 :
-        V[:,0] = 1./12.*U[:,nCol-2] - 2./3.*U[:,nCol-1] + 2./3.*U[:,1] - 1./12.*U[:,2]
-        V[:,1] = 1./12.*U[:,nCol-1] - 2./3.*U[:,0] + 2./3.*U[:,2] - 1./12.*U[:,3]
-        V[:,2:nCol-2] = 1./12.*U[:,0:nCol-4] - 2./3.*U[:,1:nCol-3] + 2./3.*U[:,3:nCol-1] - 1./12.*U[:,4:nCol]
-        V[:,nCol-2] = 1./12.*U[:,nCol-4] - 2./3.*U[:,nCol-3] + 2./3.*U[:,nCol-1] - 1./12.*U[:,0]
-        V[:,nCol-1] = 1./12.*U[:,nCol-3] - 2./3.*U[:,nCol-2] + 2./3.*U[:,0] - 1./12.*U[:,1]
+        V[:,0]        = c[0]*U[:,nCol-2]   + c[1]*U[:,nCol-1]   + c[2]*U[:,0]        + c[3]*U[:,1]        + c[4]*U[:,2]
+        V[:,1]        = c[0]*U[:,nCol-1]   + c[1]*U[:,0]        + c[2]*U[:,1]        + c[3]*U[:,2]        + c[4]*U[:,3]
+        V[:,2:nCol-2] = c[0]*U[:,0:nCol-4] + c[1]*U[:,1:nCol-3] + c[2]*U[:,2:nCol-2] + c[3]*U[:,3:nCol-1] + c[4]*U[:,4:nCol]
+        V[:,nCol-2]   = c[0]*U[:,nCol-4]   + c[1]*U[:,nCol-3]   + c[2]*U[:,nCol-2]   + c[3]*U[:,nCol-1]   + c[4]*U[:,0]
+        V[:,nCol-1]   = c[0]*U[:,nCol-3]   + c[1]*U[:,nCol-2]   + c[2]*U[:,nCol-1]   + c[3]*U[:,0]        + c[4]*U[:,1]
     else :
         sys.exit( "\nError: Invalid array dimensions.  U must be a 2D or 3D array.\n" )
     return V/dx
+
+def HV(U) :
+    c = [ 1., -4., 6., -4., 1. ] 
+    V = np.zeros( np.shape(U) )
+    V[:,:,0]        = c[0]*U[:,:,nCol-2]   + c[1]*U[:,:,nCol-1]   + c[2]*U[:,:,0]        + c[3]*U[:,:,1]        + c[4]*U[:,:,2]
+    V[:,:,1]        = c[0]*U[:,:,nCol-1]   + c[1]*U[:,:,0]        + c[2]*U[:,:,1]        + c[3]*U[:,:,2]        + c[4]*U[:,:,3]
+    V[:,:,2:nCol-2] = c[0]*U[:,:,0:nCol-4] + c[1]*U[:,:,1:nCol-3] + c[2]*U[:,:,2:nCol-2] + c[3]*U[:,:,3:nCol-1] + c[4]*U[:,:,4:nCol]
+    V[:,:,nCol-2]   = c[0]*U[:,:,nCol-4]   + c[1]*U[:,:,nCol-3]   + c[2]*U[:,:,nCol-2]   + c[3]*U[:,:,nCol-1]   + c[4]*U[:,:,0]
+    V[:,:,nCol-1]   = c[0]*U[:,:,nCol-3]   + c[1]*U[:,:,nCol-2]   + c[2]*U[:,:,nCol-1]   + c[3]*U[:,:,0]        + c[4]*U[:,:,1]
+    return -1/12/dx * V
 
 def verticalOperations( U, sDot ) :
     #get sDot on all interfaces (set it to zero on both boundaries):
@@ -131,6 +142,7 @@ def odefun( t, U ) :
     V[0,:,:] = V[0,:,:] + g/U[3,:,:]/dsdz * ( Dx(P) + dpds*dsdx )
     V[1,:,:] = V[1,:,:] - g * ( 1. - dpds/U[3,:,:] )
     V[3,:,:] = -Dx(U[3,:,:]*U[0,:,:]) - sDotDpids_s
+    V = V + HV(U)
     return V
 
 def rk( t, U ) :
