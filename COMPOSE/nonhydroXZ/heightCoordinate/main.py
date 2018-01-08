@@ -39,7 +39,7 @@ def dsdz( xTilde, zTilde ) :
 
 #x and z as 2D arrays:
 dx = ( xRight - xLeft ) / nCol
-x = np.linspace( xLeft+1./2.*dx, xRight-1./2.*dx, nCol )
+x = np.linspace( xLeft+dx/2., xRight-dx/2., nCol )
 zs = zSurf(x)
 dz = ( zTop - zs ) / nLev
 xInterfaces = np.zeros(( nLev+1, nCol ))
