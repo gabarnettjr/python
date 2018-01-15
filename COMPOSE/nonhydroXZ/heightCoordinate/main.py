@@ -1,6 +1,7 @@
 import sys
 import numpy as np
 import time
+import matplotlib.pyplot as plt
 
 testCase = "bubble"
 
@@ -20,12 +21,14 @@ if testCase == "bubble" :
     nLev = 50
     def zSurf(xTilde) :
         return 500. * ( 1. + np.sin( 2.*np.pi*xTilde / 5000. ) )
+        # return np.zeros( np.shape(xTilde) )
     def zSurfPrime(xTilde) :
         return np.pi/5. * np.cos( 2.*np.pi*xTilde / 5000. )
+        # return np.zeros( np.shape(xTilde) )
     zTop = 10000.
     tf = 1500.
-    dt = 1./4.
-    rkStages = 3
+    dt = 1./8.
+    rkStages = 4
 else :
     sys.exit( "\nError: Invalid test case string.  Only ''bubble'' for now\n" )
 nTimesteps = round( (tf-t) / dt )
@@ -57,6 +60,8 @@ U = np.zeros(( 4, nLev, nCol ))
 if testCase == "bubble" :
     thetaBar = 300. * np.ones(( nLev, nCol ))
     piBar = 1. - g / Cp / thetaBar * z
+    dpidsBar = -g / Rd / thetaBar / dsdz(x,z) * Po * piBar**(Cv/Rd)
+    Pbar = Po**(-Rd/Cv) * ( -Rd*thetaBar/g * dpidsBar * dsdz(x,z) ) ** (Cp/Cv)
     R = 1500.
     xc = 5000.
     zc = 3000.
@@ -196,22 +201,29 @@ print( [ np.min(P), np.max(P) ] )
 print()
 
 #stepping forward in time with explicit RK:
+plt.ion()
 for i in range(nTimesteps) :
+    
+    # plt.contourf( x, z, np.squeeze(U[3,:,:])-dpidsBar )
+    plt.contourf( x, z, np.squeeze(Po**(-Rd/Cv)*(-Rd*U[2,:,:]/g*U[3,:,:]*dsdz)**(Cp/Cv)) - Pbar )
+    plt.colorbar()
+    plt.axis( 'equal' )
+    plt.waitforbuttonpress()
+    plt.clf()
+    
     U = rk( t, U )
     t = t + dt
     
-    print("t =",t)
+    print( "t =", t )
     print( [ np.min(U[0,:,:]), np.max(U[0,:,:]) ] )
     print( [ np.min(U[1,:,:]), np.max(U[1,:,:]) ] )
     print( [ np.min(U[2,:,:]), np.max(U[2,:,:]) ] )
     print( [ np.min(U[3,:,:]), np.max(U[3,:,:]) ] )
-    rho = -1/g*U[3,:,:]*dsdz
-    print( [ np.min(rho), np.max(rho) ] )
-    P = Po**(-Rd/Cv) * ( -Rd*U[2,:,:]/g * U[3,:,:] * dsdz ) ** (Cp/Cv)
-    print( [ np.min(P), np.max(P) ] )
+    # rho = -1/g*U[3,:,:]*dsdz
+    # print( [ np.min(rho), np.max(rho) ] )
+    # P = Po**(-Rd/Cv) * ( -Rd*U[2,:,:]/g * U[3,:,:] * dsdz ) ** (Cp/Cv)
+    # print( [ np.min(P), np.max(P) ] )
     print()
-    
-    time.sleep(1)
 
 
 
