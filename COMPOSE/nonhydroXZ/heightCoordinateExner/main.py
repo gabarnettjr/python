@@ -19,10 +19,13 @@ if testCase == "bubble" :
     xRight = 10000.
     nCol = 50
     nLev = 50
+    kap = 10.
     def zSurf(xTilde) :
+        # return 1000. * np.exp( -(kap*(xTilde-6000.)/(xRight-xLeft))**2 )
         return 500. * ( 1. + np.sin( 2.*np.pi*xTilde / 5000. ) )
         # return np.zeros( np.shape(xTilde) )
     def zSurfPrime(xTilde) :
+        # return -2. * ( kap*(xTilde-6000.)/(xRight-xLeft) ) * kap/(xRight-xLeft) * zSurf(xTilde)
         return np.pi/5. * np.cos( 2.*np.pi*xTilde / 5000. )
         # return np.zeros( np.shape(xTilde) )
     zTop = 10000.
@@ -210,7 +213,7 @@ for i in range(nTimesteps+1) :
         print( [ np.min(U[2,:,:]-thetaBar), np.max(U[2,:,:]-thetaBar) ] )
         print( [ np.min(U[3,:,:]-piBar), np.max(U[3,:,:]-piBar) ] )
         print()
-        plt.contourf( x, z, np.squeeze(U[1,:,:]) )
+        plt.contourf( x, z, np.squeeze(U[3,:,:]) - piBar )
         plt.colorbar()
         plt.axis( 'equal' )
         if i == nTimesteps :
