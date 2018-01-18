@@ -3,7 +3,7 @@ import numpy as np
 import time
 import matplotlib.pyplot as plt
 
-testCase = "bubble"
+testCase = "igw"
 
 #atmospheric constants:
 Cp = 1004.
@@ -32,6 +32,19 @@ if testCase == "bubble" :
     tf = 1500.
     dt = 1./3.
     rkStages = 3
+elif testCase == "igw" :
+    xLeft = 0.
+    xRight = 300000.
+    nCol = 20*30
+    nLev = 20
+    def zSurf(xTilde) :
+        return np.zeros( np.shape(xTilde) )
+    def zSurfPrime(xTilde) :
+        return np.zeros( np.shape(xTilde) )
+    zTop = 10000.
+    tf = 3000.
+    dt = 1./2.
+    rkStages = 3
 else :
     sys.exit( "\nError: Invalid test case string.  Only ''bubble'' for now\n" )
 nTimesteps = round( (tf-t) / dt )
@@ -55,10 +68,10 @@ for i in np.arange(1,nLev+1) :
     z[i,:] = zs + dz/2 + (i-1)*dz
 z[nLev+1,:] = zTop + dz/2
 x = np.tile( x, (nLev+2,1) )
-ds = zTop * dz / ( zTop - zSurf(x[0,:]) )
+ds = zTop * dz / ( zTop - zs )
 ds = ds[0]
 
-#get tangent and normal vectors at surface:
+#tangent and normal vectors at surface:
 Tx = np.ones(( 1, nCol ))
 Tz = zSurfPrime( x[0,:] )
 normT = np.sqrt( Tx**2 + Tz**2 )
@@ -84,6 +97,21 @@ if testCase == "bubble" :
     U[1,:,:] = np.zeros(( nLev+2, nCol ))
     U[2,:,:] = thetaBar + thetaPrime0
     U[3,:,:] = piBar + piPrime0
+elif testCase == "igw" :
+    N = .01
+    theta0 = 300.
+    thetaBar = theta0 * np.exp( (N**2/g) * z )
+    piBar = 1. + g**2. / Cp / theta0 / N**2. * ( np.exp(-N**2./g*z) - 1. )
+    # piBar = (1.-g**2./N**2./Cp/theta0) + g**2./N**2./Cp/theta0*np.exp(-(N**2/g)*z)
+    thetaC = .01
+    hC = 10000.
+    aC = 5000.
+    xC = 100000.
+    thetaPrime0 = thetaC * np.sin( np.pi*z/hC ) / ( 1. + ((x-xC)/aC)**2 )
+    U[0,:,:] = 20. * np.ones( np.shape(thetaPrime0) )
+    U[1,:,:] = np.zeros( np.shape(thetaPrime0) )
+    U[2,:,:] = thetaBar + thetaPrime0
+    U[3,:,:] = piBar
 else :
     sys.exit("\nError: Invalid test case string.\n")
 
@@ -148,7 +176,9 @@ def setGhostNodes( U ) :
     U[0,0,:] = uT*Tx + uN*Nx
     U[1,0,:] = uT*Tz + uN*Nz
     #extrapolate theta to bottom ghost nodes:
-    U[2,0,:] = 2*U[2,1,:] - U[2,2,:]
+    tmp = 2*(U[2,1,:]-thetaBar[1,:]) - (U[2,2,:]-thetaBar[2,:])
+    U[2,0,:] = thetaBar[0,:] + tmp
+    # U[2,0,:] = 2*U[2,1,:] - U[2,2,:]
     #get pi on bottom ghost nodes using derived BC:
     dpidx = Dx( U[3,1:3,:] )
     dpidx = 2*dpidx[0,:] - dpidx[1,:]
@@ -159,7 +189,9 @@ def setGhostNodes( U ) :
     #get w on top ghost nodes:
     U[1,nLev+1,:] = -U[1,nLev,:]
     #extrapolate theta to top ghost nodes:
-    U[2,nLev+1,:] = 2*U[2,nLev,:] - U[2,nLev-1,:]
+    tmp = 2*(U[2,nLev,:]-thetaBar[nLev,:]) - (U[2,nLev-1,:]-thetaBar[nLev-1,:])
+    U[2,nLev+1,:] = thetaBar[nLev+1,:] + tmp
+    # U[2,nLev+1,:] = 2*U[2,nLev,:] - U[2,nLev-1,:]
     #get pi on top ghost nodes:
     th = ( U[2,nLev,:] + U[2,nLev+1,:] ) / 2.
     U[3,nLev+1,:] = U[3,nLev,:] - ds/dsdzBottom*g/Cp/th
@@ -202,6 +234,7 @@ def rk( t, U ) :
         sys.exit( "\nError: rkStages should be 3 or 4.\n" )
 
 #stepping forward in time with explicit RK:
+CL = np.arange(-.0015,.0035,.0005)
 plt.ion()
 print()
 for i in range(nTimesteps+1) :
@@ -213,9 +246,9 @@ for i in range(nTimesteps+1) :
         print( [ np.min(U[2,:,:]-thetaBar), np.max(U[2,:,:]-thetaBar) ] )
         print( [ np.min(U[3,:,:]-piBar), np.max(U[3,:,:]-piBar) ] )
         print()
-        plt.contourf( x, z, np.squeeze(U[3,:,:]) - piBar )
+        plt.contourf( x, z, np.squeeze(U[2,:,:]) - thetaBar )
         plt.colorbar()
-        plt.axis( 'equal' )
+        # plt.axis( 'equal' )
         if i == nTimesteps :
             plt.waitforbuttonpress()
             sys.exit( "\nDone.\n" )
