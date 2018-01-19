@@ -3,7 +3,7 @@ import numpy as np
 import time
 import matplotlib.pyplot as plt
 
-testCase = "igw"
+testCase = "bubble"
 
 #atmospheric constants:
 Cp = 1004.
@@ -17,8 +17,8 @@ t = 0.
 if testCase == "bubble" :
     xLeft = 0.
     xRight = 10000.
-    nCol = 50
-    nLev = 50
+    nCol = 100
+    nLev = 100
     kap = 10.
     def zSurf(xTilde) :
         # return 1000. * np.exp( -(kap*(xTilde-6000.)/(xRight-xLeft))**2 )
@@ -30,13 +30,13 @@ if testCase == "bubble" :
         # return np.zeros( np.shape(xTilde) )
     zTop = 10000.
     tf = 1500.
-    dt = 1./3.
+    dt = 1./5.
     rkStages = 3
 elif testCase == "igw" :
     xLeft = 0.
     xRight = 300000.
     nCol = 20*30
-    nLev = 20
+    nLev = 40
     def zSurf(xTilde) :
         return np.zeros( np.shape(xTilde) )
     def zSurfPrime(xTilde) :
@@ -49,7 +49,7 @@ else :
     sys.exit( "\nError: Invalid test case string.  Only ''bubble'' for now\n" )
 nTimesteps = round( (tf-t) / dt )
 
-#definition of the scale-preserving s coordinate and its derivatives:
+#definition of the scale-preserving s-coordinate and its derivatives:
 def s( xTilde, zTilde ) :
     return ( zTilde - zSurf(xTilde) ) / ( zTop - zSurf(xTilde) ) * zTop
 def dsdx( xTilde, zTilde ) :
@@ -102,22 +102,22 @@ elif testCase == "igw" :
     theta0 = 300.
     thetaBar = theta0 * np.exp( (N**2/g) * z )
     piBar = 1. + g**2. / Cp / theta0 / N**2. * ( np.exp(-N**2./g*z) - 1. )
-    # piBar = (1.-g**2./N**2./Cp/theta0) + g**2./N**2./Cp/theta0*np.exp(-(N**2/g)*z)
     thetaC = .01
     hC = 10000.
     aC = 5000.
     xC = 100000.
     thetaPrime0 = thetaC * np.sin( np.pi*z/hC ) / ( 1. + ((x-xC)/aC)**2 )
+    piPrime0 = 0.
     U[0,:,:] = 20. * np.ones( np.shape(thetaPrime0) )
     U[1,:,:] = np.zeros( np.shape(thetaPrime0) )
     U[2,:,:] = thetaBar + thetaPrime0
-    U[3,:,:] = piBar
+    U[3,:,:] = piBar + piPrime0
 else :
     sys.exit("\nError: Invalid test case string.\n")
 
 #convert functions to values on nodes:
-dsdxBottom = dsdx( x[0,:], zSurf(x[0,:]) )
-dsdzBottom = dsdz( x[0,:], zSurf(x[0,:]) )
+dsdxBottom = dsdx( x[0,:], zs )
+dsdzBottom = dsdz( x[0,:], zs )
 normGradS = np.sqrt( dsdxBottom**2 + dsdzBottom**2 )
 dsdx = dsdx( x[1:nLev+1,:], z[1:nLev+1,:] )
 dsdz = dsdz( x[1:nLev+1,:], z[1:nLev+1,:] )
@@ -159,11 +159,12 @@ def HVx(U) :
     V[:,:,2:nCol-2] = wxhv[0]*U[:,:,0:nCol-4] + wxhv[1]*U[:,:,1:nCol-3] + wxhv[2]*U[:,:,2:nCol-2] + wxhv[3]*U[:,:,3:nCol-1] + wxhv[4]*U[:,:,4:nCol]
     V[:,:,nCol-2]   = wxhv[0]*U[:,:,nCol-4]   + wxhv[1]*U[:,:,nCol-3]   + wxhv[2]*U[:,:,nCol-2]   + wxhv[3]*U[:,:,nCol-1]   + wxhv[4]*U[:,:,0]
     V[:,:,nCol-1]   = wxhv[0]*U[:,:,nCol-3]   + wxhv[1]*U[:,:,nCol-2]   + wxhv[2]*U[:,:,nCol-1]   + wxhv[3]*U[:,:,0]        + wxhv[4]*U[:,:,1]
-    return -1./12. * V / dx
+    return -1./12. * np.abs(U[0,:,:]) * V / dx
 
 wshv = [ 1., -2., 1 ]
 def HVs(U) :
-    return 1./2. * ( wshv[0]*U[:,0:nLev,:] + wshv[1]*U[:,1:nLev+1,:] + wshv[2]*U[:,2:nLev+2,:] ) / ds
+    sDot = U[0,1:nLev+1,:]*dsdx + U[1,1:nLev+1,:]*dsdz
+    return 1./2. * np.abs(sDot) * ( wshv[0]*U[:,0:nLev,:] + wshv[1]*U[:,1:nLev+1,:] + wshv[2]*U[:,2:nLev+2,:] ) / ds
 
 def setGhostNodes( U ) :
     #extrapolate uT to bottom ghost nodes:
@@ -176,9 +177,7 @@ def setGhostNodes( U ) :
     U[0,0,:] = uT*Tx + uN*Nx
     U[1,0,:] = uT*Tz + uN*Nz
     #extrapolate theta to bottom ghost nodes:
-    tmp = 2*(U[2,1,:]-thetaBar[1,:]) - (U[2,2,:]-thetaBar[2,:])
-    U[2,0,:] = thetaBar[0,:] + tmp
-    # U[2,0,:] = 2*U[2,1,:] - U[2,2,:]
+    U[2,0,:] = thetaBar[0,:] + 2*(U[2,1,:]-thetaBar[1,:]) - (U[2,2,:]-thetaBar[2,:])
     #get pi on bottom ghost nodes using derived BC:
     dpidx = Dx( U[3,1:3,:] )
     dpidx = 2*dpidx[0,:] - dpidx[1,:]
@@ -189,9 +188,7 @@ def setGhostNodes( U ) :
     #get w on top ghost nodes:
     U[1,nLev+1,:] = -U[1,nLev,:]
     #extrapolate theta to top ghost nodes:
-    tmp = 2*(U[2,nLev,:]-thetaBar[nLev,:]) - (U[2,nLev-1,:]-thetaBar[nLev-1,:])
-    U[2,nLev+1,:] = thetaBar[nLev+1,:] + tmp
-    # U[2,nLev+1,:] = 2*U[2,nLev,:] - U[2,nLev-1,:]
+    U[2,nLev+1,:] = thetaBar[nLev+1,:] + 2*(U[2,nLev,:]-thetaBar[nLev,:]) - (U[2,nLev-1,:]-thetaBar[nLev-1,:])
     #get pi on top ghost nodes:
     th = ( U[2,nLev,:] + U[2,nLev+1,:] ) / 2.
     U[3,nLev+1,:] = U[3,nLev,:] - ds/dsdzBottom*g/Cp/th
@@ -210,7 +207,7 @@ def odefun( t, U ) :
     sDot = U[0,:,:]*dsdx + U[1,:,:]*dsdz
     tmp = tmp - np.tile(U[0,:,:],(4,1,1)) * Ux - np.tile(sDot,(4,1,1)) * Us
     tmp[0,:,:] = tmp[0,:,:] - Cp*U[2,:,:] * ( Ux[3,:,:] + Us[3,:,:]*dsdx )
-    tmp[1,:,:] = tmp[1,:,:] - Cp*U[2,:,:] * Us[3,:,:]*dsdz - g
+    tmp[1,:,:] = tmp[1,:,:] - Cp*U[2,:,:] * ( Us[3,:,:]*dsdz ) - g
     tmp[3,:,:] = tmp[3,:,:] - Rd/Cv*U[3,:,:] * ( Ux[0,:,:]+Us[0,:,:]*dsdx + Us[1,:,:]*dsdz )
     #apply horizontal dissipation:
     tmp = tmp + HVx(U)
@@ -233,8 +230,12 @@ def rk( t, U ) :
     else :
         sys.exit( "\nError: rkStages should be 3 or 4.\n" )
 
+#set contour levels:
+CL = np.arange( -.05, 2.15, .1 )
+# CL = np.arange( -.0015, .0035, .0005 )
+# CL = np.arange( -.021, .023, .002 )
+
 #stepping forward in time with explicit RK:
-CL = np.arange(-.0015,.0035,.0005)
 plt.ion()
 print()
 for i in range(nTimesteps+1) :
@@ -246,13 +247,16 @@ for i in range(nTimesteps+1) :
         print( [ np.min(U[2,:,:]-thetaBar), np.max(U[2,:,:]-thetaBar) ] )
         print( [ np.min(U[3,:,:]-piBar), np.max(U[3,:,:]-piBar) ] )
         print()
-        plt.contourf( x, z, np.squeeze(U[2,:,:]) - thetaBar )
+        plt.contourf( x, z, np.squeeze(U[3,:,:])-piBar )
         plt.colorbar()
-        # plt.axis( 'equal' )
+        plt.title( '{0}, t = {1:04.0f}, ' . format( testCase, t ) )
+        if testCase != "igw" :
+            plt.axis( 'equal' )
         if i == nTimesteps :
             plt.waitforbuttonpress()
             sys.exit( "\nDone.\n" )
         else :
+            # plt.waitforbuttonpress()
             plt.pause(.1)
         plt.clf()
     U = rk( t, U )
