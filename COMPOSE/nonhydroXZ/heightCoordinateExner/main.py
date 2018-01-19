@@ -3,7 +3,7 @@ import numpy as np
 import time
 import matplotlib.pyplot as plt
 
-testCase = "bubble"
+testCase = "doubleStraka"
 
 #atmospheric constants:
 Cp = 1004.
@@ -45,8 +45,23 @@ elif testCase == "igw" :
     tf = 3000.
     dt = 1./2.
     rkStages = 3
+elif testCase == "doubleStraka" :
+    xLeft = -6400.
+    xRight = 6400.
+    nCol = 64*2
+    nLev = 64
+    def zSurf(xTilde) :
+        # return 1000. * np.exp( -(16.*(x-1000.)/(xRight-xLeft))**2. )
+        return np.zeros( np.shape(xTilde) )
+    def zSurfPrime(xTilde) :
+        # return 1000. * -2*() * 
+        return np.zeros( np.shape(xTilde) )
+    zTop = 6400.
+    tf = 900.
+    dt = 1./6.
+    rkStages = 3
 else :
-    sys.exit( "\nError: Invalid test case string.  Only ''bubble'' for now\n" )
+    sys.exit( "\nError: Invalid test case string.\n" )
 nTimesteps = round( (tf-t) / dt )
 
 #definition of the scale-preserving s-coordinate and its derivatives:
@@ -110,6 +125,27 @@ elif testCase == "igw" :
     piPrime0 = 0.
     U[0,:,:] = 20. * np.ones( np.shape(thetaPrime0) )
     U[1,:,:] = np.zeros( np.shape(thetaPrime0) )
+    U[2,:,:] = thetaBar + thetaPrime0
+    U[3,:,:] = piBar + piPrime0
+elif testCase == "doubleStraka" :
+    thetaBar = 300. * np.ones(( nLev+2, nCol ))
+    piBar = 1. - g / Cp / thetaBar * z
+    xc1 = -6400.
+    xc2 = 6400.
+    zc = 3000.
+    xr = 4000.
+    zr = 2000.
+    rTilde1 = np.sqrt( ((x-xc1)/xr)**2 + ((z-zc)/zr)**2 )
+    rTilde2 = np.sqrt( ((x-xc2)/xr)**2 + ((z-zc)/zr)**2 )
+    Tprime0 = np.zeros( np.shape(thetaBar) )
+    ind1 = rTilde1 <= 1
+    ind2 = rTilde2 <= 1
+    Tprime0[ind1] = -15./2. * ( 1. + np.cos(np.pi*rTilde1[ind1]) )
+    Tprime0[ind2] = -15./2. * ( 1. + np.cos(np.pi*rTilde2[ind2]) )
+    thetaPrime0 = Tprime0 / piBar
+    piPrime0 = 0.
+    U[0,:,:] = np.zeros( np.shape(thetaBar) )
+    U[1,:,:] = np.zeros( np.shape(thetaBar) )
     U[2,:,:] = thetaBar + thetaPrime0
     U[3,:,:] = piBar + piPrime0
 else :
@@ -247,7 +283,7 @@ for i in range(nTimesteps+1) :
         print( [ np.min(U[2,:,:]-thetaBar), np.max(U[2,:,:]-thetaBar) ] )
         print( [ np.min(U[3,:,:]-piBar), np.max(U[3,:,:]-piBar) ] )
         print()
-        plt.contourf( x, z, np.squeeze(U[3,:,:])-piBar )
+        plt.contourf( x, z, np.squeeze(U[2,:,:])-thetaBar )
         plt.colorbar()
         plt.title( '{0}, t = {1:04.0f}, ' . format( testCase, t ) )
         if testCase != "igw" :
