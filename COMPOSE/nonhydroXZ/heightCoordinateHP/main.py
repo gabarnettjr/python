@@ -112,7 +112,7 @@ if testCase == "bubble" :
     U[0,:,:] = np.zeros(( nLev+2, nCol ))
     U[1,:,:] = np.zeros(( nLev+2, nCol ))
     U[2,:,:] = thetaBar + thetaPrime0
-    U[3,:,:] = piBar + piPrime0
+    U[3,:,:] = -g / Rd / U[2,:,:] / dsdz(x,z) * Po * (piBar+piPrime0)**(Cv/Rd)
 elif testCase == "igw" :
     N = .01
     theta0 = 300.
@@ -127,7 +127,7 @@ elif testCase == "igw" :
     U[0,:,:] = 20. * np.ones( np.shape(thetaPrime0) )
     U[1,:,:] = np.zeros( np.shape(thetaPrime0) )
     U[2,:,:] = thetaBar + thetaPrime0
-    U[3,:,:] = piBar + piPrime0
+    U[3,:,:] = -g / Rd / U[2,:,:] / dsdz(x,z) * Po * (piBar+piPrime0)**(Cv/Rd)
 elif testCase == "doubleStraka" :
     thetaBar = 300. * np.ones(( nLev+2, nCol ))
     piBar = 1. - g / Cp / thetaBar * z
@@ -148,9 +148,11 @@ elif testCase == "doubleStraka" :
     U[0,:,:] = np.zeros( np.shape(thetaBar) )
     U[1,:,:] = np.zeros( np.shape(thetaBar) )
     U[2,:,:] = thetaBar + thetaPrime0
-    U[3,:,:] = piBar + piPrime0
+    U[3,:,:] = -g / Rd / U[2,:,:] / dsdz(x,z) * Po * (piBar+piPrime0)**(Cv/Rd)
 else :
     sys.exit("\nError: Invalid test case string.\n")
+dpidsBar = -g / Rd / thetaBar / dsdz(x,z) * Po * piBar**(Cv/Rd)
+Pbar = Po * piBar ** (Cp/Rd)
 
 #convert functions to values on nodes:
 dsdxBottom = dsdx( x[0,:], zs )
@@ -186,24 +188,42 @@ def Dx(U) :
 
 ws = [ -1./2., 0, 1./2. ]
 def Ds(U) :
-    return ( ws[0]*U[:,0:nLev,:] + ws[1]*U[:,1:nLev+1,:] + ws[2]*U[:,2:nLev+2,:] ) / ds
+    if np.shape(np.shape(U))[0] == 3 :
+        return ( ws[0]*U[:,0:nLev,:] + ws[1]*U[:,1:nLev+1,:] + ws[2]*U[:,2:nLev+2,:] ) / ds
+    elif np.shape(np.shape(U))[0] == 2 :
+        return ( ws[0]*U[0:nLev,:] + ws[1]*U[1:nLev+1,:] + ws[2]*U[2:nLev+2,:] ) / ds
+    else :
+        sys.exit( "\nError: Invalid array dimensions.  U must be a 2D or 3D array.\n" )
 
 wxhv = [ 1., -4., 6., -4., 1. ]
-def HVx(U) :
+def HVx( U, u ) :
     V = np.zeros( np.shape(U) )
-    V[:,:,0]        = wxhv[0]*U[:,:,nCol-2]   + wxhv[1]*U[:,:,nCol-1]   + wxhv[2]*U[:,:,0]        + wxhv[3]*U[:,:,1]        + wxhv[4]*U[:,:,2]
-    V[:,:,1]        = wxhv[0]*U[:,:,nCol-1]   + wxhv[1]*U[:,:,0]        + wxhv[2]*U[:,:,1]        + wxhv[3]*U[:,:,2]        + wxhv[4]*U[:,:,3]
-    V[:,:,2:nCol-2] = wxhv[0]*U[:,:,0:nCol-4] + wxhv[1]*U[:,:,1:nCol-3] + wxhv[2]*U[:,:,2:nCol-2] + wxhv[3]*U[:,:,3:nCol-1] + wxhv[4]*U[:,:,4:nCol]
-    V[:,:,nCol-2]   = wxhv[0]*U[:,:,nCol-4]   + wxhv[1]*U[:,:,nCol-3]   + wxhv[2]*U[:,:,nCol-2]   + wxhv[3]*U[:,:,nCol-1]   + wxhv[4]*U[:,:,0]
-    V[:,:,nCol-1]   = wxhv[0]*U[:,:,nCol-3]   + wxhv[1]*U[:,:,nCol-2]   + wxhv[2]*U[:,:,nCol-1]   + wxhv[3]*U[:,:,0]        + wxhv[4]*U[:,:,1]
-    return -1./12. * np.abs(U[0,:,:]) * V / dx
+    if np.shape(np.shape(U))[0] == 3 :
+        V[:,:,0]        = wxhv[0]*U[:,:,nCol-2]   + wxhv[1]*U[:,:,nCol-1]   + wxhv[2]*U[:,:,0]        + wxhv[3]*U[:,:,1]        + wxhv[4]*U[:,:,2]
+        V[:,:,1]        = wxhv[0]*U[:,:,nCol-1]   + wxhv[1]*U[:,:,0]        + wxhv[2]*U[:,:,1]        + wxhv[3]*U[:,:,2]        + wxhv[4]*U[:,:,3]
+        V[:,:,2:nCol-2] = wxhv[0]*U[:,:,0:nCol-4] + wxhv[1]*U[:,:,1:nCol-3] + wxhv[2]*U[:,:,2:nCol-2] + wxhv[3]*U[:,:,3:nCol-1] + wxhv[4]*U[:,:,4:nCol]
+        V[:,:,nCol-2]   = wxhv[0]*U[:,:,nCol-4]   + wxhv[1]*U[:,:,nCol-3]   + wxhv[2]*U[:,:,nCol-2]   + wxhv[3]*U[:,:,nCol-1]   + wxhv[4]*U[:,:,0]
+        V[:,:,nCol-1]   = wxhv[0]*U[:,:,nCol-3]   + wxhv[1]*U[:,:,nCol-2]   + wxhv[2]*U[:,:,nCol-1]   + wxhv[3]*U[:,:,0]        + wxhv[4]*U[:,:,1]
+    elif np.shape(np.shape(U))[0] == 2 :
+        V[:,0]        = wxhv[0]*U[:,nCol-2]   + wxhv[1]*U[:,nCol-1]   + wxhv[2]*U[:,0]        + wxhv[3]*U[:,1]        + wxhv[4]*U[:,2]
+        V[:,1]        = wxhv[0]*U[:,nCol-1]   + wxhv[1]*U[:,0]        + wxhv[2]*U[:,1]        + wxhv[3]*U[:,2]        + wxhv[4]*U[:,3]
+        V[:,2:nCol-2] = wxhv[0]*U[:,0:nCol-4] + wxhv[1]*U[:,1:nCol-3] + wxhv[2]*U[:,2:nCol-2] + wxhv[3]*U[:,3:nCol-1] + wxhv[4]*U[:,4:nCol]
+        V[:,nCol-2]   = wxhv[0]*U[:,nCol-4]   + wxhv[1]*U[:,nCol-3]   + wxhv[2]*U[:,nCol-2]   + wxhv[3]*U[:,nCol-1]   + wxhv[4]*U[:,0]
+        V[:,nCol-1]   = wxhv[0]*U[:,nCol-3]   + wxhv[1]*U[:,nCol-2]   + wxhv[2]*U[:,nCol-1]   + wxhv[3]*U[:,0]        + wxhv[4]*U[:,1]
+    else :
+        sys.exit( "\nError: Invalid array dimensions.  U must be a 2D or 3D array.\n" )
+    return -1./12. * np.abs(u) * V / dx
 
 wshv = [ 1., -2., 1 ]
-def HVs(U) :
-    sDot = U[0,1:nLev+1,:]*dsdx + U[1,1:nLev+1,:]*dsdz
-    return 1./2. * np.abs(sDot) * ( wshv[0]*U[:,0:nLev,:] + wshv[1]*U[:,1:nLev+1,:] + wshv[2]*U[:,2:nLev+2,:] ) / ds
+def HVs( U, sDot ) :
+    if np.shape(np.shape(U))[0] == 3 :
+        return 1./2. * np.abs(sDot) * ( wshv[0]*U[:,0:nLev,:] + wshv[1]*U[:,1:nLev+1,:] + wshv[2]*U[:,2:nLev+2,:] ) / ds
+    elif np.shape(np.shape(U))[0] == 2 :
+        return 1./2. * np.abs(sDot) * ( wshv[0]*U[0:nLev,:] + wshv[1]*U[1:nLev+1,:] + wshv[2]*U[2:nLev+2,:] ) / ds
+    else :
+        sys.exit( "\nError: Invalid array dimensions.  U must be a 2D or 3D array.\n" )
 
-def setGhostNodes( U ) :
+def setGhostNodes( U, P, sdotDpids ) :
     #extrapolate uT to bottom ghost nodes:
     uT = U[0,1:3,:]*np.vstack((Tx,Tx)) + U[1,1:3,:]*np.vstack((Tz,Tz))
     uT = 2*uT[0,:] - uT[1,:]
@@ -215,38 +235,49 @@ def setGhostNodes( U ) :
     U[1,0,:] = uT*Tz + uN*Nz
     U[0,nLev+1,:] = 2*U[0,nLev,:] - U[0,nLev-1,:]
     U[1,nLev+1,:] = -U[1,nLev,:]
-    #extrapolate theta to bottom ghost nodes, then top ghost nodes:
+    #extrapolate theta to bottom ghost nodes, then to top ghost nodes:
     U[2,0,:] = thetaBar[0,:] + 2*(U[2,1,:]-thetaBar[1,:]) - (U[2,2,:]-thetaBar[2,:])
     U[2,nLev+1,:] = thetaBar[nLev+1,:] + 2*(U[2,nLev,:]-thetaBar[nLev,:]) - (U[2,nLev-1,:]-thetaBar[nLev-1,:])
-    #get pi on bottom ghost nodes using derived BC:
-    dpidx = Dx( U[3,1:3,:] )
-    dpidx = 3./2.*dpidx[0,:] - 1./2.*dpidx[1,:]
-    th = ( U[2,0,:] + U[2,1,:] ) / 2.
-    U[3,0,:] = U[3,1,:] + ds/normGradS**2 * ( g/Cp/th*dsdzBottom + dpidx*dsdxBottom )
-    #get pi on top ghost nodes:
-    th = ( U[2,nLev,:] + U[2,nLev+1,:] ) / 2.
-    U[3,nLev+1,:] = U[3,nLev,:] - ds/dsdzBottom*g/Cp/th
-    return U
+    #get P on bottom ghost nodes using derived BC:
+    dpids = 3./2.*U[3,1,:] - 1./2.*U[3,2,:]
+    dpdx = Dx(P[1:3,:])
+    dpdx = 3./2.*dpdx[0,:] - 1./2.*dpdx[1,:]
+    P[0,:] = P[1,:] - ds/normGradS**2. * ( dpids*dsdzBottom**2. - dpdx*dsdxBottom )
+    #get P on top ghost nodes:
+    dpids = 3./2.*U[3,nLev,:] - 1./2.*U[3,nLev-1,:]
+    P[nLev+1,:] = P[nLev,:] + ds*dpids
+    #get sdotDpids on bottom, then on top ghost nodes:
+    sdotDpids[0,:] = -sdotDpids[1,:]
+    sdotDpids[nLev+1,:] = -sdotDpids[nLev,:]
+    #extrapolate dpids to bottom, then top ghost nodes (only used in HV):
+    U[3,0,:] = 2*U[3,1,:] - U[3,2,:]
+    U[3,nLev+1,:] = 2*U[3,nLev,:] - U[3,nLev-1,:]
+    return U, P, sdotDpids
 
 def odefun( t, U ) :
-    V = np.zeros( np.shape(U) )
-    #set ghost node values for all variables:
-    U = setGhostNodes( U )
-    #get Us and vertical dissipation, then remove ghost nodes from U (no longer needed):
-    Us = Ds(U)
-    tmp = HVs(U)
-    U = U[:,1:nLev+1,:]
+    #get diagnostic pressure on interior nodes:
+    P = np.zeros(( nLev+2, nCol ))
+    P[1:nLev+1,:] = Po**(-Rd/Cv) * ( -Rd * U[2,1:nLev+1,:] / g * U[3,1:nLev+1,:] * dsdz ) ** (Cp/Cv)
+    #get sDot*dpids on interior nodes:
+    sDot = U[0,1:nLev+1,:]*dsdx + U[1,1:nLev+1,:]*dsdz
+    sdotDpids = np.zeros(( nLev+2, nCol ))
+    sdotDpids[1:nLev+1,:] = sDot * U[3,1:nLev+1,:]
+    #set ghost node values using boundary conditions:
+    U, P, sdotDpids = setGhostNodes( U, P, sdotDpids )
+    #get horizontal velocity on interior nodes:
+    u = U[0,1:nLev+1,:]
     #get RHS of ode function:
-    Ux = Dx(U)
-    sDot = U[0,:,:]*dsdx + U[1,:,:]*dsdz
-    tmp = tmp - np.tile(U[0,:,:],(4,1,1)) * Ux - np.tile(sDot,(4,1,1)) * Us
-    tmp[0,:,:] = tmp[0,:,:] - Cp*U[2,:,:] * ( Ux[3,:,:] + Us[3,:,:]*dsdx )
-    tmp[1,:,:] = tmp[1,:,:] - Cp*U[2,:,:] * ( Us[3,:,:]*dsdz ) - g
-    tmp[3,:,:] = tmp[3,:,:] - Rd/Cv*U[3,:,:] * ( Ux[0,:,:]+Us[0,:,:]*dsdx + Us[1,:,:]*dsdz )
-    #apply horizontal dissipation:
-    tmp = tmp + HVx(U)
-    #set output:
-    V[:,1:nLev+1,:] = tmp
+    V = np.zeros(( 4, nLev+2, nCol ))
+    V[0,1:nLev+1,:] = -u * Dx(U[0,1:nLev+1,:]) - sDot * Ds(U[0,:,:]) \
+        + g / U[3,1:nLev+1,:] / dsdz * ( Dx(P[1:nLev+1,:]) + Ds(P)*dsdx ) \
+        + HVx( U[0,1:nLev+1,:], u ) + HVs( U[0,:,:], sDot )
+    V[1,1:nLev+1,:] = -u * Dx(U[1,1:nLev+1,:]) - sDot * Ds(U[1,:,:]) \
+        - g * ( 1. - Ds(P) / U[3,1:nLev+1,:] ) \
+        + HVx( U[1,1:nLev+1,:], u ) + HVs( U[1,:,:], sDot )
+    V[2,1:nLev+1,:] = -u * Dx(U[2,1:nLev+1,:]) - sDot * Ds(U[2,:,:]) \
+        + HVx( U[2,1:nLev+1,:], u ) + HVs( U[2,:,:], sDot )
+    V[3,1:nLev+1,:] = -Dx(U[3,1:nLev+1,:]*u) - Ds(sdotDpids) \
+        + HVx( U[3,1:nLev+1,:], u ) + HVs( U[3,:,:], sDot )
     return V
 
 def rk( t, U ) :
@@ -274,14 +305,14 @@ plt.ion()
 print()
 for i in range(nTimesteps+1) :
     if np.mod( i, np.round(100./dt) ) == 0 :
-        U = setGhostNodes(U)
         print( "t =", t )
-        print( [ np.min(U[0,:,:]), np.max(U[0,:,:]) ] )
-        print( [ np.min(U[1,:,:]), np.max(U[1,:,:]) ] )
-        print( [ np.min(U[2,:,:]-thetaBar), np.max(U[2,:,:]-thetaBar) ] )
-        print( [ np.min(U[3,:,:]-piBar), np.max(U[3,:,:]-piBar) ] )
+        print( [ np.min(U[0,1:nLev+1,:]), np.max(U[0,1:nLev+1,:]) ] )
+        print( [ np.min(U[1,1:nLev+1,:]), np.max(U[1,1:nLev+1,:]) ] )
+        print( [ np.min(U[2,1:nLev+1,:]-thetaBar[1:nLev+1,:]), np.max(U[2,1:nLev+1,:]-thetaBar[1:nLev+1,:]) ] )
+        print( [ np.min(U[3,1:nLev+1,:]-dpidsBar[1:nLev+1,:]), np.max(U[3,1:nLev+1,:]-dpidsBar[1:nLev+1,:]) ] )
         print()
-        plt.contourf( x, z, np.squeeze(U[2,:,:])-thetaBar )
+        P = Po**(-Rd/Cv) * ( -Rd * U[2,1:nLev+1,:] / g * U[3,1:nLev+1,:] * dsdz ) ** (Cp/Cv)
+        plt.contourf( x[1:nLev+1,:], z[1:nLev+1,:], np.squeeze(U[2,1:nLev+1,:])-thetaBar[1:nLev+1,:] )
         plt.colorbar()
         plt.title( '{0}, t = {1:04.0f}, ' . format( testCase, t ) )
         if testCase != "igw" :
@@ -295,6 +326,12 @@ for i in range(nTimesteps+1) :
         plt.clf()
     U = rk( t, U )
     t = t + dt
+
+
+
+
+
+
 
 
 
