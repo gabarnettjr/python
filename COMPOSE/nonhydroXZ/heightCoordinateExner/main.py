@@ -4,7 +4,7 @@ import time
 import matplotlib.pyplot as plt
 
 #choose "bubble", "igw", or "doubleStraka":
-testCase = "bubble"
+testCase = "igw"
 
 #atmospheric constants:
 Cp = 1004.
@@ -281,7 +281,7 @@ for i in range(nTimesteps+1) :
         print( [ np.min(U[2,:,:]-thetaBar), np.max(U[2,:,:]-thetaBar) ] )
         print( [ np.min(U[3,:,:]-piBar), np.max(U[3,:,:]-piBar) ] )
         print()
-        plt.contourf( x, z, np.squeeze(U[2,:,:])-thetaBar )
+        plt.contourf( x, z, np.squeeze(U[3,:,:])-piBar )
         plt.colorbar()
         plt.title( '{0}, t = {1:04.0f}, ' . format( testCase, t ) )
         if testCase != "igw" :

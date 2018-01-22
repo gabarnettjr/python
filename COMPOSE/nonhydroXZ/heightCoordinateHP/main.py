@@ -4,7 +4,7 @@ import time
 import matplotlib.pyplot as plt
 
 #choose "bubble", "igw", or "doubleStraka":
-testCase = "bubble"
+testCase = "igw"
 
 #atmospheric constants:
 Cp = 1004.
@@ -22,12 +22,12 @@ if testCase == "bubble" :
     nLev = 100
     kap = 10.
     def zSurf(xTilde) :
-        # return 1000. * np.exp( -(kap*(xTilde-6000.)/(xRight-xLeft))**2 )
-        return 500. * ( 1. + np.sin( 2.*np.pi*xTilde / 5000. ) )
+        return 1000. * np.exp( -(kap*(xTilde-6000.)/(xRight-xLeft))**2 )
+        # return 500. * ( 1. + np.sin( 2.*np.pi*xTilde / 5000. ) )
         # return np.zeros( np.shape(xTilde) )
     def zSurfPrime(xTilde) :
-        # return -2. * ( kap*(xTilde-6000.)/(xRight-xLeft) ) * kap/(xRight-xLeft) * zSurf(xTilde)
-        return np.pi/5. * np.cos( 2.*np.pi*xTilde / 5000. )
+        return -2. * ( kap*(xTilde-6000.)/(xRight-xLeft) ) * kap/(xRight-xLeft) * zSurf(xTilde)
+        # return np.pi/5. * np.cos( 2.*np.pi*xTilde / 5000. )
         # return np.zeros( np.shape(xTilde) )
     zTop = 10000.
     tf = 1500.
@@ -239,12 +239,12 @@ def setGhostNodes( U, P, sdotDpids ) :
     U[2,0,:] = thetaBar[0,:] + 2*(U[2,1,:]-thetaBar[1,:]) - (U[2,2,:]-thetaBar[2,:])
     U[2,nLev+1,:] = thetaBar[nLev+1,:] + 2*(U[2,nLev,:]-thetaBar[nLev,:]) - (U[2,nLev-1,:]-thetaBar[nLev-1,:])
     #get P on bottom ghost nodes using derived BC:
-    dpids = 3./2.*U[3,1,:] - 1./2.*U[3,2,:]
+    dpids = (dpidsBar[0,:]+dpidsBar[1,:])/2. + 3./2.*(U[3,1,:]-dpidsBar[1,:]) - 1./2.*(U[3,2,:]-dpidsBar[2,:])
     dpdx = Dx(P[1:3,:])
     dpdx = 3./2.*dpdx[0,:] - 1./2.*dpdx[1,:]
     P[0,:] = P[1,:] - ds/normGradS**2. * ( dpids*dsdzBottom**2. - dpdx*dsdxBottom )
     #get P on top ghost nodes:
-    dpids = 3./2.*U[3,nLev,:] - 1./2.*U[3,nLev-1,:]
+    dpids = (dpidsBar[nLev,:]+dpidsBar[nLev+1,:])/2. + 3./2.*(U[3,nLev,:]-dpidsBar[nLev,:]) - 1./2.*(U[3,nLev-1,:]-dpidsBar[nLev-1,:])
     P[nLev+1,:] = P[nLev,:] + ds*dpids
     #get sdotDpids on bottom, then on top ghost nodes:
     sdotDpids[0,:] = -sdotDpids[1,:]
