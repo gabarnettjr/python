@@ -4,7 +4,8 @@ import time
 import matplotlib.pyplot as plt
 
 #choose "bubble", "igw", or "doubleStraka":
-testCase = "igw"
+testCase = "bubble"
+plotFromSaved = 0
 
 #atmospheric constants:
 Cp = 1004.
@@ -15,11 +16,12 @@ Po = 10.**5.
 
 #domain parameters:
 t = 0.
+rkStages = 3
 if testCase == "bubble" :
     xLeft = 0.
     xRight = 10000.
-    nCol = 100
-    nLev = 100
+    nLev = 200
+    nCol = 200
     kap = 10.
     def zSurf(xTilde) :
         # return 1000. * np.exp( -(kap*(xTilde-6000.)/(xRight-xLeft))**2 )
@@ -31,13 +33,12 @@ if testCase == "bubble" :
         # return np.zeros( np.shape(xTilde) )
     zTop = 10000.
     tf = 1500.
-    dt = 1./5.
-    rkStages = 3
+    dt = 1./10.
 elif testCase == "igw" :
     xLeft = 0.
     xRight = 300000.
-    nCol = 20*30
     nLev = 40
+    nCol = 40*30
     def zSurf(xTilde) :
         return np.zeros( np.shape(xTilde) )
     def zSurfPrime(xTilde) :
@@ -45,12 +46,11 @@ elif testCase == "igw" :
     zTop = 10000.
     tf = 3000.
     dt = 1./2.
-    rkStages = 3
 elif testCase == "doubleStraka" :
     xLeft = -6400.
     xRight = 6400.
-    nCol = 64*2
-    nLev = 64
+    nLev = 128
+    nCol = 128*2
     def zSurf(xTilde) :
         return 1000. * np.exp( -(16.*(xTilde-1000.)/(xRight-xLeft))**2. )
         # return np.zeros( np.shape(xTilde) )
@@ -59,11 +59,13 @@ elif testCase == "doubleStraka" :
         # return np.zeros( np.shape(xTilde) )
     zTop = 6400.
     tf = 900.
-    dt = 1./6.
-    rkStages = 3
+    dt = 1./12.
 else :
     sys.exit( "\nError: Invalid test case string.\n" )
 nTimesteps = round( (tf-t) / dt )
+
+#make path to saved results:
+saveString = './results/' + testCase + '/nLev' + '{0:1d}'.format(nLev) + '_nCol' + '{0:1d}'.format(nCol) + '/'
 
 #definition of the scale-preserving s-coordinate and its derivatives:
 def s( xTilde, zTilde ) :
@@ -264,36 +266,44 @@ def rk( t, U ) :
     else :
         sys.exit( "\nError: rkStages should be 3 or 4.\n" )
 
-#set contour levels:
-CL = np.arange( -.05, 2.15, .1 )
-# CL = np.arange( -.0015, .0035, .0005 )
-# CL = np.arange( -.021, .023, .002 )
+#set how often to save the results, and set contour levels:
+if testCase == "bubble" :
+    saveDel = 100.
+    CL = np.arange( -.05, 2.15, .1 )
+elif testCase == "igw" :
+    saveDel = 200.
+    CL = np.arange( -.0015, .0035, .0005 )
+elif testCase == "doubleStraka" :
+    saveDel = 50.
+    CL = np.arange( -16.5, 1.5, 1. )
+else :
+    sys.exit( "\nError: Invalid test case string.\n" )
 
 #stepping forward in time with explicit RK:
 plt.ion()
 print()
 for i in range(nTimesteps+1) :
-    if np.mod( i, np.round(100./dt) ) == 0 :
-        U = setGhostNodes(U)
+    if np.mod( i, np.round(saveDel/dt) ) == 0 :
+        if plotFromSaved == 0 :
+            U = setGhostNodes(U)
+            np.save( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy', U )
+        else :
+            U = np.load( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy' )
+            plt.contourf( x, z, np.squeeze(U[2,:,:])-thetaBar, CL )
+            plt.colorbar()
+            plt.title( '{0}, t = {1:04.0f}, ' . format( testCase, t ) )
+            if testCase != "igw" :
+                plt.axis( 'equal' )
+            plt.waitforbuttonpress()
+            plt.clf()
         print( "t =", t )
         print( [ np.min(U[0,:,:]), np.max(U[0,:,:]) ] )
         print( [ np.min(U[1,:,:]), np.max(U[1,:,:]) ] )
         print( [ np.min(U[2,:,:]-thetaBar), np.max(U[2,:,:]-thetaBar) ] )
         print( [ np.min(U[3,:,:]-piBar), np.max(U[3,:,:]-piBar) ] )
         print()
-        plt.contourf( x, z, np.squeeze(U[3,:,:])-piBar )
-        plt.colorbar()
-        plt.title( '{0}, t = {1:04.0f}, ' . format( testCase, t ) )
-        if testCase != "igw" :
-            plt.axis( 'equal' )
-        if i == nTimesteps :
-            plt.waitforbuttonpress()
-            sys.exit( "\nDone.\n" )
-        else :
-            # plt.waitforbuttonpress()
-            plt.pause(.1)
-        plt.clf()
-    U = rk( t, U )
+    if plotFromSaved == 0 :
+        U = rk( t, U )
     t = t + dt
 
 
