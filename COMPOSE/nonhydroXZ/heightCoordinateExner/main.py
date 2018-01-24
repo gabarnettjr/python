@@ -4,12 +4,12 @@ import time
 import matplotlib.pyplot as plt
 
 #"exner", "hydrostaticPressure":
-formulation = "hydrostaticPressure"
+formulation = "exner"
 
 #"bubble", "igw", "densityCurrent", "doubleDensityCurrent", "movingDensityCurrent":
-testCase = "igw"
+testCase = "movingDensityCurrent"
 
-plotFromSaved = 0
+plotFromSaved = 1
 
 ###########################################################################
 
@@ -281,6 +281,10 @@ def HVs( U, sDot ) :
     else :
         sys.exit( "\nError: U should be a 2D or 3D array.\n" )
 
+###########################################################################
+
+#Setting ghost node values and getting the RHS of the ODE system:
+
 if formulation == "exner" :
     def setGhostNodes( U ) :
         #extrapolate uT to bottom ghost nodes:
@@ -388,6 +392,8 @@ elif formulation == "hydrostaticPressure" :
 else :
     sys.exit( "\nError: Invalid formulation string.\n" )
 
+###########################################################################
+
 def rk( t, U ) :
     if rkStages == 4 :
         q1 = odefun( t,      U         )
@@ -403,7 +409,10 @@ def rk( t, U ) :
     else :
         sys.exit( "\nError: rkStages should be 3 or 4.\n" )
 
+###########################################################################
+
 #set how often to save the results, and set contour levels:
+
 if testCase == "bubble" :
     saveDel = 100.
     CL = np.arange( -.05, 2.15, .1 )
@@ -416,10 +425,14 @@ elif ( testCase == "densityCurrent" ) | ( testCase == "doubleDensityCurrent" ) |
 else :
     sys.exit( "\nError: Invalid test case string.\n" )
 
+###########################################################################
+
 #stepping forward in time with explicit RK:
+
 et = 0.             #elapsed time
 plt.ion()           #interactive plotting on
 print()
+
 for i in range(nTimesteps+1) :
     if np.mod( i, np.int(np.round(saveDel/dt)) ) == 0 :
         if plotFromSaved == 0 :
@@ -441,6 +454,7 @@ for i in range(nTimesteps+1) :
             plt.title( '{0}, t = {1:04.0f}, ' . format( testCase, t ) )
             if testCase != "igw" :
                 plt.axis( 'equal' )
+            plt.axis( [ xLeft-dx, xRight+dx, -dx, zTop+dx ] )
             plt.waitforbuttonpress()
             plt.clf()
         print( "t =", np.int(np.round(t)) )
@@ -460,6 +474,8 @@ for i in range(nTimesteps+1) :
     if plotFromSaved == 0 :
         U = rk( t, U )
     t = t + dt
+
+###########################################################################
 
 
 
