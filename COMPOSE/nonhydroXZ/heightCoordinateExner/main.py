@@ -9,7 +9,7 @@ formulation = "exner"
 #"bubble", "igw", "densityCurrent", "doubleDensityCurrent", "movingDensityCurrent":
 testCase = "movingDensityCurrent"
 
-plotFromSaved = 1
+plotFromSaved = 0
 
 ###########################################################################
 
@@ -125,6 +125,8 @@ Tz = zSurfPrime( x[0,:] )
 normT = np.sqrt( Tx**2 + Tz**2 )
 Tx = Tx / normT
 Tz = Tz / normT
+bigTx = np.vstack((Tx,Tx))
+bigTz = np.vstack((Tz,Tz))
 Nx = -Tz
 Nz = Tx
 
@@ -288,7 +290,7 @@ def HVs( U, sDot ) :
 if formulation == "exner" :
     def setGhostNodes( U ) :
         #extrapolate uT to bottom ghost nodes:
-        uT = U[0,1:3,:]*np.vstack((Tx,Tx)) + U[1,1:3,:]*np.vstack((Tz,Tz))
+        uT = U[0,1:3,:]*bigTx + U[1,1:3,:]*bigTz
         uT = 2*uT[0,:] - uT[1,:]
         #get uN on bottom ghost nodes:
         uN = U[0,1,:]*Nx + U[1,1,:]*Nz
