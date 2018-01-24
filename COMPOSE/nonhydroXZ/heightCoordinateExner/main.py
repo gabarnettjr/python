@@ -3,9 +3,15 @@ import numpy as np
 import time
 import matplotlib.pyplot as plt
 
-#choose "bubble", "igw", or "doubleStraka":
-testCase = "bubble"
+#"exner", "hydrostaticPressure":
+formulation = "hydrostaticPressure"
+
+#"bubble", "igw", "densityCurrent", "doubleDensityCurrent", "movingDensityCurrent":
+testCase = "igw"
+
 plotFromSaved = 0
+
+###########################################################################
 
 #atmospheric constants:
 Cp = 1004.
@@ -20,8 +26,8 @@ rkStages = 3
 if testCase == "bubble" :
     xLeft = 0.
     xRight = 10000.
-    nLev = 200
-    nCol = 200
+    nLev = 100
+    nCol = 100
     kap = 10.
     def zSurf(xTilde) :
         # return 1000. * np.exp( -(kap*(xTilde-6000.)/(xRight-xLeft))**2 )
@@ -33,12 +39,12 @@ if testCase == "bubble" :
         # return np.zeros( np.shape(xTilde) )
     zTop = 10000.
     tf = 1500.
-    dt = 1./10.
+    dt = 1./5.
 elif testCase == "igw" :
     xLeft = 0.
     xRight = 300000.
     nLev = 40
-    nCol = 40*30
+    nCol = 20*30
     def zSurf(xTilde) :
         return np.zeros( np.shape(xTilde) )
     def zSurfPrime(xTilde) :
@@ -46,11 +52,23 @@ elif testCase == "igw" :
     zTop = 10000.
     tf = 3000.
     dt = 1./2.
-elif testCase == "doubleStraka" :
+elif testCase == "densityCurrent" :
+    xLeft = -25600.
+    xRight = 25600.
+    nLev = 64
+    nCol = 64*8
+    def zSurf(xTilde) :
+        return np.zeros( np.shape(xTilde) )
+    def zSurfPrime(xTilde) :
+        return np.zeros( np.shape(xTilde) )
+    zTop = 6400.
+    tf = 900.
+    dt = 1./6.
+elif testCase == "doubleDensityCurrent" :
     xLeft = -6400.
     xRight = 6400.
-    nLev = 128
-    nCol = 128*2
+    nLev = 64
+    nCol = 64*2
     def zSurf(xTilde) :
         return 1000. * np.exp( -(16.*(xTilde-1000.)/(xRight-xLeft))**2. )
         # return np.zeros( np.shape(xTilde) )
@@ -59,13 +77,25 @@ elif testCase == "doubleStraka" :
         # return np.zeros( np.shape(xTilde) )
     zTop = 6400.
     tf = 900.
-    dt = 1./12.
+    dt = 1./6.
+elif testCase == "movingDensityCurrent" :
+    xLeft = -18000.
+    xRight = 18000.
+    nLev = 64
+    nCol = 360
+    def zSurf(xTilde) :
+        return np.zeros( np.shape(xTilde) )
+    def zSurfPrime(xTilde) :
+        return np.zeros( np.shape(xTilde) )
+    zTop = 6400.
+    tf = 900.
+    dt = 1./6.
 else :
     sys.exit( "\nError: Invalid test case string.\n" )
 nTimesteps = round( (tf-t) / dt )
 
-#make path to saved results:
-saveString = './results/' + testCase + '/nLev' + '{0:1d}'.format(nLev) + '_nCol' + '{0:1d}'.format(nCol) + '/'
+#path to saved results:
+saveString = './results/' + formulation + '/' + testCase + '/nLev' + '{0:1d}'.format(nLev) + '_nCol' + '{0:1d}'.format(nCol) + '/'
 
 #definition of the scale-preserving s-coordinate and its derivatives:
 def s( xTilde, zTilde ) :
@@ -84,7 +114,7 @@ z = np.zeros(( nLev+2, nCol ))
 z[0,:] = zs - dz/2
 for i in np.arange(1,nLev+1) :
     z[i,:] = zs + dz/2 + (i-1)*dz
-z[nLev+1,:] = zTop + dz/2
+z[nLev+1,:] = zTop + dz/2.
 x = np.tile( x, (nLev+2,1) )
 ds = zTop * dz / ( zTop - zs )
 ds = ds[0]
@@ -112,9 +142,6 @@ if testCase == "bubble" :
     thetaPrime0[ind] = 2. * ( 1. - r[ind]/R )
     piPrime0 = 0.
     U[0,:,:] = np.zeros(( nLev+2, nCol ))
-    U[1,:,:] = np.zeros(( nLev+2, nCol ))
-    U[2,:,:] = thetaBar + thetaPrime0
-    U[3,:,:] = piBar + piPrime0
 elif testCase == "igw" :
     N = .01
     theta0 = 300.
@@ -127,10 +154,21 @@ elif testCase == "igw" :
     thetaPrime0 = thetaC * np.sin( np.pi*z/hC ) / ( 1. + ((x-xC)/aC)**2 )
     piPrime0 = 0.
     U[0,:,:] = 20. * np.ones( np.shape(thetaPrime0) )
-    U[1,:,:] = np.zeros( np.shape(thetaPrime0) )
-    U[2,:,:] = thetaBar + thetaPrime0
-    U[3,:,:] = piBar + piPrime0
-elif testCase == "doubleStraka" :
+elif testCase == "densityCurrent" :
+    thetaBar = 300. * np.ones(( nLev+2, nCol ))
+    piBar = 1. - g / Cp / thetaBar * z
+    xc = 0.
+    zc = 3000.
+    xr = 4000.
+    zr = 2000.
+    rTilde = np.sqrt( ((x-xc)/xr)**2 + ((z-zc)/zr)**2 )
+    Tprime0 = np.zeros( np.shape(thetaBar) )
+    ind = rTilde <= 1
+    Tprime0[ind] = -15./2. * ( 1. + np.cos(np.pi*rTilde[ind]) )
+    thetaPrime0 = Tprime0 / piBar
+    piPrime0 = 0.
+    U[0,:,:] = np.zeros( np.shape(thetaBar) )
+elif testCase == "doubleDensityCurrent" :
     thetaBar = 300. * np.ones(( nLev+2, nCol ))
     piBar = 1. - g / Cp / thetaBar * z
     xc1 = -6400.
@@ -148,11 +186,31 @@ elif testCase == "doubleStraka" :
     thetaPrime0 = Tprime0 / piBar
     piPrime0 = 0.
     U[0,:,:] = np.zeros( np.shape(thetaBar) )
-    U[1,:,:] = np.zeros( np.shape(thetaBar) )
-    U[2,:,:] = thetaBar + thetaPrime0
-    U[3,:,:] = piBar + piPrime0
+elif testCase == "movingDensityCurrent" :
+    thetaBar = 300. * np.ones(( nLev+2, nCol ))
+    piBar = 1. - g / Cp / thetaBar * z
+    xc = 0.
+    zc = 3000.
+    xr = 4000.
+    zr = 2000.
+    rTilde = np.sqrt( ((x-xc)/xr)**2 + ((z-zc)/zr)**2 )
+    Tprime0 = np.zeros( np.shape(thetaBar) )
+    ind = rTilde <= 1
+    Tprime0[ind] = -15./2. * ( 1. + np.cos(np.pi*rTilde[ind]) )
+    thetaPrime0 = Tprime0 / piBar
+    piPrime0 = 0.
+    U[0,:,:] = 20. * np.ones( np.shape(thetaBar) )
 else :
     sys.exit("\nError: Invalid test case string.\n")
+U[1,:,:] = np.zeros( np.shape(thetaBar) )
+U[2,:,:] = thetaBar + thetaPrime0
+if formulation == "exner" :
+    U[3,:,:] = piBar + piPrime0
+elif formulation == "hydrostaticPressure" :
+    U[3,:,:] = -g / Rd / U[2,:,:] / dsdz(x,z) * Po * (piBar+piPrime0)**(Cv/Rd)
+    dpidsBar = -g / Rd / thetaBar / dsdz(x,z) * Po * piBar**(Cv/Rd)
+else :
+    sys.exit( "\nError: Invalid formulation string.\n" )
 
 #convert functions to values on nodes:
 dsdxBottom = dsdx( x[0,:], zs )
@@ -188,81 +246,160 @@ def Dx(U) :
 
 ws = [ -1./2., 0, 1./2. ]
 def Ds(U) :
-    return ( ws[0]*U[:,0:nLev,:] + ws[1]*U[:,1:nLev+1,:] + ws[2]*U[:,2:nLev+2,:] ) / ds
+    if np.shape(np.shape(U))[0] == 3 :
+        return ( ws[0]*U[:,0:nLev,:] + ws[1]*U[:,1:nLev+1,:] + ws[2]*U[:,2:nLev+2,:] ) / ds
+    elif np.shape(np.shape(U))[0] == 2 :
+        return ( ws[0]*U[0:nLev,:] + ws[1]*U[1:nLev+1,:] + ws[2]*U[2:nLev+2,:] ) / ds
+    else :
+        sys.exit( "\nError: U should be a 2D or 3D array.\n" )
 
 wxhv = [ 1., -4., 6., -4., 1. ]
-def HVx(U) :
+def HVx( U, u ) :
     V = np.zeros( np.shape(U) )
-    V[:,:,0]        = wxhv[0]*U[:,:,nCol-2]   + wxhv[1]*U[:,:,nCol-1]   + wxhv[2]*U[:,:,0]        + wxhv[3]*U[:,:,1]        + wxhv[4]*U[:,:,2]
-    V[:,:,1]        = wxhv[0]*U[:,:,nCol-1]   + wxhv[1]*U[:,:,0]        + wxhv[2]*U[:,:,1]        + wxhv[3]*U[:,:,2]        + wxhv[4]*U[:,:,3]
-    V[:,:,2:nCol-2] = wxhv[0]*U[:,:,0:nCol-4] + wxhv[1]*U[:,:,1:nCol-3] + wxhv[2]*U[:,:,2:nCol-2] + wxhv[3]*U[:,:,3:nCol-1] + wxhv[4]*U[:,:,4:nCol]
-    V[:,:,nCol-2]   = wxhv[0]*U[:,:,nCol-4]   + wxhv[1]*U[:,:,nCol-3]   + wxhv[2]*U[:,:,nCol-2]   + wxhv[3]*U[:,:,nCol-1]   + wxhv[4]*U[:,:,0]
-    V[:,:,nCol-1]   = wxhv[0]*U[:,:,nCol-3]   + wxhv[1]*U[:,:,nCol-2]   + wxhv[2]*U[:,:,nCol-1]   + wxhv[3]*U[:,:,0]        + wxhv[4]*U[:,:,1]
-    return -1./12. * np.abs(U[0,:,:]) * V / dx
+    if np.shape(np.shape(U))[0] == 3 :
+        V[:,:,0]        = wxhv[0]*U[:,:,nCol-2]   + wxhv[1]*U[:,:,nCol-1]   + wxhv[2]*U[:,:,0]        + wxhv[3]*U[:,:,1]        + wxhv[4]*U[:,:,2]
+        V[:,:,1]        = wxhv[0]*U[:,:,nCol-1]   + wxhv[1]*U[:,:,0]        + wxhv[2]*U[:,:,1]        + wxhv[3]*U[:,:,2]        + wxhv[4]*U[:,:,3]
+        V[:,:,2:nCol-2] = wxhv[0]*U[:,:,0:nCol-4] + wxhv[1]*U[:,:,1:nCol-3] + wxhv[2]*U[:,:,2:nCol-2] + wxhv[3]*U[:,:,3:nCol-1] + wxhv[4]*U[:,:,4:nCol]
+        V[:,:,nCol-2]   = wxhv[0]*U[:,:,nCol-4]   + wxhv[1]*U[:,:,nCol-3]   + wxhv[2]*U[:,:,nCol-2]   + wxhv[3]*U[:,:,nCol-1]   + wxhv[4]*U[:,:,0]
+        V[:,:,nCol-1]   = wxhv[0]*U[:,:,nCol-3]   + wxhv[1]*U[:,:,nCol-2]   + wxhv[2]*U[:,:,nCol-1]   + wxhv[3]*U[:,:,0]        + wxhv[4]*U[:,:,1]
+    elif np.shape(np.shape(U))[0] == 2 :
+        V[:,0]        = wxhv[0]*U[:,nCol-2]   + wxhv[1]*U[:,nCol-1]   + wxhv[2]*U[:,0]        + wxhv[3]*U[:,1]        + wxhv[4]*U[:,2]
+        V[:,1]        = wxhv[0]*U[:,nCol-1]   + wxhv[1]*U[:,0]        + wxhv[2]*U[:,1]        + wxhv[3]*U[:,2]        + wxhv[4]*U[:,3]
+        V[:,2:nCol-2] = wxhv[0]*U[:,0:nCol-4] + wxhv[1]*U[:,1:nCol-3] + wxhv[2]*U[:,2:nCol-2] + wxhv[3]*U[:,3:nCol-1] + wxhv[4]*U[:,4:nCol]
+        V[:,nCol-2]   = wxhv[0]*U[:,nCol-4]   + wxhv[1]*U[:,nCol-3]   + wxhv[2]*U[:,nCol-2]   + wxhv[3]*U[:,nCol-1]   + wxhv[4]*U[:,0]
+        V[:,nCol-1]   = wxhv[0]*U[:,nCol-3]   + wxhv[1]*U[:,nCol-2]   + wxhv[2]*U[:,nCol-1]   + wxhv[3]*U[:,0]        + wxhv[4]*U[:,1]
+    else :
+        sys.exit( "\nError: U should be a 2D or 3D array.\n" )
+    return -1./12. * np.abs(u) * V / dx
 
 wshv = [ 1., -2., 1 ]
-def HVs(U) :
-    sDot = U[0,1:nLev+1,:]*dsdx + U[1,1:nLev+1,:]*dsdz
-    return 1./2. * np.abs(sDot) * ( wshv[0]*U[:,0:nLev,:] + wshv[1]*U[:,1:nLev+1,:] + wshv[2]*U[:,2:nLev+2,:] ) / ds
+def HVs( U, sDot ) :
+    if np.shape(np.shape(U))[0] == 3 :
+        return 1./2. * np.abs(sDot) * ( wshv[0]*U[:,0:nLev,:] + wshv[1]*U[:,1:nLev+1,:] + wshv[2]*U[:,2:nLev+2,:] ) / ds
+    elif np.shape(np.shape(U))[0] == 2 :
+        return 1./2. * np.abs(sDot) * ( wshv[0]*U[0:nLev,:] + wshv[1]*U[1:nLev+1,:] + wshv[2]*U[2:nLev+2,:] ) / ds
+    else :
+        sys.exit( "\nError: U should be a 2D or 3D array.\n" )
 
-def setGhostNodes( U ) :
-    #extrapolate uT to bottom ghost nodes:
-    uT = U[0,1:3,:]*np.vstack((Tx,Tx)) + U[1,1:3,:]*np.vstack((Tz,Tz))
-    uT = 2*uT[0,:] - uT[1,:]
-    #get uN on bottom ghost nodes:
-    uN = U[0,1,:]*Nx + U[1,1,:]*Nz
-    uN = -uN
-    #use uT and uN to get (u,w) on bottom ghost nodes, then get (u,w) on top ghost nodes:
-    U[0,0,:] = uT*Tx + uN*Nx
-    U[1,0,:] = uT*Tz + uN*Nz
-    U[0,nLev+1,:] = 2*U[0,nLev,:] - U[0,nLev-1,:]
-    U[1,nLev+1,:] = -U[1,nLev,:]
-    #extrapolate theta to bottom ghost nodes, then top ghost nodes:
-    U[2,0,:] = thetaBar[0,:] + 2*(U[2,1,:]-thetaBar[1,:]) - (U[2,2,:]-thetaBar[2,:])
-    U[2,nLev+1,:] = thetaBar[nLev+1,:] + 2*(U[2,nLev,:]-thetaBar[nLev,:]) - (U[2,nLev-1,:]-thetaBar[nLev-1,:])
-    #get pi on bottom ghost nodes using derived BC:
-    dpidx = Dx( U[3,1:3,:] )
-    dpidx = 3./2.*dpidx[0,:] - 1./2.*dpidx[1,:]
-    th = ( U[2,0,:] + U[2,1,:] ) / 2.
-    U[3,0,:] = U[3,1,:] + ds/normGradS**2 * ( g/Cp/th*dsdzBottom + dpidx*dsdxBottom )
-    #get pi on top ghost nodes:
-    th = ( U[2,nLev,:] + U[2,nLev+1,:] ) / 2.
-    U[3,nLev+1,:] = U[3,nLev,:] - ds/dsdzBottom*g/Cp/th
-    return U
-
-def odefun( t, U ) :
-    V = np.zeros( np.shape(U) )
-    #set ghost node values for all variables:
-    U = setGhostNodes( U )
-    #get Us and vertical dissipation, then remove ghost nodes from U (no longer needed):
-    Us = Ds(U)
-    tmp = HVs(U)
-    U = U[:,1:nLev+1,:]
-    #get RHS of ode function:
-    Ux = Dx(U)
-    sDot = U[0,:,:]*dsdx + U[1,:,:]*dsdz
-    tmp = tmp - np.tile(U[0,:,:],(4,1,1)) * Ux - np.tile(sDot,(4,1,1)) * Us
-    tmp[0,:,:] = tmp[0,:,:] - Cp*U[2,:,:] * ( Ux[3,:,:] + Us[3,:,:]*dsdx )
-    tmp[1,:,:] = tmp[1,:,:] - Cp*U[2,:,:] * ( Us[3,:,:]*dsdz ) - g
-    tmp[3,:,:] = tmp[3,:,:] - Rd/Cv*U[3,:,:] * ( Ux[0,:,:]+Us[0,:,:]*dsdx + Us[1,:,:]*dsdz )
-    #apply horizontal dissipation:
-    tmp = tmp + HVx(U)
-    #set output:
-    V[:,1:nLev+1,:] = tmp
-    return V
+if formulation == "exner" :
+    def setGhostNodes( U ) :
+        #extrapolate uT to bottom ghost nodes:
+        uT = U[0,1:3,:]*np.vstack((Tx,Tx)) + U[1,1:3,:]*np.vstack((Tz,Tz))
+        uT = 2*uT[0,:] - uT[1,:]
+        #get uN on bottom ghost nodes:
+        uN = U[0,1,:]*Nx + U[1,1,:]*Nz
+        uN = -uN
+        #use uT and uN to get (u,w) on bottom ghost nodes, then get (u,w) on top ghost nodes:
+        U[0,0,:] = uT*Tx + uN*Nx
+        U[1,0,:] = uT*Tz + uN*Nz
+        U[0,nLev+1,:] = 2*U[0,nLev,:] - U[0,nLev-1,:]
+        U[1,nLev+1,:] = -U[1,nLev,:]
+        #extrapolate theta to bottom ghost nodes, then top ghost nodes:
+        U[2,0,:] = thetaBar[0,:] + 2*(U[2,1,:]-thetaBar[1,:]) - (U[2,2,:]-thetaBar[2,:])
+        U[2,nLev+1,:] = thetaBar[nLev+1,:] + 2*(U[2,nLev,:]-thetaBar[nLev,:]) - (U[2,nLev-1,:]-thetaBar[nLev-1,:])
+        #get pi on bottom ghost nodes using derived BC:
+        dpidx = Dx( U[3,1:3,:] )
+        dpidx = 3./2.*dpidx[0,:] - 1./2.*dpidx[1,:]
+        th = ( U[2,0,:] + U[2,1,:] ) / 2.
+        U[3,0,:] = U[3,1,:] + ds/normGradS**2 * ( g/Cp/th*dsdzBottom + dpidx*dsdxBottom )
+        #get pi on top ghost nodes:
+        th = ( U[2,nLev,:] + U[2,nLev+1,:] ) / 2.
+        U[3,nLev+1,:] = U[3,nLev,:] - ds/dsdzBottom*g/Cp/th
+        return U
+    def odefun( t, U ) :
+        V = np.zeros( np.shape(U) )
+        #set ghost node values for all variables:
+        U = setGhostNodes( U )
+        #get Us and vertical dissipation, then remove ghost nodes from U (no longer needed):
+        Us = Ds(U)
+        sDot = U[0,1:nLev+1,:]*dsdx + U[1,1:nLev+1,:]*dsdz
+        sDot = np.tile( sDot, (4,1,1) )
+        tmp = HVs( U, sDot )
+        U = U[:,1:nLev+1,:]
+        #get RHS of ode function:
+        Ux = Dx(U)
+        u = np.tile( U[0,:,:], (4,1,1) )
+        tmp = tmp - u * Ux - sDot * Us
+        tmp[0,:,:] = tmp[0,:,:] - Cp*U[2,:,:] * ( Ux[3,:,:] + Us[3,:,:]*dsdx )
+        tmp[1,:,:] = tmp[1,:,:] - Cp*U[2,:,:] * ( Us[3,:,:]*dsdz ) - g
+        tmp[3,:,:] = tmp[3,:,:] - Rd/Cv*U[3,:,:] * ( Ux[0,:,:]+Us[0,:,:]*dsdx + Us[1,:,:]*dsdz )
+        #apply horizontal dissipation:
+        tmp = tmp + HVx( U, u )
+        #set output:
+        V[:,1:nLev+1,:] = tmp
+        return V
+elif formulation == "hydrostaticPressure" :
+    def setGhostNodes( U, P, sDot ) :
+        #extrapolate uT to bottom ghost nodes:
+        uT = U[0,1:3,:]*np.vstack((Tx,Tx)) + U[1,1:3,:]*np.vstack((Tz,Tz))
+        uT = 2*uT[0,:] - uT[1,:]
+        #get uN on bottom ghost nodes:
+        uN = U[0,1,:]*Nx + U[1,1,:]*Nz
+        uN = -uN
+        #use uT and uN to get (u,w) on bottom ghost nodes, then get (u,w) on top ghost nodes:
+        U[0,0,:] = uT*Tx + uN*Nx
+        U[1,0,:] = uT*Tz + uN*Nz
+        U[0,nLev+1,:] = 2*U[0,nLev,:] - U[0,nLev-1,:]
+        U[1,nLev+1,:] = -U[1,nLev,:]
+        #extrapolate theta to bottom ghost nodes, then to top ghost nodes:
+        U[2,0,:] = thetaBar[0,:] + 2*(U[2,1,:]-thetaBar[1,:]) - (U[2,2,:]-thetaBar[2,:])
+        U[2,nLev+1,:] = thetaBar[nLev+1,:] + 2*(U[2,nLev,:]-thetaBar[nLev,:]) - (U[2,nLev-1,:]-thetaBar[nLev-1,:])
+        #get P on bottom ghost nodes using derived BC:
+        dpids = (dpidsBar[0,:]+dpidsBar[1,:])/2. + 3./2.*(U[3,1,:]-dpidsBar[1,:]) - 1./2.*(U[3,2,:]-dpidsBar[2,:])
+        dpdx = Dx(P[1:3,:])
+        dpdx = 3./2.*dpdx[0,:] - 1./2.*dpdx[1,:]
+        P[0,:] = P[1,:] - ds/normGradS**2. * ( dpids*dsdzBottom**2. - dpdx*dsdxBottom )
+        #get P on top ghost nodes:
+        dpids = (dpidsBar[nLev,:]+dpidsBar[nLev+1,:])/2. + 3./2.*(U[3,nLev,:]-dpidsBar[nLev,:]) - 1./2.*(U[3,nLev-1,:]-dpidsBar[nLev-1,:])
+        P[nLev+1,:] = P[nLev,:] + ds*dpids
+        #get sDot on bottom, then on top ghost nodes:
+        sDot[0,:] = -sDot[1,:]
+        sDot[nLev+1,:] = -sDot[nLev,:]
+        #get dpids on bottom, then top ghost nodes:
+        U[3,0,:] = -g / Rd / U[2,0,:] / dsdzBottom * ( Po**(Rd/Cv) * P[0,:] ) ** (Cv/Cp)
+        U[3,nLev+1,:] = -g / Rd / U[2,nLev+1,:] / dsdzBottom * ( Po**(Rd/Cv) * P[nLev+1,:] ) ** (Cv/Cp)
+        return U, P, sDot
+    def odefun( t, U ) :
+        #get diagnostic pressure on interior nodes:
+        P = np.zeros(( nLev+2, nCol ))
+        P[1:nLev+1,:] = Po**(-Rd/Cv) * ( -Rd * U[2,1:nLev+1,:] / g * U[3,1:nLev+1,:] * dsdz ) ** (Cp/Cv)
+        #get sDot on interior nodes:
+        sDot = np.zeros(( nLev+2, nCol ))
+        sDot[1:nLev+1,:] = U[0,1:nLev+1,:]*dsdx + U[1,1:nLev+1,:]*dsdz
+        #set ghost node values using boundary conditions:
+        U, P, sDot = setGhostNodes( U, P, sDot )
+        #get velocity on interior nodes:
+        u = U[0,1:nLev+1,:]
+        sdotDpids = sDot * U[3,:,:]
+        sDot = sDot[1:nLev+1,:]
+        #get RHS of ode function:
+        V = np.zeros(( 4, nLev+2, nCol ))
+        V[0,1:nLev+1,:] = -u * Dx(U[0,1:nLev+1,:]) - sDot * Ds(U[0,:,:]) \
+            + g / U[3,1:nLev+1,:] / dsdz * ( Dx(P[1:nLev+1,:]) + Ds(P)*dsdx ) \
+            + HVx( U[0,1:nLev+1,:], u ) + HVs( U[0,:,:], sDot )
+        V[1,1:nLev+1,:] = -u * Dx(U[1,1:nLev+1,:]) - sDot * Ds(U[1,:,:]) \
+            - g * ( 1. - Ds(P) / U[3,1:nLev+1,:] ) \
+            + HVx( U[1,1:nLev+1,:], u ) + HVs( U[1,:,:], sDot )
+        V[2,1:nLev+1,:] = -u * Dx(U[2,1:nLev+1,:]) - sDot * Ds(U[2,:,:]) \
+            + HVx( U[2,1:nLev+1,:], u ) + HVs( U[2,:,:], sDot )
+        V[3,1:nLev+1,:] = -Dx(U[3,1:nLev+1,:]*u) - Ds(sdotDpids) \
+            + HVx( U[3,1:nLev+1,:], u ) + HVs( U[3,:,:], sDot )
+        return V
+else :
+    sys.exit( "\nError: Invalid formulation string.\n" )
 
 def rk( t, U ) :
     if rkStages == 4 :
-        q1 = odefun( t, U )
+        q1 = odefun( t,      U         )
         q2 = odefun( t+dt/2, U+dt/2*q1 )
         q3 = odefun( t+dt/2, U+dt/2*q2 )
-        q4 = odefun( t+dt, U+dt*q3 )
+        q4 = odefun( t+dt,   U+dt*q3   )
         return U + dt/6 * ( q1 + 2*q2 + 2*q3 + q4 )
     elif rkStages == 3 :
-        q1 = odefun( t, U );
-        q2 = odefun( t+dt/3, U+dt/3*q1 );
-        q2 = odefun( t+2*dt/3, U+2*dt/3*q2 );
-        return U + dt/4 * ( q1 + 3*q2 );
+        q1 = odefun( t,        U           )
+        q2 = odefun( t+dt/3,   U+dt/3*q1   )
+        q2 = odefun( t+2*dt/3, U+2*dt/3*q2 )
+        return U + dt/4 * ( q1 + 3*q2 )
     else :
         sys.exit( "\nError: rkStages should be 3 or 4.\n" )
 
@@ -273,19 +410,29 @@ if testCase == "bubble" :
 elif testCase == "igw" :
     saveDel = 200.
     CL = np.arange( -.0015, .0035, .0005 )
-elif testCase == "doubleStraka" :
+elif ( testCase == "densityCurrent" ) | ( testCase == "doubleDensityCurrent" ) | ( testCase == "movingDensityCurrent" ) :
     saveDel = 50.
     CL = np.arange( -16.5, 1.5, 1. )
 else :
     sys.exit( "\nError: Invalid test case string.\n" )
 
 #stepping forward in time with explicit RK:
-plt.ion()
+et = 0.             #elapsed time
+plt.ion()           #interactive plotting on
 print()
 for i in range(nTimesteps+1) :
-    if np.mod( i, np.round(saveDel/dt) ) == 0 :
+    if np.mod( i, np.int(np.round(saveDel/dt)) ) == 0 :
         if plotFromSaved == 0 :
-            U = setGhostNodes(U)
+            if formulation == "hydrostaticPressure" :
+                P = np.zeros(( nLev+2, nCol ))
+                P[1:nLev+1,:] = Po**(-Rd/Cv) * ( -Rd * U[2,1:nLev+1,:] / g * U[3,1:nLev+1,:] * dsdz ) ** (Cp/Cv)
+                sDot = np.zeros(( nLev+2, nCol ))
+                sDot[1:nLev+1,:] = U[0,1:nLev+1,:]*dsdx + U[1,1:nLev+1,:]*dsdz
+                U, P, sDot = setGhostNodes( U, P, sDot )
+            elif formulation == "exner" :
+                U = setGhostNodes(U)
+            else :
+                sys.exit( "\nError: Invalid formulation string.\n" )
             np.save( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy', U )
         else :
             U = np.load( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy' )
@@ -296,11 +443,19 @@ for i in range(nTimesteps+1) :
                 plt.axis( 'equal' )
             plt.waitforbuttonpress()
             plt.clf()
-        print( "t =", t )
+        print( "t =", np.int(np.round(t)) )
+        print( "et =", time.clock()-et )
+        et = time.clock()
         print( [ np.min(U[0,:,:]), np.max(U[0,:,:]) ] )
         print( [ np.min(U[1,:,:]), np.max(U[1,:,:]) ] )
         print( [ np.min(U[2,:,:]-thetaBar), np.max(U[2,:,:]-thetaBar) ] )
-        print( [ np.min(U[3,:,:]-piBar), np.max(U[3,:,:]-piBar) ] )
+        if formulation == "exner" :
+            pi = U[3,:,:]
+        elif formulation == "hydrostaticPressure" :
+            pi = ( -Rd * U[2,:,:] * np.tile(dsdzBottom,(nLev+2,1)) / g / Po * U[3,:,:] ) ** (Rd/Cv)
+        else :
+            sys.exit( "\nError: Invalid formulation string.\n" )
+        print( [ np.min(pi-piBar), np.max(pi-piBar) ] )
         print()
     if plotFromSaved == 0 :
         U = rk( t, U )
