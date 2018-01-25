@@ -9,7 +9,9 @@ formulation = "exner"
 #"bubble", "igw", "densityCurrent", "doubleDensityCurrent", "movingDensityCurrent":
 testCase = "movingDensityCurrent"
 
-plotFromSaved = 0
+plotFromSaved = 1
+
+highOrderZ = 0          #NOTE:  highOrderZ=1 is not working yet.
 
 ###########################################################################
 
@@ -55,15 +57,15 @@ elif testCase == "igw" :
 elif testCase == "densityCurrent" :
     xLeft = -25600.
     xRight = 25600.
-    nLev = 64
-    nCol = 64*8
+    nLev = 32
+    nCol = 32*8
     def zSurf(xTilde) :
         return np.zeros( np.shape(xTilde) )
     def zSurfPrime(xTilde) :
         return np.zeros( np.shape(xTilde) )
     zTop = 6400.
     tf = 900.
-    dt = 1./6.
+    dt = 1./3.
 elif testCase == "doubleDensityCurrent" :
     xLeft = -6400.
     xRight = 6400.
@@ -81,15 +83,15 @@ elif testCase == "doubleDensityCurrent" :
 elif testCase == "movingDensityCurrent" :
     xLeft = -18000.
     xRight = 18000.
-    nLev = 64
-    nCol = 360
+    nLev = 32
+    nCol = 180
     def zSurf(xTilde) :
         return np.zeros( np.shape(xTilde) )
     def zSurfPrime(xTilde) :
         return np.zeros( np.shape(xTilde) )
     zTop = 6400.
     tf = 900.
-    dt = 1./6.
+    dt = 1./3.
 else :
     sys.exit( "\nError: Invalid test case string.\n" )
 nTimesteps = round( (tf-t) / dt )
@@ -288,30 +290,58 @@ def HVs( U, sDot ) :
 #Setting ghost node values and getting the RHS of the ODE system:
 
 if formulation == "exner" :
-    def setGhostNodes( U ) :
-        #extrapolate uT to bottom ghost nodes:
-        uT = U[0,1:3,:]*bigTx + U[1,1:3,:]*bigTz
-        uT = 2*uT[0,:] - uT[1,:]
-        #get uN on bottom ghost nodes:
-        uN = U[0,1,:]*Nx + U[1,1,:]*Nz
-        uN = -uN
-        #use uT and uN to get (u,w) on bottom ghost nodes, then get (u,w) on top ghost nodes:
-        U[0,0,:] = uT*Tx + uN*Nx
-        U[1,0,:] = uT*Tz + uN*Nz
-        U[0,nLev+1,:] = 2*U[0,nLev,:] - U[0,nLev-1,:]
-        U[1,nLev+1,:] = -U[1,nLev,:]
-        #extrapolate theta to bottom ghost nodes, then top ghost nodes:
-        U[2,0,:] = thetaBar[0,:] + 2*(U[2,1,:]-thetaBar[1,:]) - (U[2,2,:]-thetaBar[2,:])
-        U[2,nLev+1,:] = thetaBar[nLev+1,:] + 2*(U[2,nLev,:]-thetaBar[nLev,:]) - (U[2,nLev-1,:]-thetaBar[nLev-1,:])
-        #get pi on bottom ghost nodes using derived BC:
-        dpidx = Dx( U[3,1:3,:] )
-        dpidx = 3./2.*dpidx[0,:] - 1./2.*dpidx[1,:]
-        th = ( U[2,0,:] + U[2,1,:] ) / 2.
-        U[3,0,:] = U[3,1,:] + ds/normGradS**2 * ( g/Cp/th*dsdzBottom + dpidx*dsdxBottom )
-        #get pi on top ghost nodes:
-        th = ( U[2,nLev,:] + U[2,nLev+1,:] ) / 2.
-        U[3,nLev+1,:] = U[3,nLev,:] - ds/dsdzBottom*g/Cp/th
-        return U
+    if highOrderZ == 1 :
+        def setGhostNodes( U ) :
+            #extrapolate uT to bottom ghost nodes:
+            uT = U[0,1:12,:]*bigTx + U[1,1:12,:]*bigTz
+            uT = np.sum( we*uT, axis=0 )
+            #get uN on bottom ghost nodes:
+            uN = U[0,1:11,:]*bigNx + U[1,1:11,:]*bigNz
+            uN = np.sum( wi*uN, axis=0 )
+            #use uT and uN to get (u,w) on bottom ghost nodes, then get (u,w) on top ghost nodes:
+            U[0,0,:] = uT*Tx + uN*Nx
+            U[1,0,:] = uT*Tz + uN*Nz
+            U[0,nLev+1,:] = 2*U[0,nLev,:] - U[0,nLev-1,:]
+            U[1,nLev+1,:] = -U[1,nLev,:]
+            #extrapolate theta to bottom ghost nodes, then top ghost nodes:
+            U[2,0,:] = thetaBar[0,:] + 2*(U[2,1,:]-thetaBar[1,:]) - (U[2,2,:]-thetaBar[2,:])
+            U[2,nLev+1,:] = thetaBar[nLev+1,:] + 2*(U[2,nLev,:]-thetaBar[nLev,:]) - (U[2,nLev-1,:]-thetaBar[nLev-1,:])
+            #get pi on bottom ghost nodes using derived BC:
+            dpidx = Dx( U[3,1:3,:] )
+            dpidx = 3./2.*dpidx[0,:] - 1./2.*dpidx[1,:]
+            th = ( U[2,0,:] + U[2,1,:] ) / 2.
+            U[3,0,:] = U[3,1,:] + ds/normGradS**2 * ( g/Cp/th*dsdzBottom + dpidx*dsdxBottom )
+            #get pi on top ghost nodes:
+            th = ( U[2,nLev,:] + U[2,nLev+1,:] ) / 2.
+            U[3,nLev+1,:] = U[3,nLev,:] - ds/dsdzBottom*g/Cp/th
+            return U
+    elif highOrderZ == 0 :
+        def setGhostNodes( U ) :
+            #extrapolate uT to bottom ghost nodes:
+            uT = U[0,1:3,:]*bigTx + U[1,1:3,:]*bigTz
+            uT = 2*uT[0,:] - uT[1,:]
+            #get uN on bottom ghost nodes:
+            uN = U[0,1,:]*Nx + U[1,1,:]*Nz
+            uN = -uN
+            #use uT and uN to get (u,w) on bottom ghost nodes, then get (u,w) on top ghost nodes:
+            U[0,0,:] = uT*Tx + uN*Nx
+            U[1,0,:] = uT*Tz + uN*Nz
+            U[0,nLev+1,:] = 2*U[0,nLev,:] - U[0,nLev-1,:]
+            U[1,nLev+1,:] = -U[1,nLev,:]
+            #extrapolate theta to bottom ghost nodes, then top ghost nodes:
+            U[2,0,:] = thetaBar[0,:] + 2*(U[2,1,:]-thetaBar[1,:]) - (U[2,2,:]-thetaBar[2,:])
+            U[2,nLev+1,:] = thetaBar[nLev+1,:] + 2*(U[2,nLev,:]-thetaBar[nLev,:]) - (U[2,nLev-1,:]-thetaBar[nLev-1,:])
+            #get pi on bottom ghost nodes using derived BC:
+            dpidx = Dx( U[3,1:3,:] )
+            dpidx = 3./2.*dpidx[0,:] - 1./2.*dpidx[1,:]
+            th = ( U[2,0,:] + U[2,1,:] ) / 2.
+            U[3,0,:] = U[3,1,:] + ds/normGradS**2 * ( g/Cp/th*dsdzBottom + dpidx*dsdxBottom )
+            #get pi on top ghost nodes:
+            th = ( U[2,nLev,:] + U[2,nLev+1,:] ) / 2.
+            U[3,nLev+1,:] = U[3,nLev,:] - ds/dsdzBottom*g/Cp/th
+            return U
+    else :
+        sys.exit( "\nError: highOrderZ should be zero or one.\n" )
     def odefun( t, U ) :
         V = np.zeros( np.shape(U) )
         #set ghost node values for all variables:
@@ -320,19 +350,15 @@ if formulation == "exner" :
         Us = Ds(U)
         sDot = U[0,1:nLev+1,:]*dsdx + U[1,1:nLev+1,:]*dsdz
         sDot = np.tile( sDot, (4,1,1) )
-        tmp = HVs( U, sDot )
+        V[:,1:nLev+1,:] = HVs( U, sDot )
         U = U[:,1:nLev+1,:]
         #get RHS of ode function:
         Ux = Dx(U)
         u = np.tile( U[0,:,:], (4,1,1) )
-        tmp = tmp - u * Ux - sDot * Us
-        tmp[0,:,:] = tmp[0,:,:] - Cp*U[2,:,:] * ( Ux[3,:,:] + Us[3,:,:]*dsdx )
-        tmp[1,:,:] = tmp[1,:,:] - Cp*U[2,:,:] * ( Us[3,:,:]*dsdz ) - g
-        tmp[3,:,:] = tmp[3,:,:] - Rd/Cv*U[3,:,:] * ( Ux[0,:,:]+Us[0,:,:]*dsdx + Us[1,:,:]*dsdz )
-        #apply horizontal dissipation:
-        tmp = tmp + HVx( U, u )
-        #set output:
-        V[:,1:nLev+1,:] = tmp
+        V[:,1:nLev+1,:] = V[:,1:nLev+1,:] - u * Ux - sDot * Us + HVx( U, u )
+        V[0,1:nLev+1,:] = V[0,1:nLev+1,:] - Cp*U[2,:,:] * ( Ux[3,:,:] + Us[3,:,:]*dsdx )
+        V[1,1:nLev+1,:] = V[1,1:nLev+1,:] - Cp*U[2,:,:] * ( Us[3,:,:]*dsdz ) - g
+        V[3,1:nLev+1,:] = V[3,1:nLev+1,:] - Rd/Cv*U[3,:,:] * ( Ux[0,:,:]+Us[0,:,:]*dsdx + Us[1,:,:]*dsdz )
         return V
 elif formulation == "hydrostaticPressure" :
     def setGhostNodes( U, P, sDot ) :
@@ -417,12 +443,16 @@ def rk( t, U ) :
 
 if testCase == "bubble" :
     saveDel = 100.
+    # saveDel = 1500.
     CL = np.arange( -.05, 2.15, .1 )
 elif testCase == "igw" :
     saveDel = 200.
-    CL = np.arange( -.0015, .0035, .0005 )
+    # saveDel = 600.
+    CL = np.arange( -.0021, .0035, .0002 )
+    # CL = np.arange( -.0015, .0035, .0005 )
 elif ( testCase == "densityCurrent" ) | ( testCase == "doubleDensityCurrent" ) | ( testCase == "movingDensityCurrent" ) :
     saveDel = 50.
+    # saveDel = 900.
     CL = np.arange( -16.5, 1.5, 1. )
 else :
     sys.exit( "\nError: Invalid test case string.\n" )
@@ -434,6 +464,20 @@ else :
 et = 0.             #elapsed time
 plt.ion()           #interactive plotting on
 print()
+if plotFromSaved == 1 :
+    if testCase == "densityCurrent" :
+        fig = plt.figure( figsize = (30,10) )
+    elif testCase == "doubleDensityCurrent" :
+        fig = plt.figure( figsize = (30,15) )
+    elif testCase == "movingDensityCurrent" :
+        fig = plt.figure( figsize = (30,10) )
+    elif testCase == "bubble" :
+        fig = plt.figure( figsize = (12,10) )
+    elif testCase == "igw" :
+        fig = plt.figure( figsize = (30,3) )
+    else :
+        sys.exit( "\nError: Invalid test case string.\n" )
+    ax = fig.add_subplot(111)
 
 for i in range(nTimesteps+1) :
     if np.mod( i, np.int(np.round(saveDel/dt)) ) == 0 :
@@ -451,12 +495,29 @@ for i in range(nTimesteps+1) :
             np.save( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy', U )
         else :
             U = np.load( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy' )
-            plt.contourf( x, z, np.squeeze(U[2,:,:])-thetaBar, CL )
-            plt.colorbar()
+            cp = plt.contourf( x, z, np.squeeze(U[2,:,:])-thetaBar, CL )
+            if testCase == "densityCurrent" :
+                cb = plt.colorbar( cp, orientation = 'horizontal', fraction = .25, pad = -.05, aspect = 100 )
+                cb.ax.tick_params( labelsize = 30 )
+            elif testCase == "doubleDensityCurrent" :
+                cb = plt.colorbar( cp )
+                cb.ax.tick_params( labelsize = 20 )
+            elif testCase == "movingDensityCurrent" :
+                cb = plt.colorbar( cp, orientation = 'horizontal', fraction = .25, pad = -.05, aspect = 100 )
+                cb.ax.tick_params( labelsize = 30 )
+            elif testCase == "bubble" :
+                cb = plt.colorbar( cp )
+                cb.ax.tick_params( labelsize = 20 )
+            elif testCase == "igw" :
+                cb = plt.colorbar( cp, orientation = 'horizontal', fraction = .25, pad = .05, aspect = 100 )
+                cb.ax.tick_params( labelsize = 20 )
+            else :
+                sys.exit( "\nError: Invalid test case string.\n" )
             plt.title( '{0}, t = {1:04.0f}, ' . format( testCase, t ) )
-            if testCase != "igw" :
-                plt.axis( 'equal' )
-            plt.axis( [ xLeft-dx, xRight+dx, -dx, zTop+dx ] )
+            plt.axis( 'equal' )
+            # plt.axis( [ xLeft-dx, xRight+dx, -dx, zTop+dx ] )
+            plt.axis( 'off' )
+            # fig.savefig( 'foo' + '{0:1d}'.format(np.int(np.round(t))) + '.png', bbox_inches = 'tight' )
             plt.waitforbuttonpress()
             plt.clf()
         print( "t =", np.int(np.round(t)) )
