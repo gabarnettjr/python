@@ -2,16 +2,23 @@ import sys
 import numpy as np
 import time
 import matplotlib.pyplot as plt
+from gab import rk, phs1
+
+weights = phs1.getWeights( 0, np.array([-2.,-1.,0.,1.,2.]), 4, 5, 4 )
+print(weights)
+sys.exit( "\nStop here for now.\n" )
 
 #"exner", "hydrostaticPressure":
 formulation = "exner"
 
 #"bubble", "igw", "densityCurrent", "doubleDensityCurrent", "movingDensityCurrent":
-testCase = "movingDensityCurrent"
+testCase = "doubleDensityCurrent"
 
 plotFromSaved = 1
 
-highOrderZ = 0          #NOTE:  highOrderZ=1 is not working yet.
+#NOTE:  highOrderZ=1 is not working yet:
+highOrderZ = 0
+ni = 11
 
 ###########################################################################
 
@@ -22,9 +29,17 @@ Rd = Cp - Cv
 g = 9.81
 Po = 10.**5.
 
+#Choose number of Runge-Kutta stages (3 or 4):
+rkStages = 3
+if rkStages == 3 :
+    rk = rk.rk3
+elif rkStages == 4 :
+    rk = rk.rk4
+else :
+    sys.exit( "\nError: rkStages should be 3 or 4.\n" )
+
 #domain parameters:
 t = 0.
-rkStages = 3
 if testCase == "bubble" :
     xLeft = 0.
     xRight = 10000.
@@ -97,7 +112,8 @@ else :
 nTimesteps = round( (tf-t) / dt )
 
 #path to saved results:
-saveString = './results/' + formulation + '/' + testCase + '/nLev' + '{0:1d}'.format(nLev) + '_nCol' + '{0:1d}'.format(nCol) + '/'
+saveString = './results/' + formulation + '/' + testCase + \
+    '/nLev' + '{0:1d}'.format(nLev) + '_nCol' + '{0:1d}'.format(nCol) + '/'
 
 #definition of the scale-preserving s-coordinate and its derivatives:
 def s( xTilde, zTilde ) :
@@ -127,10 +143,12 @@ Tz = zSurfPrime( x[0,:] )
 normT = np.sqrt( Tx**2 + Tz**2 )
 Tx = Tx / normT
 Tz = Tz / normT
-bigTx = np.vstack((Tx,Tx))
-bigTz = np.vstack((Tz,Tz))
+bigTx = np.tile( Tx, (ni,1) )
+bigTz = np.tile( Tz, (ni,1) )
 Nx = -Tz
 Nz = Tx
+bigNx = np.tile( Nx, (ni-1,1) )
+bigNz = np.tile( Nz, (ni-1,1) )
 
 #definition of background states and initial conditions:
 U = np.zeros(( 4, nLev+2, nCol ))
@@ -293,21 +311,24 @@ if formulation == "exner" :
     if highOrderZ == 1 :
         def setGhostNodes( U ) :
             #extrapolate uT to bottom ghost nodes:
-            uT = U[0,1:12,:]*bigTx + U[1,1:12,:]*bigTz
+            uT = U[0,1:ni+1,:]*bigTx + U[1,1:ni+1,:]*bigTz
             uT = np.sum( we*uT, axis=0 )
             #get uN on bottom ghost nodes:
-            uN = U[0,1:11,:]*bigNx + U[1,1:11,:]*bigNz
+            uN = U[0,1:ni,:]*bigNx + U[1,1:ni,:]*bigNz
             uN = np.sum( wi*uN, axis=0 )
             #use uT and uN to get (u,w) on bottom ghost nodes, then get (u,w) on top ghost nodes:
             U[0,0,:] = uT*Tx + uN*Nx
             U[1,0,:] = uT*Tz + uN*Nz
-            U[0,nLev+1,:] = 2*U[0,nLev,:] - U[0,nLev-1,:]
-            U[1,nLev+1,:] = -U[1,nLev,:]
+            U[0,nLev+1,:] = np.sum( np.flipud(we)*U[0,nLev-(ni-1):nLev+1,:], axis=0 )
+            U[1,nLev+1,:] = np.sum( np.flipud(wi)*U[0,nLev-(ni-2):nLev+1,:], axis=0 )
             #extrapolate theta to bottom ghost nodes, then top ghost nodes:
-            U[2,0,:] = thetaBar[0,:] + 2*(U[2,1,:]-thetaBar[1,:]) - (U[2,2,:]-thetaBar[2,:])
-            U[2,nLev+1,:] = thetaBar[nLev+1,:] + 2*(U[2,nLev,:]-thetaBar[nLev,:]) - (U[2,nLev-1,:]-thetaBar[nLev-1,:])
+            th = U[2,1:(ni+1),:] - thetaBar[1:(ni+1),:]
+            U[2,0,:] = thetaBar[0,:] + np.sum( we*th, axis=0 )
+            th = U[2,nLev-(ni-1):nLev+1,:] - thetaBar[nLev-(ni-1):nLev+1,:]
+            U[2,nLev+1,:] = thetaBar[nLev+1,:] + np.sum( np.flipud(we)*th, axis=0 )
+            
             #get pi on bottom ghost nodes using derived BC:
-            dpidx = Dx( U[3,1:3,:] )
+            dpidx = Dx( U[3,1:(ni+1),:] )
             dpidx = 3./2.*dpidx[0,:] - 1./2.*dpidx[1,:]
             th = ( U[2,0,:] + U[2,1,:] ) / 2.
             U[3,0,:] = U[3,1,:] + ds/normGradS**2 * ( g/Cp/th*dsdzBottom + dpidx*dsdxBottom )
@@ -422,23 +443,6 @@ else :
 
 ###########################################################################
 
-def rk( t, U ) :
-    if rkStages == 4 :
-        q1 = odefun( t,      U         )
-        q2 = odefun( t+dt/2, U+dt/2*q1 )
-        q3 = odefun( t+dt/2, U+dt/2*q2 )
-        q4 = odefun( t+dt,   U+dt*q3   )
-        return U + dt/6 * ( q1 + 2*q2 + 2*q3 + q4 )
-    elif rkStages == 3 :
-        q1 = odefun( t,        U           )
-        q2 = odefun( t+dt/3,   U+dt/3*q1   )
-        q2 = odefun( t+2*dt/3, U+2*dt/3*q2 )
-        return U + dt/4 * ( q1 + 3*q2 )
-    else :
-        sys.exit( "\nError: rkStages should be 3 or 4.\n" )
-
-###########################################################################
-
 #set how often to save the results, and set contour levels:
 
 if testCase == "bubble" :
@@ -468,7 +472,7 @@ if plotFromSaved == 1 :
     if testCase == "densityCurrent" :
         fig = plt.figure( figsize = (30,10) )
     elif testCase == "doubleDensityCurrent" :
-        fig = plt.figure( figsize = (30,15) )
+        fig = plt.figure( figsize = (25,10) )
     elif testCase == "movingDensityCurrent" :
         fig = plt.figure( figsize = (30,10) )
     elif testCase == "bubble" :
@@ -515,7 +519,6 @@ for i in range(nTimesteps+1) :
                 sys.exit( "\nError: Invalid test case string.\n" )
             plt.title( '{0}, t = {1:04.0f}, ' . format( testCase, t ) )
             plt.axis( 'equal' )
-            # plt.axis( [ xLeft-dx, xRight+dx, -dx, zTop+dx ] )
             plt.axis( 'off' )
             # fig.savefig( 'foo' + '{0:1d}'.format(np.int(np.round(t))) + '.png', bbox_inches = 'tight' )
             plt.waitforbuttonpress()
@@ -535,7 +538,7 @@ for i in range(nTimesteps+1) :
         print( [ np.min(pi-piBar), np.max(pi-piBar) ] )
         print()
     if plotFromSaved == 0 :
-        U = rk( t, U )
+        U = rk( t, U, odefun, dt )
     t = t + dt
 
 ###########################################################################
