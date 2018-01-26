@@ -14,10 +14,10 @@ from gab import rk, phs1
 formulation = "exner"
 
 #"bubble", "igw", "densityCurrent", "doubleDensityCurrent", "movingDensityCurrent":
-testCase = "igw"
+testCase = "movingDensityCurrent"
 
 plotFromSaved = 1
-var = 3
+var = 2
 
 #NOTE:  highOrderZ=1 and formulation="hydrostaticPressure" does not work yet
 highOrderZ = 0
@@ -100,15 +100,15 @@ elif testCase == "doubleDensityCurrent" :
 elif testCase == "movingDensityCurrent" :
     xLeft = -18000.
     xRight = 18000.
-    nLev = 32
-    nCol = 180
+    nLev = 64
+    nCol = 360
     def zSurf(xTilde) :
         return np.zeros( np.shape(xTilde) )
     def zSurfPrime(xTilde) :
         return np.zeros( np.shape(xTilde) )
     zTop = 6400.
     tf = 900.
-    dt = 1./3.
+    dt = 1./6.
 else :
     sys.exit( "\nError: Invalid test case string.\n" )
 nTimesteps = round( (tf-t) / dt )
@@ -314,18 +314,24 @@ def HVs( U, sDot ) :
 
 if formulation == "exner" :
     if highOrderZ == 1 :
-        ni = 2
-        rbfOrder = 3
-        polyOrder = 1
+        ni = 11
+        rbfOrder = 5
+        polyOrder = 3
         bigTx = np.tile( Tx, (ni,1) )
         bigTz = np.tile( Tz, (ni,1) )
         bigNx = np.tile( Nx, (ni-1,1) )
         bigNz = np.tile( Nz, (ni-1,1) )
+        #weights to extrapolate to ghost nodes:
         we = phs1.getWeights( s[0,0], s[1:ni+1,0], 0, rbfOrder, polyOrder )
         we = np.transpose( np.tile( we, (nCol,1) ) )
+        #weights to extrapolate to boundary:
+        we2 = phs1.getWeights( (s[0,0]+s[1,0])/2., s[1:ni+1,0], 0, rbfOrder, polyOrder )
+        we2 = np.transpose( np.tile( we2, (nCol,1) ) )
+        #weights to interpolate to boundary:
         wi = phs1.getWeights( 0., s[0:ni,0], 0, rbfOrder, polyOrder )
         wi = -1/wi[0] * wi[1:ni]
         wi = np.transpose( np.tile( wi, (nCol,1) ) )
+        #weights to approximate d/ds at boundary:
         wd = phs1.getWeights( 0., s[0:ni,0], 1, rbfOrder, polyOrder )
         wd = np.transpose( np.tile( wd, (nCol,1) ) )
         def setGhostNodes( U ) :
@@ -341,19 +347,16 @@ if formulation == "exner" :
             U[0,nLev+1,:] = np.sum( np.flipud(we)*U[0,nLev-(ni-1):nLev+1,:], axis=0 )
             U[1,nLev+1,:] = np.sum( np.flipud(wi)*U[1,nLev-(ni-2):nLev+1,:], axis=0 )
             #extrapolate theta to bottom ghost nodes, then top ghost nodes:
-            th = U[2,1:(ni+1),:] - thetaBar[1:(ni+1),:]
-            U[2,0,:] = thetaBar[0,:] + np.sum( we*th, axis=0 )
-            th = U[2,nLev-(ni-1):nLev+1,:] - thetaBar[nLev-(ni-1):nLev+1,:]
-            U[2,nLev+1,:] = thetaBar[nLev+1,:] + np.sum( np.flipud(we)*th, axis=0 )
+            U[2,0,:] = np.sum( we*U[2,1:(ni+1),:], axis=0 )
+            U[2,nLev+1,:] = np.sum( np.flipud(we)*U[2,nLev-(ni-1):nLev+1,:], axis=0 )
             #get pi on bottom ghost nodes using derived BC:
             dpidx = Dx( U[3,1:(ni+1),:] )
-            dpidx = np.sum( we*dpidx, axis=0 )
-            
-            th = ( U[2,0,:] + U[2,1,:] ) / 2.
-            U[3,0,:] = U[3,1,:] + ds/normGradS**2 * ( g/Cp/th*dsdzBottom + dpidx*dsdxBottom )
+            dpidx = np.sum( we2*dpidx, axis=0 )
+            th = np.sum( we2*U[2,1:(ni+1),:], axis=0 )
+            U[3,0,:] = 1/wd[0,:] * ( -1/normGradS**2 * ( g/Cp/th*dsdzBottom + dpidx*dsdxBottom ) - np.sum( wd[1:ni,:]*U[3,1:ni,:], axis=0 ) )
             #get pi on top ghost nodes:
-            th = ( U[2,nLev,:] + U[2,nLev+1,:] ) / 2.
-            U[3,nLev+1,:] = U[3,nLev,:] - ds/dsdzBottom*g/Cp/th
+            th = np.sum( np.flipud(we2)*U[2,nLev-(ni-1):nLev+1,:], axis=0 )
+            U[3,nLev+1,:] = -1/wd[0,:] * ( -1/dsdzBottom*g/Cp/th + np.sum( np.flipud(wd[1:ni,:])*U[3,nLev-(ni-2):nLev+1], axis=0 ) )
             return U
     elif highOrderZ == 0 :
         bigTx = np.tile( Tx, (2,1) )
