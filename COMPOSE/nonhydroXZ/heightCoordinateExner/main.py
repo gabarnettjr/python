@@ -4,21 +4,23 @@ import time
 import matplotlib.pyplot as plt
 from gab import rk, phs1
 
-weights = phs1.getWeights( 0, np.array([-2.,-1.,0.,1.,2.]), 4, 5, 4 )
-print(weights)
-sys.exit( "\nStop here for now.\n" )
+# x = np.arange(-.5,10.5,1.)
+# weights = phs1.getWeights( 0, x, 1, 5, 3 )
+# print()
+# print( np.sum( weights * x**4 ) )
+# sys.exit( "\nStop here for now.\n" )
 
 #"exner", "hydrostaticPressure":
 formulation = "exner"
 
 #"bubble", "igw", "densityCurrent", "doubleDensityCurrent", "movingDensityCurrent":
-testCase = "doubleDensityCurrent"
+testCase = "igw"
 
 plotFromSaved = 1
+var = 3
 
-#NOTE:  highOrderZ=1 is not working yet:
+#NOTE:  highOrderZ=1 and formulation="hydrostaticPressure" does not work yet
 highOrderZ = 0
-ni = 11
 
 ###########################################################################
 
@@ -112,8 +114,14 @@ else :
 nTimesteps = round( (tf-t) / dt )
 
 #path to saved results:
-saveString = './results/' + formulation + '/' + testCase + \
-    '/nLev' + '{0:1d}'.format(nLev) + '_nCol' + '{0:1d}'.format(nCol) + '/'
+if highOrderZ == 0 :
+    saveString = './results/' + formulation + '/lowOrderZ/' + testCase + \
+        '/nLev' + '{0:1d}'.format(nLev) + '_nCol' + '{0:1d}'.format(nCol) + '/'
+elif highOrderZ == 1 :
+    saveString = './results/' + formulation + '/highOrderZ/' + testCase + \
+        '/nLev' + '{0:1d}'.format(nLev) + '_nCol' + '{0:1d}'.format(nCol) + '/'
+else :
+    sys.exit( "\nError: highOrderZ should be 0 or 1.\n" )
 
 #definition of the scale-preserving s-coordinate and its derivatives:
 def s( xTilde, zTilde ) :
@@ -143,12 +151,8 @@ Tz = zSurfPrime( x[0,:] )
 normT = np.sqrt( Tx**2 + Tz**2 )
 Tx = Tx / normT
 Tz = Tz / normT
-bigTx = np.tile( Tx, (ni,1) )
-bigTz = np.tile( Tz, (ni,1) )
 Nx = -Tz
 Nz = Tx
-bigNx = np.tile( Nx, (ni-1,1) )
-bigNz = np.tile( Nz, (ni-1,1) )
 
 #definition of background states and initial conditions:
 U = np.zeros(( 4, nLev+2, nCol ))
@@ -235,6 +239,7 @@ else :
     sys.exit( "\nError: Invalid formulation string.\n" )
 
 #convert functions to values on nodes:
+s = s(x,z)
 dsdxBottom = dsdx( x[0,:], zs )
 dsdzBottom = dsdz( x[0,:], zs )
 normGradS = np.sqrt( dsdxBottom**2 + dsdzBottom**2 )
@@ -309,6 +314,20 @@ def HVs( U, sDot ) :
 
 if formulation == "exner" :
     if highOrderZ == 1 :
+        ni = 2
+        rbfOrder = 3
+        polyOrder = 1
+        bigTx = np.tile( Tx, (ni,1) )
+        bigTz = np.tile( Tz, (ni,1) )
+        bigNx = np.tile( Nx, (ni-1,1) )
+        bigNz = np.tile( Nz, (ni-1,1) )
+        we = phs1.getWeights( s[0,0], s[1:ni+1,0], 0, rbfOrder, polyOrder )
+        we = np.transpose( np.tile( we, (nCol,1) ) )
+        wi = phs1.getWeights( 0., s[0:ni,0], 0, rbfOrder, polyOrder )
+        wi = -1/wi[0] * wi[1:ni]
+        wi = np.transpose( np.tile( wi, (nCol,1) ) )
+        wd = phs1.getWeights( 0., s[0:ni,0], 1, rbfOrder, polyOrder )
+        wd = np.transpose( np.tile( wd, (nCol,1) ) )
         def setGhostNodes( U ) :
             #extrapolate uT to bottom ghost nodes:
             uT = U[0,1:ni+1,:]*bigTx + U[1,1:ni+1,:]*bigTz
@@ -320,16 +339,16 @@ if formulation == "exner" :
             U[0,0,:] = uT*Tx + uN*Nx
             U[1,0,:] = uT*Tz + uN*Nz
             U[0,nLev+1,:] = np.sum( np.flipud(we)*U[0,nLev-(ni-1):nLev+1,:], axis=0 )
-            U[1,nLev+1,:] = np.sum( np.flipud(wi)*U[0,nLev-(ni-2):nLev+1,:], axis=0 )
+            U[1,nLev+1,:] = np.sum( np.flipud(wi)*U[1,nLev-(ni-2):nLev+1,:], axis=0 )
             #extrapolate theta to bottom ghost nodes, then top ghost nodes:
             th = U[2,1:(ni+1),:] - thetaBar[1:(ni+1),:]
             U[2,0,:] = thetaBar[0,:] + np.sum( we*th, axis=0 )
             th = U[2,nLev-(ni-1):nLev+1,:] - thetaBar[nLev-(ni-1):nLev+1,:]
             U[2,nLev+1,:] = thetaBar[nLev+1,:] + np.sum( np.flipud(we)*th, axis=0 )
-            
             #get pi on bottom ghost nodes using derived BC:
             dpidx = Dx( U[3,1:(ni+1),:] )
-            dpidx = 3./2.*dpidx[0,:] - 1./2.*dpidx[1,:]
+            dpidx = np.sum( we*dpidx, axis=0 )
+            
             th = ( U[2,0,:] + U[2,1,:] ) / 2.
             U[3,0,:] = U[3,1,:] + ds/normGradS**2 * ( g/Cp/th*dsdzBottom + dpidx*dsdxBottom )
             #get pi on top ghost nodes:
@@ -337,6 +356,8 @@ if formulation == "exner" :
             U[3,nLev+1,:] = U[3,nLev,:] - ds/dsdzBottom*g/Cp/th
             return U
     elif highOrderZ == 0 :
+        bigTx = np.tile( Tx, (2,1) )
+        bigTz = np.tile( Tz, (2,1) )
         def setGhostNodes( U ) :
             #extrapolate uT to bottom ghost nodes:
             uT = U[0,1:3,:]*bigTx + U[1,1:3,:]*bigTz
@@ -499,7 +520,16 @@ for i in range(nTimesteps+1) :
             np.save( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy', U )
         else :
             U = np.load( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy' )
-            cp = plt.contourf( x, z, np.squeeze(U[2,:,:])-thetaBar, CL )
+            if var == 0 :
+                cp = plt.contourf( x, z, np.squeeze(U[0,:,:]) )
+            elif var == 1 :
+                cp = plt.contourf( x, z, np.squeeze(U[1,:,:]) )
+            elif var == 2 :
+                cp = plt.contourf( x, z, np.squeeze(U[2,:,:])-thetaBar, CL )
+            elif var == 3 :
+                cp = plt.contourf( x, z, np.squeeze(U[3,:,:])-piBar )
+            else :
+                sys.exit( "\nError: var should be 0, 1, 2, or 3.\n" )
             if testCase == "densityCurrent" :
                 cb = plt.colorbar( cp, orientation = 'horizontal', fraction = .25, pad = -.05, aspect = 100 )
                 cb.ax.tick_params( labelsize = 30 )
