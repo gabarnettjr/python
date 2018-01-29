@@ -14,13 +14,13 @@ from gab import rk, phs1
 formulation = "exner"
 
 #"bubble", "igw", "densityCurrent", "doubleDensityCurrent", "movingDensityCurrent":
-testCase = "movingDensityCurrent"
+testCase = "igw"
 
 plotFromSaved = 1
-var = 2
+var = 3
 
 #NOTE:  highOrderZ=1 and formulation="hydrostaticPressure" does not work yet
-highOrderZ = 0
+highOrderZ = 1
 
 ###########################################################################
 
@@ -271,15 +271,6 @@ def Dx(U) :
         sys.exit( "\nError: Invalid array dimensions.  U must be a 1D, 2D, or 3D array.\n" )
     return V/dx
 
-ws = [ -1./2., 0, 1./2. ]
-def Ds(U) :
-    if np.shape(np.shape(U))[0] == 3 :
-        return ( ws[0]*U[:,0:nLev,:] + ws[1]*U[:,1:nLev+1,:] + ws[2]*U[:,2:nLev+2,:] ) / ds
-    elif np.shape(np.shape(U))[0] == 2 :
-        return ( ws[0]*U[0:nLev,:] + ws[1]*U[1:nLev+1,:] + ws[2]*U[2:nLev+2,:] ) / ds
-    else :
-        sys.exit( "\nError: U should be a 2D or 3D array.\n" )
-
 wxhv = [ 1., -4., 6., -4., 1. ]
 def HVx( U, u ) :
     V = np.zeros( np.shape(U) )
@@ -299,6 +290,15 @@ def HVx( U, u ) :
         sys.exit( "\nError: U should be a 2D or 3D array.\n" )
     return -1./12. * np.abs(u) * V / dx
 
+ws = [ -1./2., 0, 1./2. ]
+def Ds(U) :
+    if np.shape(np.shape(U))[0] == 3 :
+        return ( ws[0]*U[:,0:nLev,:] + ws[1]*U[:,1:nLev+1,:] + ws[2]*U[:,2:nLev+2,:] ) / ds
+    elif np.shape(np.shape(U))[0] == 2 :
+        return ( ws[0]*U[0:nLev,:] + ws[1]*U[1:nLev+1,:] + ws[2]*U[2:nLev+2,:] ) / ds
+    else :
+        sys.exit( "\nError: U should be a 2D or 3D array.\n" )
+
 wshv = [ 1., -2., 1 ]
 def HVs( U, sDot ) :
     if np.shape(np.shape(U))[0] == 3 :
@@ -314,9 +314,9 @@ def HVs( U, sDot ) :
 
 if formulation == "exner" :
     if highOrderZ == 1 :
-        ni = 11
-        rbfOrder = 5
-        polyOrder = 3
+        ni = 2
+        rbfOrder = 3
+        polyOrder = 1
         bigTx = np.tile( Tx, (ni,1) )
         bigTz = np.tile( Tz, (ni,1) )
         bigNx = np.tile( Nx, (ni-1,1) )
@@ -374,8 +374,10 @@ if formulation == "exner" :
             U[0,nLev+1,:] = 2*U[0,nLev,:] - U[0,nLev-1,:]
             U[1,nLev+1,:] = -U[1,nLev,:]
             #extrapolate theta to bottom ghost nodes, then top ghost nodes:
-            U[2,0,:] = thetaBar[0,:] + 2*(U[2,1,:]-thetaBar[1,:]) - (U[2,2,:]-thetaBar[2,:])
-            U[2,nLev+1,:] = thetaBar[nLev+1,:] + 2*(U[2,nLev,:]-thetaBar[nLev,:]) - (U[2,nLev-1,:]-thetaBar[nLev-1,:])
+            U[2,0,:] = 2*U[2,1,:] - U[2,2,:]
+            U[2,nLev+1,:] = 2*U[2,nLev,:] - U[2,nLev-1,:]
+            # U[2,0,:] = thetaBar[0,:] + 2*(U[2,1,:]-thetaBar[1,:]) - (U[2,2,:]-thetaBar[2,:])
+            # U[2,nLev+1,:] = thetaBar[nLev+1,:] + 2*(U[2,nLev,:]-thetaBar[nLev,:]) - (U[2,nLev-1,:]-thetaBar[nLev-1,:])
             #get pi on bottom ghost nodes using derived BC:
             dpidx = Dx( U[3,1:3,:] )
             dpidx = 3./2.*dpidx[0,:] - 1./2.*dpidx[1,:]
@@ -406,9 +408,11 @@ if formulation == "exner" :
         V[3,1:nLev+1,:] = V[3,1:nLev+1,:] - Rd/Cv*U[3,:,:] * ( Ux[0,:,:]+Us[0,:,:]*dsdx + Us[1,:,:]*dsdz )
         return V
 elif formulation == "hydrostaticPressure" :
+    bigTx = np.tile( Tx, (2,1) )
+    bigTz = np.tile( Tz, (2,1) )
     def setGhostNodes( U, P, sDot ) :
         #extrapolate uT to bottom ghost nodes:
-        uT = U[0,1:3,:]*np.vstack((Tx,Tx)) + U[1,1:3,:]*np.vstack((Tz,Tz))
+        uT = U[0,1:3,:]*bigTx + U[1,1:3,:]*bigTz
         uT = 2*uT[0,:] - uT[1,:]
         #get uN on bottom ghost nodes:
         uN = U[0,1,:]*Nx + U[1,1,:]*Nz
