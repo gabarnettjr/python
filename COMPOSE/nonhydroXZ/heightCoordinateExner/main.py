@@ -2,7 +2,7 @@ import sys
 import numpy as np
 import time
 import matplotlib.pyplot as plt
-from gab import rk, phs1
+from gab import rk, phs1, nonhydro
 
 # x = np.arange(-.5,10.5,1.)
 # weights = phs1.getWeights( 0, x, 1, 5, 3 )
@@ -17,10 +17,10 @@ formulation = "exner"
 testCase = "igw"
 
 plotFromSaved = 1
-var = 3
+var = 2
 
 #NOTE:  highOrderZ=1 and formulation="hydrostaticPressure" does not work yet
-highOrderZ = 1
+highOrderZ = 0
 
 ###########################################################################
 
@@ -111,6 +111,7 @@ elif testCase == "movingDensityCurrent" :
     dt = 1./6.
 else :
     sys.exit( "\nError: Invalid test case string.\n" )
+
 nTimesteps = round( (tf-t) / dt )
 
 #path to saved results:
