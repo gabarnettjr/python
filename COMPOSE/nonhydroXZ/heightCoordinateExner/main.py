@@ -14,9 +14,9 @@ from gab import rk, phs1, nonhydro
 formulation = "exner"
 
 #"bubble", "igw", "densityCurrent", "doubleDensityCurrent", "movingDensityCurrent":
-testCase = "igw"
+testCase = "doubleDensityCurrent"
 
-plotFromSaved = 1
+plotFromSaved = 0
 var = 2
 
 #NOTE:  highOrderZ=1 and formulation="hydrostaticPressure" does not work yet
@@ -24,12 +24,7 @@ highOrderZ = 0
 
 ###########################################################################
 
-#atmospheric constants:
-Cp = 1004.
-Cv = 717.
-Rd = Cp - Cv
-g = 9.81
-Po = 10.**5.
+Cp, Cv, Rd, g, Po = nonhydro.getConstants()
 
 #Choose number of Runge-Kutta stages (3 or 4):
 rkStages = 3
