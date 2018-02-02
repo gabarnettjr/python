@@ -9,15 +9,16 @@ from gab import nonhydro, phs2, rk
 testCase = "doubleDensityCurrent"
 formulation = "exner"
 semiLagrangian = 0
+rbfs = 0
 dx = 100.
 ds = 100.
 FD = 4                          #Order of lateral FD (positive even number)
-rbforder = 3
-polyorder = 1
-stencilSize = 9
+rbforder = 5
+polyorder = 3
+stencilSize = 45
 saveDel = 50
-var = 3
-plotFromSaved = 1
+var = 2
+plotFromSaved = 0
 
 ###########################################################################
 
@@ -123,41 +124,11 @@ def setGhostNodes( U ) :
 ###########################################################################
 
 def odefun( t, U ) :
-    
-    #Initialize output array:
-    V = np.zeros( np.shape(U) )
-    
-    #Set ghost node values for all variables:
-    U = setGhostNodes( U )
-    
-    #Us and Ux:
-    Us = nonhydro.Ls( U[:,:,jj], ws, ii, ds )
-    Ux = nonhydro.Lx( U[:,ii,:], wx, jj, dx, FD, FDo2 )
-    
-    #Get u and sDot:
-    u = np.tile( U[0,ii,:][:,jj], (4,1,1) )
-    sDot = U[0,ii,:][:,jj] * dsdx + U[1,ii,:][:,jj] * dsdz
-    sDot = np.tile( sDot, (4,1,1) )
-    
-    #RHS of ODE function:
-    V[ :, i0:i1, j0:j1 ] = - u * Ux - sDot * Us
-    V[ 0, i0:i1, j0:j1 ] = V[0,ii,:][:,jj] - Cp*U[2,ii,:][:,jj] * ( Ux[3,:,:] + Us[3,:,:]*dsdx )
-    V[ 1, i0:i1, j0:j1 ] = V[1,ii,:][:,jj] - Cp*U[2,ii,:][:,jj] * ( Us[3,:,:]*dsdz ) - g
-    V[ 3, i0:i1, j0:j1 ] = V[3,ii,:][:,jj] - Rd/Cv*U[3,ii,:][:,jj] * ( Ux[0,:,:]+Us[0,:,:]*dsdx + Us[1,:,:]*dsdz )
-    
-    #Add dissipation:
-    if FD == 2 :
-        V[ :, i0:i1, j0:j1 ] = V[:,ii,:][:,:,jj] \
-        + (1./2.) * np.abs(u) * nonhydro.Lx( U[:,ii,:], wxhv, jj, dx, FD, FDo2 )
-    elif FD == 4 :
-        V[ :, i0:i1, j0:j1 ] = V[:,ii,:][:,:,jj] \
-        - (1./12.) * np.abs(u) * nonhydro.Lx( U[:,ii,:], wxhv, jj, dx, FD, FDo2 )
-    else :
-        sys.exit( "\nError: FD should be 2 or 4.\n" )
-    V[ :, i0:i1, j0:j1 ] = V[:,ii,:][:,:,jj] \
-    + (1./2.) * np.abs(sDot) * nonhydro.Ls( U[:,:,jj], wshv, ii, ds )
-    
-    return V
+    return nonhydro.odefunFD( t, U, setGhostNodes \
+    , dx, ds, wx, ws, wxhv, wshv, nonhydro.Lx, nonhydro.Ls \
+    , ii, jj, i0, i1, j0, j1 \
+    , dsdx, dsdz, FD, FDo2 \
+    , Cp, Cv, Rd, g )
 
 ###########################################################################
 
