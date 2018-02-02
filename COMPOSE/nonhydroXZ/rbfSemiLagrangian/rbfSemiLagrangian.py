@@ -40,7 +40,7 @@ ii = np.arange( 1, nLev+1 )
 jj = np.arange( FDo2, nCol+FDo2 )
 Tx, Tz, Nx, Nz = nonhydro.getTanNorm( nCol, zSurfPrime, x[0,jj] )
 
-U, thetaBar = nonhydro.getInitialConditions( testCase, formulation \
+U, thetaBar, piBar = nonhydro.getInitialConditions( testCase, formulation \
 , nLev, nCol, FD, x, z \
 , Cp, Cv, Rd, g, Po \
 , dsdx, dsdz )
@@ -155,11 +155,13 @@ def odefun( t, U ) :
 
 ###########################################################################
 
-U = odefun( t, U )
+# U = odefun( t, U )
 
-sys.exit("\nStop here for now.\n")
+# sys.exit("\nStop here for now.\n")
 
+#Go from 3D array to 2D array:
 U = np.transpose( np.reshape( U, ( 4, (nLev+2)*(nCol+FD) ) ) )
+#Go from 2D array back to 3D array:
 U = np.reshape( np.transpose(U), ( 4, nLev+2, nCol+FD ) )
 
 ###########################################################################
