@@ -6,17 +6,17 @@ from gab import nonhydro, phs2, rk
 
 ###########################################################################
 
-testCase = "doubleDensityCurrent"
+testCase = "igw"
 formulation = "exner"
 semiLagrangian = 0
 rbfs = 0
-dx = 100.
-ds = 100.
+dx = 500.
+ds = 500.
 FD = 4                          #Order of lateral FD (positive even number)
 rbforder = 5
 polyorder = 3
 stencilSize = 45
-saveDel = 50
+saveDel = 100
 var = 2
 plotFromSaved = 0
 
@@ -85,47 +85,17 @@ bigTz = np.tile( Tz, (2,1) )
 normGradS = np.sqrt( dsdxBottom**2. + dsdzBottom**2. )
 
 def setGhostNodes( U ) :
-    
-    #extrapolate uT to bottom ghost nodes:
-    uT = U[0,1:3,:][:,jj] * bigTx + U[1,1:3,:][:,jj] * bigTz
-    uT = 2*uT[0,:] - uT[1,:]
-    
-    #get uN on bottom ghost nodes:
-    uN = U[0,1,jj]*Nx + U[1,1,jj]*Nz
-    uN = -uN
-    
-    #use uT and uN to get (u,w) on bottom ghost nodes, then get (u,w) on top ghost nodes:
-    U[0,0,jj] = uT*Tx + uN*Nx
-    U[1,0,jj] = uT*Tz + uN*Nz
-    U[0,nLev+1,jj] = 2*U[0,nLev,jj] - U[0,nLev-1,jj]
-    U[1,nLev+1,jj] = -U[1,nLev,jj]
-    
-    #extrapolate theta to bottom ghost nodes, then top ghost nodes:
-    U[2,0,jj] = thetaBar[0,jj] + 2*(U[2,1,jj]-thetaBar[1,jj]) - (U[2,2,jj]-thetaBar[2,jj])
-    U[2,nLev+1,jj] = thetaBar[nLev+1,jj] + 2*(U[2,nLev,jj]-thetaBar[nLev,jj]) \
-    - (U[2,nLev-1,jj]-thetaBar[nLev-1,jj])
-    
-    #get pi on bottom ghost nodes using derived BC:
-    dpidx = nonhydro.Lx( U[3,1:3,:], wx, jj, dx, FD, FDo2 )
-    dpidx = 3./2.*dpidx[0,:] - 1./2.*dpidx[1,:]
-    th = ( U[2,0,jj] + U[2,1,jj] ) / 2.
-    U[3,0,jj] = U[3,1,jj] + ds/normGradS**2 * ( g/Cp/th*dsdzBottom + dpidx*dsdxBottom )
-    
-    #get pi on top ghost nodes:
-    th = ( U[2,nLev,jj] + U[2,nLev+1,jj] ) / 2.
-    U[3,nLev+1,jj] = U[3,nLev,jj] - ds/dsdzBottom*g/Cp/th
-    
-    #enforce periodic lateral boundary condition:
-    U[:,:,0:FDo2] = U[:,:,nCol:nCol+FDo2]
-    U[:,:,nCol+FDo2:nCol+FD] = U[:,:,FDo2:FD]
-    
-    return U
+    return nonhydro.setGhostNodesFD( U \
+    , Tx, Tz, Nx, Nz, bigTx, bigTz \
+    , nLev, nCol, thetaBar, g, Cp \
+    , normGradS, ds, dsdxBottom, dsdzBottom \
+    , wx, jj, dx, FD, FDo2 )
 
 ###########################################################################
 
 def odefun( t, U ) :
     return nonhydro.odefunFD( t, U, setGhostNodes \
-    , dx, ds, wx, ws, wxhv, wshv, nonhydro.Lx, nonhydro.Ls \
+    , dx, ds, wx, ws, wxhv, wshv \
     , ii, jj, i0, i1, j0, j1 \
     , dsdx, dsdz, FD, FDo2 \
     , Cp, Cv, Rd, g )
@@ -230,7 +200,7 @@ print()
 
 #Contour plot of something:
 
-plt.contourf( x[ii,:], z[ii,:], nonhydro.Ls( U[2,:,:]-thetaBar, ws, ii, ds ) )
+plt.contourf( x[ii,:], z[ii,:], nonhydro.LsFD( U[2,:,:]-thetaBar, ws, ii, ds ) )
 if testCase != "igw" :
     plt.axis( 'equal' )
 plt.colorbar()
