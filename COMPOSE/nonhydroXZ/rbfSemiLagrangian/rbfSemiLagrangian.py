@@ -8,20 +8,20 @@ from gab import nonhydro, rk
 
 #"bubble", "igw", "densityCurrent", "doubleDensityCurrent",
 #or "movingDensityCurrent":
-testCase = "bubble"
+testCase = "doubleDensityCurrent"
 
 #"exner" or "hydrostaticPressure"
 formulation = "exner"
 
 semiLagrangian = 0
-dx = 200.
-ds = 200.
-FD = 4                                    #Order of lateral FD (2, 4, or 6)
+dx = 100.
+ds = 100.
+FD = 6                                    #Order of lateral FD (2, 4, or 6)
 rbforder = 3
 polyorder = 1
 stencilSize = 9
-saveDel = 100
-var = 2
+saveDel = 50
+var = 3
 plotFromSaved = 0
 rkStages = 3
 plotNodes = 0
@@ -60,6 +60,10 @@ U, thetaBar, piBar = nonhydro.getInitialConditions( testCase, formulation \
 , Cp, Cv, Rd, g, Po \
 , dsdz )
 
+if plotNodes == 1 :
+    ind = nonhydro.getIndexes( x, z, xLeft, xRight, zSurf, zTop, FD, nLev, nCol )
+    nonhydro.plotNodes( x, z, ind, testCase )
+    
 ###########################################################################
 
 dsdxBottom = dsdx( x[0,jj], zSurf(x[0,jj]) )
@@ -122,14 +126,18 @@ elif rkStages == 4 :
 else :
     sys.exit( "\nError: rkStages should be 3 or 4.\n" )
 
+def printInfo( U, et, t ) :
+    return nonhydro.printInfo( U, et, t \
+    , thetaBar, piBar )
+
 #Figure size and contour levels for plotting:
 fig, CL = nonhydro.setFigAndContourLevels( testCase )
 
-def saveContourPlot( U ) :
-    return nonhydro.saveContourPlot( U \
+def saveContourPlot( U, t ) :
+    nonhydro.saveContourPlot( U, t \
     , testCase, var, fig \
     , x, z, thetaBar, piBar, CL, FDo2 \
-    , xLeft, xRight, zTop, dx, ds, t )
+    , xLeft, xRight, zTop, dx, ds )
 
 ###########################################################################
 
@@ -137,7 +145,8 @@ def saveContourPlot( U ) :
 
 #Save initial conditions and contour of first frame:
 U = setGhostNodes(U)
-saveContourPlot( U )
+et = printInfo( U, time.clock(), t )
+saveContourPlot( U, t )
 
 #The actual Eulerian time-stepping
 for i in range( np.int(dt/dtEul) ) :
@@ -159,36 +168,12 @@ for i in range(1,nTimesteps+1) :
         else :
             sys.exit( "\nError: plotFromSaved should be 0 or 1.\n" )
         
-        saveContourPlot( U )
+        et = printInfo( U, et, t )
+        saveContourPlot( U, t )
         
     if plotFromSaved == 0 :
         U = rk( t, U, odefun, dt )
     
     t = t + dt
-
-###########################################################################
-
-if plotNodes == 1 :
-
-    #Plot some nodes:
-
-    x = x.flatten()
-    z = z.flatten()
-
-    ms = 12
-
-    plt.plot( x, z, ".", color="black" )
-    plt.plot( x[ind.m],  z[ind.m],  "o", color="black",  fillstyle="none", markersize=10 )
-    plt.plot( x[ind.gl], z[ind.gl], "o", color="red",    fillstyle="none", markersize=ms )
-    plt.plot( x[ind.r],  z[ind.r],  "s", color="red",    fillstyle="none", markersize=ms )
-    plt.plot( x[ind.gr], z[ind.gr], "o", color="blue",   fillstyle="none", markersize=ms )
-    plt.plot( x[ind.l],  z[ind.l],  "s", color="blue",   fillstyle="none", markersize=ms )
-    plt.plot( x[ind.gb], z[ind.gb], "^", color="orange", fillstyle="none", markersize=ms )
-    plt.plot( x[ind.b],  z[ind.b],  "v", color="orange", fillstyle="none", markersize=ms )
-    plt.plot( x[ind.gt], z[ind.gt], "v", color="green",  fillstyle="none", markersize=ms )
-    plt.plot( x[ind.t],  z[ind.t],  "^", color="green",  fillstyle="none", markersize=ms )
-    if testCase != "igw" :
-        plt.axis( 'equal' )
-    plt.show()
 
 ############################################################################
