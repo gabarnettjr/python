@@ -122,6 +122,9 @@ elif rkStages == 4 :
 else :
     sys.exit( "\nError: rkStages should be 3 or 4.\n" )
 
+#Figure size and contour levels for plotting:
+fig, CL = nonhydro.setFigAndContourLevels( testCase )
+
 def saveContourPlot( U ) :
     return nonhydro.saveContourPlot( U \
     , testCase, var, fig \
@@ -131,9 +134,6 @@ def saveContourPlot( U ) :
 ###########################################################################
 
 #Eulerian time-stepping for first large time step:
-
-#Figure size and contour levels for plotting:
-fig, CL = nonhydro.setFigAndContourLevels( testCase )
 
 #Save initial conditions and contour of first frame:
 U = setGhostNodes(U)
