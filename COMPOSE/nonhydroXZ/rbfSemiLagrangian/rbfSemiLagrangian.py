@@ -8,7 +8,7 @@ from gab import nonhydro, rk
 
 #"bubble", "igw", "densityCurrent", "doubleDensityCurrent",
 #or "movingDensityCurrent":
-testCase = "densityCurrent"
+testCase = "bubble"
 
 #"exner" or "hydrostaticPressure"
 formulation = "exner"
@@ -16,14 +16,15 @@ formulation = "exner"
 semiLagrangian = 0
 dx = 200.
 ds = 200.
-FD = 6                                    #Order of lateral FD (2, 4, or 6)
+FD = 4                                    #Order of lateral FD (2, 4, or 6)
 rbforder = 3
 polyorder = 1
 stencilSize = 9
 saveDel = 100
-var = 3
+var = 2
 plotFromSaved = 0
 rkStages = 3
+plotNodes = 0
 
 ###########################################################################
 
@@ -39,7 +40,7 @@ Cp, Cv, Rd, g, Po = nonhydro.getConstants()
 xLeft, xRight, nLev, nCol, zTop, zSurf, zSurfPrime, x, z \
 = nonhydro.getSpaceDomain( testCase, dx, ds, FD )
 
-tf, dt, nTimesteps = nonhydro.getTimeDomain( testCase, dx, ds )
+tf, dt, dtEul, nTimesteps = nonhydro.getTimeDomain( testCase, dx, ds )
 
 s, dsdx, dsdz = nonhydro.getHeightCoordinate( zTop, zSurf, zSurfPrime )
 
@@ -68,7 +69,7 @@ dsdz = dsdz( x[ii,:][:,jj], z[ii,:][:,jj] )
 
 ###########################################################################
 
-#Define operators using functions from nonhydro.m:
+#Define finite difference (FD) weights for derivative approximation:
 
 if FD == 2 :
     wx = np.array( [ -1./2., 0., 1./2. ] )
@@ -88,15 +89,6 @@ else :
 ws = np.array( [ -1./2., 0., 1./2. ] )
 wshv = np.array( [ 1., -2., 1. ] )
 
-# def Lx( U ) :
-    # return nonhydro.LxFD( U, wx, jj, dx, FD, FDo2 )
-# def Lxhv( U ) :
-    # return nonhydro.LxFD( U, wxhv, jj, dx, FD, FDo2 )
-# def Ls( U ) :
-    # return nonhydro.LsFD( U, ws, ii, ds )
-# def Lshv( U ) :
-    # return nonhydro.LsFD( U, wshv, ii, ds )
-
 ###########################################################################
 
 bigTx = np.tile( Tx, (2,1) )
@@ -106,7 +98,7 @@ normGradS = np.sqrt( dsdxBottom**2. + dsdzBottom**2. )
 
 ###########################################################################
 
-#Important functions for Eulerian time stepping:
+#Important functions for time stepping:
 
 def setGhostNodes( U ) :
     return nonhydro.setGhostNodesFD( U \
@@ -116,7 +108,8 @@ def setGhostNodes( U ) :
     , wx, jj, dx, FD, FDo2 )
 
 def odefun( t, U ) :
-    return nonhydro.odefunFD( t, U, setGhostNodes \
+    return nonhydro.odefunFD( t, U \
+    , setGhostNodes \
     , dx, ds, wx, ws, wxhv, wshv \
     , ii, jj, i0, i1, j0, j1 \
     , dsdx, dsdz, FD, FDo2 \
@@ -129,14 +122,49 @@ elif rkStages == 4 :
 else :
     sys.exit( "\nError: rkStages should be 3 or 4.\n" )
 
+def saveContourPlot( U ) :
+    return nonhydro.saveContourPlot( U \
+    , testCase, var, fig \
+    , x, z, thetaBar, piBar, CL, FDo2 \
+    , xLeft, xRight, zTop, dx, ds, t )
+
 ###########################################################################
 
-#Time-stepping:
+#Eulerian time-stepping for first large time step:
 
-nonhydro.timeStepEulerian( testCase, nTimesteps, saveDel, dt, plotFromSaved \
-, saveString, t, U, x, z, var, thetaBar, piBar \
-, xLeft, xRight, zTop, dx, ds, FDo2 \
-, setGhostNodes, odefun, rk )
+#Figure size and contour levels for plotting:
+fig, CL = nonhydro.setFigAndContourLevels( testCase )
+
+#Save initial conditions and contour of first frame:
+U = setGhostNodes(U)
+saveContourPlot( U )
+
+#The actual Eulerian time-stepping
+for i in range( np.int(dt/dtEul) ) :
+    U = rk( t, U, odefun, dtEul )
+    t = t + dtEul
+
+###########################################################################
+
+#Semi-Lagrangian time-stepping (still Eulerian for now):
+
+for i in range(1,nTimesteps+1) :
+    
+    if np.mod( i, np.int(np.round(saveDel/dt)) ) == 0 :
+        
+        if plotFromSaved == 0 :
+            U = setGhostNodes(U)
+        elif plotFromSaved == 1 :
+            U = np.load( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy' )
+        else :
+            sys.exit( "\nError: plotFromSaved should be 0 or 1.\n" )
+        
+        saveContourPlot( U )
+        
+    if plotFromSaved == 0 :
+        U = rk( t, U, odefun, dt )
+    
+    t = t + dt
 
 ###########################################################################
 
