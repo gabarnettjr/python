@@ -6,13 +6,13 @@ from gab import nonhydro, phs2, rk
 
 ###########################################################################
 
-testCase = "igw"
+testCase = "bubble"
 formulation = "exner"
 semiLagrangian = 0
 rbfs = 0
-dx = 500.
-ds = 500.
-FD = 4                          #Order of lateral FD (positive even number)
+dx = 100.
+ds = 100.
+FD = 2                                    #Order of lateral FD (2, 4, or 6)
 rbforder = 5
 polyorder = 3
 stencilSize = 45
@@ -38,8 +38,8 @@ tf, dt, nTimesteps = nonhydro.getTimeDomain( testCase, dx, ds )
 
 s, dsdx, dsdz = nonhydro.getHeightCoordinate( zTop, zSurf, zSurfPrime )
 
-ii = np.arange( 1, nLev+1 )
 FDo2 = np.int( FD/2 )
+ii = np.arange( 1, nLev+1 )
 jj = np.arange( FDo2, nCol+FDo2 )
 
 i0 = ii[0]
@@ -61,21 +61,48 @@ dsdzBottom = dsdz( x[0,jj], zSurf(x[0,jj]) )
 dsdx = dsdx( x[ii,:][:,jj], z[ii,:][:,jj] )
 dsdz = dsdz( x[ii,:][:,jj], z[ii,:][:,jj] )
 
-ind = nonhydro.getIndexes( x, z, xLeft, xRight, zSurf, zTop, FD, nLev, nCol )
-
 ###########################################################################
 
-if FD == 2 :
-    wx = np.array( [ -1./2., 0., 1./2. ] )
-    wxhv = np.array( [ 1., -2., 1. ] )
-elif FD == 4 :
-    wx = np.array( [ 1./12., -2./3., 0., 2./3., -1./12. ] )
-    wxhv = np.array( [ 1., -4., 6., -4., 1. ] )
-else :
-    sys.exit( "\nError: FD should be 2 or 4.\n" )
+#Define operators using functions from nonhydro.m:
 
-ws = np.array( [ -1./2., 0., 1./2. ] )
-wshv = np.array( [ 1., -2., 1. ] )
+if rbfs == 0 :
+    
+    if FD == 2 :
+        wx = np.array( [ -1./2., 0., 1./2. ] )
+        wxhv = np.array( [ 1., -2., 1. ] )
+        gamma = 1./2.
+    elif FD == 4 :
+        wx = np.array( [ 1./12., -2./3., 0., 2./3., -1./12. ] )
+        wxhv = np.array( [ 1., -4., 6., -4., 1. ] )
+        gamma = -1./12.
+    elif FD == 6 :
+        wx = np.array( [ -1./60., 3./20., -3./4., 0., 3./4, -3./20., 1./60. ] )
+        wxhv = np.array( [ 1., -6., 15., -20., 15., -6., 1. ] )
+        gamma = 1./60.
+    else :
+        sys.exit( "\nError: FD should be 2, 4, or 6.\n" )
+    
+    ws = np.array( [ -1./2., 0., 1./2. ] )
+    wshv = np.array( [ 1., -2., 1. ] )
+    
+    def Lx( U ) :
+        return nonhydro.LxFD( U, wx, jj, dx, FD, FDo2 )
+    def Lxhv( U ) :
+        return nonhydro.LxFD( U, wxhv, jj, dx, FD, FDo2 )
+    def Ls( U ) :
+        return nonhydro.LsFD( U, ws, ii, ds )
+    def Lshv( U ) :
+        return nonhydro.LsFD( U, wshv, ii, ds )
+    
+elif rbfs == 1 :
+    
+    ind = nonhydro.getIndexes( x, z, xLeft, xRight, zSurf, zTop, FD, nLev, nCol )
+    
+    sys.exit( "\nError: RBFs aren't working yet.\n" )
+    
+else :
+    
+    sys.exit( "\nError: rbfs should be 0 or 1.\n" )
 
 ###########################################################################
 
@@ -84,6 +111,8 @@ bigTz = np.tile( Tz, (2,1) )
 
 normGradS = np.sqrt( dsdxBottom**2. + dsdzBottom**2. )
 
+###########################################################################
+
 def setGhostNodes( U ) :
     return nonhydro.setGhostNodesFD( U \
     , Tx, Tz, Nx, Nz, bigTx, bigTz \
@@ -91,14 +120,12 @@ def setGhostNodes( U ) :
     , normGradS, ds, dsdxBottom, dsdzBottom \
     , wx, jj, dx, FD, FDo2 )
 
-###########################################################################
-
 def odefun( t, U ) :
     return nonhydro.odefunFD( t, U, setGhostNodes \
     , dx, ds, wx, ws, wxhv, wshv \
     , ii, jj, i0, i1, j0, j1 \
     , dsdx, dsdz, FD, FDo2 \
-    , Cp, Cv, Rd, g )
+    , Cp, Cv, Rd, g, gamma )
 
 ###########################################################################
 
