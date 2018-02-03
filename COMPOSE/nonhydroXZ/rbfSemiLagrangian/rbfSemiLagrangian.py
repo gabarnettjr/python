@@ -6,17 +6,22 @@ from gab import nonhydro, rk
 
 ###########################################################################
 
-testCase = "igw"
+#"bubble", "igw", "densityCurrent", "doubleDensityCurrent",
+#or "movingDensityCurrent":
+testCase = "densityCurrent"
+
+#"exner" or "hydrostaticPressure"
 formulation = "exner"
+
 semiLagrangian = 0
-dx = 500.
-ds = 500.
+dx = 200.
+ds = 200.
 FD = 6                                    #Order of lateral FD (2, 4, or 6)
-rbforder = 5
-polyorder = 3
-stencilSize = 45
+rbforder = 3
+polyorder = 1
+stencilSize = 9
 saveDel = 100
-var = 1
+var = 3
 plotFromSaved = 0
 rkStages = 3
 
@@ -52,7 +57,7 @@ Tx, Tz, Nx, Nz = nonhydro.getTanNorm( zSurfPrime, x[0,jj] )
 U, thetaBar, piBar = nonhydro.getInitialConditions( testCase, formulation \
 , nLev, nCol, FD, x, z \
 , Cp, Cv, Rd, g, Po \
-, dsdx, dsdz )
+, dsdz )
 
 ###########################################################################
 
@@ -130,6 +135,7 @@ else :
 
 nonhydro.timeStepEulerian( testCase, nTimesteps, saveDel, dt, plotFromSaved \
 , saveString, t, U, x, z, var, thetaBar, piBar \
+, xLeft, xRight, zTop, dx, ds, FDo2 \
 , setGhostNodes, odefun, rk )
 
 ###########################################################################
