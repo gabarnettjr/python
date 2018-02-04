@@ -10,18 +10,18 @@ from gab import nonhydro, rk
 #or "movingDensityCurrent":
 testCase = "doubleDensityCurrent"
 
-#"exner" or "hydrostaticPressure"
+#"exner" or "hydrostaticPressure":
 formulation = "exner"
 
 semiLagrangian = 0
 dx = 100.
 ds = 100.
-FD = 6                                    #Order of lateral FD (2, 4, or 6)
+FD = 4                                    #Order of lateral FD (2, 4, or 6)
 rbforder = 3
 polyorder = 1
 stencilSize = 9
 saveDel = 50
-var = 3
+var = 2
 plotFromSaved = 0
 rkStages = 3
 plotNodes = 0
@@ -139,12 +139,21 @@ def saveContourPlot( U, t ) :
     , x, z, thetaBar, piBar, CL, FDo2 \
     , xLeft, xRight, zTop, dx, ds )
 
+def semiLagrangianTimestep( Un1, U ) :
+    return nonhydro.semiLagrangianTimestep(  )
+
 ###########################################################################
 
 #Eulerian time-stepping for first large time step:
 
+print()
+print("dt =",dt)
+print("dtEul =",dtEul)
+print()
+
 #Save initial conditions and contour of first frame:
 U = setGhostNodes(U)
+Un1 = U
 et = printInfo( U, time.clock(), t )
 saveContourPlot( U, t )
 
@@ -173,6 +182,9 @@ for i in range(1,nTimesteps+1) :
         
     if plotFromSaved == 0 :
         U = rk( t, U, odefun, dt )
+        # U1 = semiLagrangianTimestep( Un1, U )
+        # Un1 = U
+        # U = U1
     
     t = t + dt
 
