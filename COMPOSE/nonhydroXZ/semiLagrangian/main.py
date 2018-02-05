@@ -13,16 +13,16 @@ testCase = "bubble"
 #"exner" (need to fix so that "hydrostaticPressure" also works):
 formulation = "exner"
 
-semiLagrangian = 0                  #Set this to zero.  SL not working yet.
-dx = 100.
-ds = 100.
+semiLagrangian = 1                  #Set this to zero.  SL not working yet.
+dx = 200.
+ds = 200.
 FD = 4                                    #Order of lateral FD (2, 4, or 6)
 rbfOrder = 3
 polyOrder = 1
 stencilSize = 9
-saveDel = 100
-var = 3
-plotFromSaved = 0
+saveDel = 50
+var = 1
+plotFromSaved = 1
 rkStages = 3
 plotNodes = 0
 
@@ -138,7 +138,7 @@ def odefun( t, U ) :
 def semiLagrangianTimestep( Un1, U ) :
     return nonhydro.semiLagrangianTimestep( Un1, U \
     , setGhostNodes, Dx, Ds \
-    , x.flatten(), z.flatten(), ind, dt \
+    , x.flatten(), z.flatten(), ind.m, dt \
     , nLev, nCol, FD, i0, i1, j0, j1 \
     , Cp, Rd, Cv, g, dsdxVec[ind.m], dsdzVec[ind.m] \
     , rbfOrder, polyOrder, stencilSize )
