@@ -8,20 +8,20 @@ from gab import nonhydro, rk
 
 #"bubble", "igw", "densityCurrent", "doubleDensityCurrent",
 #or "movingDensityCurrent":
-testCase = "doubleDensityCurrent"
+testCase = "bubble"
 
-#"exner" or "hydrostaticPressure":
+#"exner" (need to fix so that "hydrostaticPressure" also works):
 formulation = "exner"
 
-semiLagrangian = 0
+semiLagrangian = 0                  #Set this to zero.  SL not working yet.
 dx = 100.
 ds = 100.
 FD = 4                                    #Order of lateral FD (2, 4, or 6)
-rbforder = 3
-polyorder = 1
+rbfOrder = 3
+polyOrder = 1
 stencilSize = 9
-saveDel = 50
-var = 2
+saveDel = 100
+var = 3
 plotFromSaved = 0
 rkStages = 3
 plotNodes = 0
@@ -30,8 +30,9 @@ plotNodes = 0
 
 t = 0.
 
-saveString = './results/' + testCase + '/dx' \
-+ '{0:1d}'.format(np.int(dx)) + 'ds' + '{0:1d}'.format(np.int(ds)) + '/'
+saveString = './results/' + testCase + '/' \
++ 'dx' + '{0:1d}'.format(np.int(np.round(dx)+1e-12)) \
++ 'ds' + '{0:1d}'.format(np.int(np.round(ds)+1e-12)) + '/'
 
 ###########################################################################
 
@@ -60,14 +61,17 @@ U, thetaBar, piBar = nonhydro.getInitialConditions( testCase, formulation \
 , Cp, Cv, Rd, g, Po \
 , dsdz )
 
+ind = nonhydro.getIndexes( x, z, xLeft, xRight, zSurf, zTop, FD, nLev, nCol )
+
 if plotNodes == 1 :
-    ind = nonhydro.getIndexes( x, z, xLeft, xRight, zSurf, zTop, FD, nLev, nCol )
     nonhydro.plotNodes( x, z, ind, testCase )
     
 ###########################################################################
 
 dsdxBottom = dsdx( x[0,jj], zSurf(x[0,jj]) )
 dsdzBottom = dsdz( x[0,jj], zSurf(x[0,jj]) )
+dsdxVec = dsdx( x, z ) . flatten()
+dsdzVec = dsdz( x, z ) . flatten()
 dsdx = dsdx( x[ii,:][:,jj], z[ii,:][:,jj] )
 dsdz = dsdz( x[ii,:][:,jj], z[ii,:][:,jj] )
 
@@ -111,13 +115,33 @@ def setGhostNodes( U ) :
     , normGradS, ds, dsdxBottom, dsdzBottom \
     , wx, jj, dx, FD, FDo2 )
 
+def Dx( U ) :
+    return nonhydro.LxFD( U, wx, jj, dx, FD, FDo2 )
+
+def Ds( U ) :
+    return nonhydro.LsFD( U, ws, ii, ds )
+
+def HVx( U ) :
+    return nonhydro.LxFD( U, wxhv, jj, dx, FD, FDo2 )
+
+def HVs( U ) :
+    return nonhydro.LsFD( U, wshv, ii, ds )
+
 def odefun( t, U ) :
     return nonhydro.odefunFD( t, U \
-    , setGhostNodes \
+    , setGhostNodes, Dx, Ds, HVx, HVs \
     , dx, ds, wx, ws, wxhv, wshv \
     , ii, jj, i0, i1, j0, j1 \
     , dsdx, dsdz, FD, FDo2 \
     , Cp, Cv, Rd, g, gamma )
+
+def semiLagrangianTimestep( Un1, U ) :
+    return nonhydro.semiLagrangianTimestep( Un1, U \
+    , setGhostNodes, Dx, Ds \
+    , x.flatten(), z.flatten(), ind, dt \
+    , nLev, nCol, FD, i0, i1, j0, j1 \
+    , Cp, Rd, Cv, g, dsdxVec[ind.m], dsdzVec[ind.m] \
+    , rbfOrder, polyOrder, stencilSize )
 
 if rkStages == 3 :
     rk = rk.rk3
@@ -139,9 +163,6 @@ def saveContourPlot( U, t ) :
     , x, z, thetaBar, piBar, CL, FDo2 \
     , xLeft, xRight, zTop, dx, ds )
 
-def semiLagrangianTimestep( Un1, U ) :
-    return nonhydro.semiLagrangianTimestep(  )
-
 ###########################################################################
 
 #Eulerian time-stepping for first large time step:
@@ -152,15 +173,18 @@ print("dtEul =",dtEul)
 print()
 
 #Save initial conditions and contour of first frame:
-U = setGhostNodes(U)
+U = setGhostNodes( U )
+np.save( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy', U )
 Un1 = U
 et = printInfo( U, time.clock(), t )
 saveContourPlot( U, t )
 
-#The actual Eulerian time-stepping
-for i in range( np.int(dt/dtEul) ) :
+#The actual Eulerian time-stepping from t=0 to t=dt:
+for i in range( np.int(np.round(dt/dtEul)+1e-12) ) :
     U = rk( t, U, odefun, dtEul )
     t = t + dtEul
+
+U = setGhostNodes( U )
 
 ###########################################################################
 
@@ -171,7 +195,8 @@ for i in range(1,nTimesteps+1) :
     if np.mod( i, np.int(np.round(saveDel/dt)) ) == 0 :
         
         if plotFromSaved == 0 :
-            U = setGhostNodes(U)
+            U = setGhostNodes( U )
+            np.save( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy', U )
         elif plotFromSaved == 1 :
             U = np.load( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy' )
         else :
@@ -181,10 +206,14 @@ for i in range(1,nTimesteps+1) :
         saveContourPlot( U, t )
         
     if plotFromSaved == 0 :
-        U = rk( t, U, odefun, dt )
-        # U1 = semiLagrangianTimestep( Un1, U )
-        # Un1 = U
-        # U = U1
+        if semiLagrangian == 0 :
+            U = rk( t, U, odefun, dt )
+        elif semiLagrangian == 1 :
+            U1 = semiLagrangianTimestep( Un1, U )
+            Un1 = U
+            U = U1
+        else :
+            sys.exit( "\nError: semiLagrangian should be 0 or 1.\n" )
     
     t = t + dt
 
