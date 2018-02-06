@@ -8,7 +8,7 @@ from gab import nonhydro, rk
 
 #"bubble", "igw", "densityCurrent", "doubleDensityCurrent",
 #or "movingDensityCurrent":
-testCase = "bubble"
+testCase = "movingDensityCurrent"
 
 #"exner" (need to fix so that "hydrostaticPressure" also works):
 formulation = "exner"
@@ -20,9 +20,9 @@ FD = 4                                    #Order of lateral FD (2, 4, or 6)
 rbfOrder = 3
 polyOrder = 1
 stencilSize = 9
-saveDel = 50
-var = 1
-plotFromSaved = 1
+saveDel = 25
+var = 3
+plotFromSaved = 0
 rkStages = 3
 plotNodes = 0
 
@@ -106,7 +106,7 @@ normGradS = np.sqrt( dsdxBottom**2. + dsdzBottom**2. )
 
 ###########################################################################
 
-#Important functions for time stepping:
+#Important functions for time stepping, which may be chosen by user:
 
 def setGhostNodes( U ) :
     return nonhydro.setGhostNodesFD( U \
@@ -135,13 +135,26 @@ def odefun( t, U ) :
     , dsdx, dsdz, FD, FDo2 \
     , Cp, Cv, Rd, g, gamma )
 
-def semiLagrangianTimestep( Un1, U ) :
-    return nonhydro.semiLagrangianTimestep( Un1, U \
+def semiLagrangianTimestep( Un1, U, alp, bet ) :
+    
+    U1, alp, bet = nonhydro.conventionalSemiLagrangianTimestep( Un1, U, alp, bet \
     , setGhostNodes, Dx, Ds \
-    , x.flatten(), z.flatten(), ind.m, dt \
-    , nLev, nCol, FD, i0, i1, j0, j1 \
-    , Cp, Rd, Cv, g, dsdxVec[ind.m], dsdzVec[ind.m] \
+    , nLev, nCol, FD, FDo2, ds \
+    , Cp, Rd, Cv, g, dt \
+    , x.flatten(), z.flatten(), dsdxVec[ind.m], dsdzVec[ind.m] \
+    , ind.m, i0, i1, j0, j1 \
     , rbfOrder, polyOrder, stencilSize )
+    return U1, alp, bet
+    # return nonhydro.mySemiLagrangianTimestep( Un1, U \
+    # , setGhostNodes, Dx, Ds \
+    # , x.flatten(), z.flatten(), ind.m, dt \
+    # , nLev, nCol, FD, i0, i1, j0, j1 \
+    # , Cp, Rd, Cv, g, dsdxVec[ind.m], dsdzVec[ind.m] \
+    # , rbfOrder, polyOrder, stencilSize )
+
+###########################################################################
+
+#functions that will not be changed by user:
 
 if rkStages == 3 :
     rk = rk.rk3
@@ -180,15 +193,17 @@ et = printInfo( U, time.clock(), t )
 saveContourPlot( U, t )
 
 #The actual Eulerian time-stepping from t=0 to t=dt:
-for i in range( np.int(np.round(dt/dtEul)+1e-12) ) :
+for i in range( np.int( np.round(dt/dtEul) + 1e-12 ) ) :
     U = rk( t, U, odefun, dtEul )
     t = t + dtEul
 
 U = setGhostNodes( U )
+alp = 0.
+bet = 0.
 
 ###########################################################################
 
-#Semi-Lagrangian time-stepping (still Eulerian for now):
+#The rest of the time-stepping:
 
 for i in range(1,nTimesteps+1) :
     
@@ -209,7 +224,7 @@ for i in range(1,nTimesteps+1) :
         if semiLagrangian == 0 :
             U = rk( t, U, odefun, dt )
         elif semiLagrangian == 1 :
-            U1 = semiLagrangianTimestep( Un1, U )
+            U1, alp, bet = semiLagrangianTimestep( Un1, U, alp, bet )
             Un1 = U
             U = U1
         else :
