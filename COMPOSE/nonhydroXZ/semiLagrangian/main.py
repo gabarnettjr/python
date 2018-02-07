@@ -8,20 +8,20 @@ from gab import nonhydro, rk
 
 #"bubble", "igw", "densityCurrent", "doubleDensityCurrent",
 #or "movingDensityCurrent":
-testCase = "movingDensityCurrent"
+testCase = "bubble"
 
 #"exner" (need to fix so that "hydrostaticPressure" also works):
-formulation = "exner"
+formulation = "hydrostaticPressure"
 
-semiLagrangian = 1                  #Set this to zero.  SL not working yet.
-dx = 200.
-ds = 200.
+semiLagrangian = 0                  #Set this to zero.  SL not working yet.
+dx = 100.
+ds = 100.
 FD = 4                                    #Order of lateral FD (2, 4, or 6)
 rbfOrder = 3
 polyOrder = 1
 stencilSize = 9
-saveDel = 25
-var = 3
+saveDel = 100
+var = 2
 plotFromSaved = 0
 rkStages = 3
 plotNodes = 0
@@ -48,7 +48,6 @@ s, dsdx, dsdz = nonhydro.getHeightCoordinate( zTop, zSurf, zSurfPrime )
 FDo2 = np.int( FD/2 )
 ii = np.arange( 1, nLev+1 )
 jj = np.arange( FDo2, nCol+FDo2 )
-
 i0 = ii[0]
 i1 = ii[-1] + 1
 j0 = jj[0]
@@ -56,7 +55,8 @@ j1 = jj[-1] + 1
 
 Tx, Tz, Nx, Nz = nonhydro.getTanNorm( zSurfPrime, x[0,jj] )
 
-U, thetaBar, piBar = nonhydro.getInitialConditions( testCase, formulation \
+U, thetaBar, piBar, dpidsBar \
+= nonhydro.getInitialConditions( testCase, formulation \
 , nLev, nCol, FD, x, z \
 , Cp, Cv, Rd, g, Po \
 , dsdz )
@@ -65,15 +65,18 @@ ind = nonhydro.getIndexes( x, z, xLeft, xRight, zSurf, zTop, FD, nLev, nCol )
 
 if plotNodes == 1 :
     nonhydro.plotNodes( x, z, ind, testCase )
+    sys.exit( "\nDone plotting nodes.\n" )
     
 ###########################################################################
 
 dsdxBottom = dsdx( x[0,jj], zSurf(x[0,jj]) )
 dsdzBottom = dsdz( x[0,jj], zSurf(x[0,jj]) )
-dsdxVec = dsdx( x, z ) . flatten()
-dsdzVec = dsdz( x, z ) . flatten()
-dsdx = dsdx( x[ii,:][:,jj], z[ii,:][:,jj] )
-dsdz = dsdz( x[ii,:][:,jj], z[ii,:][:,jj] )
+dsdxAll = dsdx( x, z )
+dsdzAll = dsdz( x, z )
+dsdxVec = dsdxAll . flatten()
+dsdzVec = dsdzAll . flatten()
+dsdxEul = dsdx( x[ii,:][:,jj], z[ii,:][:,jj] )
+dsdzEul = dsdz( x[ii,:][:,jj], z[ii,:][:,jj] )
 
 ###########################################################################
 
@@ -106,14 +109,7 @@ normGradS = np.sqrt( dsdxBottom**2. + dsdzBottom**2. )
 
 ###########################################################################
 
-#Important functions for time stepping, which may be chosen by user:
-
-def setGhostNodes( U ) :
-    return nonhydro.setGhostNodesFD( U \
-    , Tx, Tz, Nx, Nz, bigTx, bigTz \
-    , nLev, nCol, thetaBar, g, Cp \
-    , normGradS, ds, dsdxBottom, dsdzBottom \
-    , wx, jj, dx, FD, FDo2 )
+#Define functions for approximating derivatives:
 
 def Dx( U ) :
     return nonhydro.LxFD( U, wx, jj, dx, FD, FDo2 )
@@ -127,30 +123,68 @@ def HVx( U ) :
 def HVs( U ) :
     return nonhydro.LsFD( U, wshv, ii, ds )
 
-def odefun( t, U ) :
-    return nonhydro.odefunFD( t, U \
-    , setGhostNodes, Dx, Ds, HVx, HVs \
-    , dx, ds, wx, ws, wxhv, wshv \
-    , ii, jj, i0, i1, j0, j1 \
-    , dsdx, dsdz, FD, FDo2 \
-    , Cp, Cv, Rd, g, gamma )
+###########################################################################
 
-def semiLagrangianTimestep( Un1, U, alp, bet ) :
+#Important functions for time stepping, which may be chosen by user:
+
+if formulation == "exner" :
     
-    U1, alp, bet = nonhydro.conventionalSemiLagrangianTimestep( Un1, U, alp, bet \
-    , setGhostNodes, Dx, Ds \
-    , nLev, nCol, FD, FDo2, ds \
-    , Cp, Rd, Cv, g, dt \
-    , x.flatten(), z.flatten(), dsdxVec[ind.m], dsdzVec[ind.m] \
-    , ind.m, i0, i1, j0, j1 \
-    , rbfOrder, polyOrder, stencilSize )
-    return U1, alp, bet
-    # return nonhydro.mySemiLagrangianTimestep( Un1, U \
-    # , setGhostNodes, Dx, Ds \
-    # , x.flatten(), z.flatten(), ind.m, dt \
-    # , nLev, nCol, FD, i0, i1, j0, j1 \
-    # , Cp, Rd, Cv, g, dsdxVec[ind.m], dsdzVec[ind.m] \
-    # , rbfOrder, polyOrder, stencilSize )
+    def setGhostNodes( U ) :
+        U = nonhydro.setGhostNodes1( U \
+        , Tx, Tz, Nx, Nz, bigTx, bigTz \
+        , nLev, nCol, thetaBar, g, Cp \
+        , normGradS, ds, dsdxBottom, dsdzBottom \
+        , wx, jj, dx, FD, FDo2 )
+        P = []
+        return U, P
+    
+    def odefun( t, U ) :
+        return nonhydro.odefun1( t, U \
+        , setGhostNodes, Dx, Ds, HVx, HVs \
+        , ii, jj, i0, i1, j0, j1 \
+        , dsdxEul, dsdzEul \
+        , Cp, Cv, Rd, g, gamma )
+    
+elif formulation == "hydrostaticPressure" :
+    
+    def setGhostNodes( U ) :
+        U, P = nonhydro.setGhostNodes2( U \
+        , Tx, Tz, Nx, Nz, bigTx, bigTz \
+        , nLev, nCol, thetaBar, dpidsBar, g, Cp, Po, Rd, Cv \
+        , normGradS, ds, dsdxBottom, dsdzBottom, dsdz(x,z) \
+        , wx, jj, dx, FD, FDo2 )
+        return U, P
+    
+    def odefun( t, U ) :
+        return nonhydro.odefun2( t, U \
+        , setGhostNodes, Dx, Ds, HVx, HVs \
+        , ii, jj, i0, i1, j0, j1 \
+        , dsdxEul, dsdzEul, dsdxAll, dsdzAll \
+        , Cp, Cv, Rd, g, gamma )
+    
+else :
+    
+    sys.exit( "\nError: formulation should be 'exner' or 'hydrostaticPressure'.\n" )
+
+###########################################################################
+
+if semiLagrangian == 1 :
+    
+    def semiLagrangianTimestep( Un1, U, alp, bet ) :
+        U1, alp, bet = nonhydro.conventionalSemiLagrangianTimestep( Un1, U, alp, bet \
+        , setGhostNodes, Dx, Ds \
+        , nLev, nCol, FD, FDo2, ds \
+        , Cp, Rd, Cv, g, dt \
+        , x.flatten(), z.flatten(), dsdx, dsdz \
+        , ind.m, i0, i1, j0, j1 \
+        , rbfOrder, polyOrder, stencilSize )
+        return U1, alp, bet
+        # return nonhydro.mySemiLagrangianTimestep( Un1, U \
+        # , setGhostNodes, Dx, Ds \
+        # , x.flatten(), z.flatten(), ind.m, dt \
+        # , nLev, nCol, FD, i0, i1, j0, j1 \
+        # , Cp, Rd, Cv, g, dsdxVec[ind.m], dsdzVec[ind.m] \
+        # , rbfOrder, polyOrder, stencilSize )
 
 ###########################################################################
 
@@ -161,19 +195,20 @@ if rkStages == 3 :
 elif rkStages == 4 :
     rk = rk.rk4
 else :
-    sys.exit( "\nError: rkStages should be 3 or 4.\n" )
+    sys.exit( "\nError: rkStages should be 3 or 4.  rk2 is not stable for this problem.\n" )
 
 def printInfo( U, et, t ) :
-    return nonhydro.printInfo( U, et, t \
-    , thetaBar, piBar )
+    return nonhydro.printInfo( U, et , t \
+    , formulation \
+    , thetaBar, piBar, dpidsBar )
 
 #Figure size and contour levels for plotting:
 fig, CL = nonhydro.setFigAndContourLevels( testCase )
 
 def saveContourPlot( U, t ) :
     nonhydro.saveContourPlot( U, t \
-    , testCase, var, fig \
-    , x, z, thetaBar, piBar, CL, FDo2 \
+    , formulation, testCase, var, fig \
+    , x, z, thetaBar, piBar, dpidsBar, CL, FDo2 \
     , xLeft, xRight, zTop, dx, ds )
 
 ###########################################################################
@@ -186,7 +221,7 @@ print("dtEul =",dtEul)
 print()
 
 #Save initial conditions and contour of first frame:
-U = setGhostNodes( U )
+U, P = setGhostNodes( U )
 np.save( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy', U )
 Un1 = U
 et = printInfo( U, time.clock(), t )
@@ -197,7 +232,7 @@ for i in range( np.int( np.round(dt/dtEul) + 1e-12 ) ) :
     U = rk( t, U, odefun, dtEul )
     t = t + dtEul
 
-U = setGhostNodes( U )
+U, P = setGhostNodes( U )
 alp = 0.
 bet = 0.
 
@@ -210,7 +245,7 @@ for i in range(1,nTimesteps+1) :
     if np.mod( i, np.int(np.round(saveDel/dt)) ) == 0 :
         
         if plotFromSaved == 0 :
-            U = setGhostNodes( U )
+            U, P = setGhostNodes( U )
             np.save( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy', U )
         elif plotFromSaved == 1 :
             U = np.load( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy' )
