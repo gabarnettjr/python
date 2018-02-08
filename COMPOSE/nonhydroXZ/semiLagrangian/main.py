@@ -2,29 +2,33 @@ import sys
 import numpy as np
 import time
 import matplotlib.pyplot as plt
-from gab import nonhydro, rk
+from scipy import sparse
+
+sys.path.append( 'C:\\cygwin64\\home\\gabarne\\repos\\python\\site-packages' )
+from gab import nonhydro, rk, phs2
 
 ###########################################################################
 
 #"bubble", "igw", "densityCurrent", "doubleDensityCurrent",
 #or "movingDensityCurrent":
-testCase = "igw"
+testCase = "densityCurrent"
 
 #"exner" (need to fix so that "hydrostaticPressure" also works):
 formulation = "exner"
 
 semiLagrangian = 0                  #Set this to zero.  SL not working yet.
-dx = 250.
-ds = 250.
+dx = 200.
+ds = 200.
 FD = 4                                    #Order of lateral FD (2, 4, or 6)
-rbfOrder = 3
-polyOrder = 1
-stencilSize = 9
+rbfOrder = 5
+polyOrder = 3
+stencilSize = 45
 saveDel = 100
-var = 3
+var = 2
 plotFromSaved = 0
 rkStages = 3
 plotNodes = 0
+rbfDerivatives = 1
 
 ###########################################################################
 
@@ -78,6 +82,9 @@ dsdzVec = dsdzAll . flatten()
 dsdxEul = dsdx( x[ii,:][:,jj], z[ii,:][:,jj] )
 dsdzEul = dsdz( x[ii,:][:,jj], z[ii,:][:,jj] )
 
+xVec = x.flatten()
+zVec = z.flatten()
+
 ###########################################################################
 
 #Define finite difference (FD) weights for derivative approximation:
@@ -111,17 +118,58 @@ normGradS = np.sqrt( dsdxBottom**2. + dsdzBottom**2. )
 
 #Define functions for approximating derivatives:
 
-def Dx( U ) :
-    return nonhydro.LxFD( U, wx, jj, dx, FD, FDo2 )
-
-def Ds( U ) :
-    return nonhydro.LsFD( U, ws, ii, ds )
-
-def HVx( U ) :
-    return nonhydro.LxFD( U, wxhv, jj, dx, FD, FDo2 )
-
-def HVs( U ) :
-    return nonhydro.LsFD( U, wshv, ii, ds )
+if rbfDerivatives == 0 :
+    
+    def Dx( U ) :
+        return nonhydro.LxFD( U, wx, jj, dx, FD, FDo2 )
+    
+    def Ds( U ) :
+        return nonhydro.LsFD( U, ws, ii, ds )
+    
+    def HVx( U ) :
+        return nonhydro.LxFD( U, wxhv, jj, dx, FD, FDo2 )
+    
+    def HVs( U ) :
+        return nonhydro.LsFD( U, wshv, ii, ds )
+    
+elif rbfDerivatives == 1 :
+    
+    stencils = phs2.getStencils( xVec, zVec, xVec[ind.m], zVec[ind.m], stencilSize )
+    A = phs2.getAmatrices( stencils, rbfOrder, polyOrder )
+    Wx = phs2.getWeights(  stencils, A, "1",  0 )
+    Wz = phs2.getWeights(  stencils, A, "2",  0 )
+    Whv = phs2.getWeights( stencils, A, "hv", 2 )
+    
+    ib = np.transpose( np.tile( np.arange(len(xVec[ind.m])), (stencilSize,1) ) )
+    ib = ib.flatten()
+    jb = stencils.idx
+    jb = jb.flatten()
+    Wx  = sparse.coo_matrix( (Wx .flatten(),(ib,jb)), shape = ( len(xVec[ind.m]), len(xVec) ) )
+    Wz  = sparse.coo_matrix( (Wz .flatten(),(ib,jb)), shape = ( len(xVec[ind.m]), len(xVec) ) )
+    Whv = sparse.coo_matrix( (Whv.flatten(),(ib,jb)), shape = ( len(xVec[ind.m]), len(xVec) ) )
+    
+    def Dx( U ) :
+        return nonhydro.Lphs( U \
+        , Wx \
+        , nLev, nCol, FD \
+        , ind.m, ii, jj )
+    
+    def Dz( U ) :
+        return nonhydro.Lphs( U \
+        , Wz \
+        , nLev, nCol, FD \
+        , ind.m, ii, jj )
+    
+    def Dhv( U ) :
+        U = nonhydro.Lphs( U \
+        , Whv \
+        , nLev, nCol, FD \
+        , ind.m, ii, jj )
+        return dx**3. * U
+    
+else :
+    
+    sys.exit( "\nError: rbfDerivatives should be 0 or 1.\n" )
 
 ###########################################################################
 
@@ -138,12 +186,22 @@ if formulation == "exner" :
         P = []
         return U, P
     
-    def odefun( t, U ) :
-        return nonhydro.odefun1( t, U \
-        , setGhostNodes, Dx, Ds, HVx, HVs \
-        , ii, jj, i0, i1, j0, j1 \
-        , dsdxEul, dsdzEul \
-        , Cp, Cv, Rd, g, gamma )
+    if rbfDerivatives == 0 :
+        def odefun( t, U ) :
+            return nonhydro.odefun1( t, U \
+            , setGhostNodes, Dx, Ds, HVx, HVs, [], [] \
+            , ii, jj, i0, i1, j0, j1 \
+            , dsdxEul, dsdzEul, rbfDerivatives \
+            , Cp, Cv, Rd, g, gamma )
+    elif rbfDerivatives == 1 :
+        def odefun( t, U ) :
+            return nonhydro.odefun1( t, U \
+            , setGhostNodes, Dx, [], [], [], Dhv, Dz \
+            , ii, jj, i0, i1, j0, j1 \
+            , dsdxEul, dsdzEul, rbfDerivatives \
+            , Cp, Cv, Rd, g, gamma )
+    else :
+        sys.exit( "\nError: rbfDerivatives should be 0 or 1.\n" )
     
 elif formulation == "hydrostaticPressure" :
     
