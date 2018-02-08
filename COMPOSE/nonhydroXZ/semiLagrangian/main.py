@@ -8,20 +8,20 @@ from gab import nonhydro, rk
 
 #"bubble", "igw", "densityCurrent", "doubleDensityCurrent",
 #or "movingDensityCurrent":
-testCase = "bubble"
+testCase = "igw"
 
 #"exner" (need to fix so that "hydrostaticPressure" also works):
-formulation = "hydrostaticPressure"
+formulation = "exner"
 
 semiLagrangian = 0                  #Set this to zero.  SL not working yet.
-dx = 100.
-ds = 100.
+dx = 250.
+ds = 250.
 FD = 4                                    #Order of lateral FD (2, 4, or 6)
 rbfOrder = 3
 polyOrder = 1
 stencilSize = 9
 saveDel = 100
-var = 2
+var = 3
 plotFromSaved = 0
 rkStages = 3
 plotNodes = 0
