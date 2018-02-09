@@ -11,24 +11,25 @@ from gab import nonhydro, rk, phs2
 
 #"bubble", "igw", "densityCurrent", "doubleDensityCurrent",
 #or "movingDensityCurrent":
-testCase = "densityCurrent"
+testCase = "doubleDensityCurrent"
 
-#"exner" (need to fix so that "hydrostaticPressure" also works):
+#"exner" or "hydrostaticPressure":
 formulation = "exner"
 
 semiLagrangian = 0                  #Set this to zero.  SL not working yet.
-dx = 200.
-ds = 200.
+rbfDerivatives = 0
+dx = 50.
+ds = 50.
 FD = 4                                    #Order of lateral FD (2, 4, or 6)
-rbfOrder = 5
-polyOrder = 3
+rbfOrder    = 5
+polyOrder   = 3
 stencilSize = 45
-saveDel = 100
-var = 2
+K           = FD/2+1
+saveDel = 50
+var = 1
 plotFromSaved = 0
 rkStages = 3
 plotNodes = 0
-rbfDerivatives = 1
 
 ###########################################################################
 
@@ -44,6 +45,9 @@ Cp, Cv, Rd, g, Po = nonhydro.getConstants()
 
 xLeft, xRight, nLev, nCol, zTop, zSurf, zSurfPrime, x, z \
 = nonhydro.getSpaceDomain( testCase, dx, ds, FD )
+
+xVec = x.flatten()
+zVec = z.flatten()
 
 tf, dt, dtEul, nTimesteps = nonhydro.getTimeDomain( testCase, dx, ds )
 
@@ -81,9 +85,6 @@ dsdxVec = dsdxAll . flatten()
 dsdzVec = dsdzAll . flatten()
 dsdxEul = dsdx( x[ii,:][:,jj], z[ii,:][:,jj] )
 dsdzEul = dsdz( x[ii,:][:,jj], z[ii,:][:,jj] )
-
-xVec = x.flatten()
-zVec = z.flatten()
 
 ###########################################################################
 
@@ -136,16 +137,16 @@ elif rbfDerivatives == 1 :
     
     stencils = phs2.getStencils( xVec, zVec, xVec[ind.m], zVec[ind.m], stencilSize )
     A = phs2.getAmatrices( stencils, rbfOrder, polyOrder )
-    Wx = phs2.getWeights(  stencils, A, "1",  0 )
-    Wz = phs2.getWeights(  stencils, A, "2",  0 )
-    Whv = phs2.getWeights( stencils, A, "hv", 2 )
+    Wx  = phs2.getWeights( stencils, A, "1",  0 )
+    Wz  = phs2.getWeights( stencils, A, "2",  0 )
+    Whv = phs2.getWeights( stencils, A, "hv", K )
     
     ib = np.transpose( np.tile( np.arange(len(xVec[ind.m])), (stencilSize,1) ) )
     ib = ib.flatten()
     jb = stencils.idx
     jb = jb.flatten()
-    Wx  = sparse.coo_matrix( (Wx .flatten(),(ib,jb)), shape = ( len(xVec[ind.m]), len(xVec) ) )
-    Wz  = sparse.coo_matrix( (Wz .flatten(),(ib,jb)), shape = ( len(xVec[ind.m]), len(xVec) ) )
+    Wx  = sparse.coo_matrix( (Wx.flatten(), (ib,jb)), shape = ( len(xVec[ind.m]), len(xVec) ) )
+    Wz  = sparse.coo_matrix( (Wz.flatten(), (ib,jb)), shape = ( len(xVec[ind.m]), len(xVec) ) )
     Whv = sparse.coo_matrix( (Whv.flatten(),(ib,jb)), shape = ( len(xVec[ind.m]), len(xVec) ) )
     
     def Dx( U ) :
@@ -165,7 +166,7 @@ elif rbfDerivatives == 1 :
         , Whv \
         , nLev, nCol, FD \
         , ind.m, ii, jj )
-        return dx**3. * U
+        return dx**(2*K-1) * U
     
 else :
     
@@ -187,20 +188,25 @@ if formulation == "exner" :
         return U, P
     
     if rbfDerivatives == 0 :
+        
         def odefun( t, U ) :
             return nonhydro.odefun1( t, U \
             , setGhostNodes, Dx, Ds, HVx, HVs, [], [] \
             , ii, jj, i0, i1, j0, j1 \
             , dsdxEul, dsdzEul, rbfDerivatives \
             , Cp, Cv, Rd, g, gamma )
+        
     elif rbfDerivatives == 1 :
+        
         def odefun( t, U ) :
             return nonhydro.odefun1( t, U \
             , setGhostNodes, Dx, [], [], [], Dhv, Dz \
             , ii, jj, i0, i1, j0, j1 \
             , dsdxEul, dsdzEul, rbfDerivatives \
             , Cp, Cv, Rd, g, gamma )
+        
     else :
+        
         sys.exit( "\nError: rbfDerivatives should be 0 or 1.\n" )
     
 elif formulation == "hydrostaticPressure" :
