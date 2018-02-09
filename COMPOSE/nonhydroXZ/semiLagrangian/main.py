@@ -4,33 +4,36 @@ import time
 import matplotlib.pyplot as plt
 from scipy import sparse
 
-# sys.path.append( 'C:\\cygwin64\\home\\gabarne\\repos\\python\\site-packages' )
-sys.path.append( 'C:\\cygwin64\\home\\gabarnettjr\\repos\\python\\site-packages' )
+sys.path.append( 'C:\\cygwin64\\home\\gabarne\\repos\\python\\site-packages' )
+# sys.path.append( 'C:\\cygwin64\\home\\gabarnettjr\\repos\\python\\site-packages' )
 from gab import nonhydro, rk, phs2
 
 ###########################################################################
 
 #"bubble", "igw", "densityCurrent", "doubleDensityCurrent",
 #or "movingDensityCurrent":
-testCase = "movingDensityCurrent"
+testCase = "bubble"
 
 #"exner" or "hydrostaticPressure":
 formulation = "exner"
 
 semiLagrangian = 0                  #Set this to zero.  SL not working yet.
 rbfDerivatives = 0
-dx = 200.
-ds = 200.
+dx = 50.
+ds = 50.
 FD = 4                                    #Order of lateral FD (2, 4, or 6)
 rbfOrder    = 5
 polyOrder   = 3
 stencilSize = 45
 K = FD/2+1                          #determines exponent in HV for RBF case
-saveDel = 50                  #solution will be saved every saveDel seconds
-var = 3                                  #determines what to plot (0,1,2,3)
-plotFromSaved = 0                   #if 1, results are loaded, not computed
+var = 2                                  #determines what to plot (0,1,2,3)
 rkStages = 3
 plotNodes = 0                               #if 1, plot nodes and then exit
+saveDel = 50                              #print/save every saveDel seconds
+
+saveArrays    = 0
+saveContours  = 0
+plotFromSaved = 0                   #if 1, results are loaded, not computed
 
 ###########################################################################
 
@@ -81,7 +84,8 @@ U, thetaBar, piBar, dpidsBar \
 , Cp(), Cv(), Rd(), g(), Po() \
 , dsdz )
 
-ind = nonhydro.getIndexes( x, z, xLeft, xRight, zSurf, zTop, FD, nLev, nCol )
+ind = nonhydro.getIndexes( x, z, xLeft, xRight, zSurf, zTop, FD \
+, nLev, nCol )
 
 if plotNodes == 1 :
     nonhydro.plotNodes( x, z, ind, testCase )
@@ -120,12 +124,19 @@ else :
 ws = np.array( [ -1./2., 0., 1./2. ] )
 wshv = np.array( [ 1., -2., 1. ] )
 
+wx = wx / dx
+wxhv = wxhv / dx
+ws = ws / ds
+wshv = wshv / ds
+
 ###########################################################################
 
 bigTx = np.tile( Tx, (2,1) )
 bigTz = np.tile( Tz, (2,1) )
 
 normGradS = np.sqrt( dsdxBottom**2. + dsdzBottom**2. )
+
+bigNull = np.zeros(( 4, nLev+2, nCol+FD ))
 
 ###########################################################################
 
@@ -134,16 +145,16 @@ normGradS = np.sqrt( dsdxBottom**2. + dsdzBottom**2. )
 if rbfDerivatives == 0 :
     
     def Dx( U ) :
-        return nonhydro.LxFD( U, wx, jj, dx, FD, FDo2 )
+        return nonhydro.LxFD_3D( U, wx, j0, j1, dx, FD, FDo2 )
     
     def Ds( U ) :
-        return nonhydro.LsFD( U, ws, ii, ds )
+        return nonhydro.LsFD( U, ws, i0, i1, ds )
     
     def HVx( U ) :
-        return nonhydro.LxFD( U, wxhv, jj, dx, FD, FDo2 )
+        return nonhydro.LxFD_3D( U, wxhv, j0, j1, dx, FD, FDo2 )
     
     def HVs( U ) :
-        return nonhydro.LsFD( U, wshv, ii, ds )
+        return nonhydro.LsFD( U, wshv, i0, i1, ds )
     
 elif rbfDerivatives == 1 :
     
@@ -157,27 +168,21 @@ elif rbfDerivatives == 1 :
     ib = ib.flatten()
     jb = stencils.idx
     jb = jb.flatten()
-    Wx  = sparse.coo_matrix( (Wx.flatten(), (ib,jb)), shape = ( len(xVec[ind.m]), len(xVec) ) )
-    Wz  = sparse.coo_matrix( (Wz.flatten(), (ib,jb)), shape = ( len(xVec[ind.m]), len(xVec) ) )
-    Whv = sparse.coo_matrix( (Whv.flatten(),(ib,jb)), shape = ( len(xVec[ind.m]), len(xVec) ) )
+    Wx  = sparse.coo_matrix( (Wx.flatten(), (ib,jb)) \
+    , shape = ( len(xVec[ind.m]), len(xVec) ) )
+    Wz  = sparse.coo_matrix( (Wz.flatten(), (ib,jb)) \
+    , shape = ( len(xVec[ind.m]), len(xVec) ) )
+    Whv = sparse.coo_matrix( (Whv.flatten(),(ib,jb)) \
+    , shape = ( len(xVec[ind.m]), len(xVec) ) )
     
     def Dx( U ) :
-        return nonhydro.Lphs( U \
-        , Wx \
-        , nLev, nCol, FD \
-        , ind.m, ii, jj )
+        return nonhydro.Lphs( U, Wx, nLev, nCol, FD, ind.m, ii, jj )
     
     def Dz( U ) :
-        return nonhydro.Lphs( U \
-        , Wz \
-        , nLev, nCol, FD \
-        , ind.m, ii, jj )
+        return nonhydro.Lphs( U, Wz, nLev, nCol, FD, ind.m, ii, jj )
     
     def Dhv( U ) :
-        U = nonhydro.Lphs( U \
-        , Whv \
-        , nLev, nCol, FD \
-        , ind.m, ii, jj )
+        U = nonhydro.Lphs( U, Whv, nLev, nCol, FD, ind.m, ii, jj )
         return dx**(2*K-1) * U
     
 else :
@@ -192,10 +197,10 @@ if formulation == "exner" :
     
     def setGhostNodes( U ) :
         U = nonhydro.setGhostNodes1( U \
-        , Tx, Tz, Nx, Nz, bigTx, bigTz \
+        , Tx, Tz, Nx, Nz, bigTx, bigTz, jj \
         , nLev, nCol, thetaBar, g(), Cp() \
         , normGradS, ds, dsdxBottom, dsdzBottom \
-        , wx, jj, dx, FD, FDo2 )
+        , wx, j0, j1, dx, FD, FDo2 )
         P = []
         return U, P
     
@@ -206,7 +211,8 @@ if formulation == "exner" :
             , setGhostNodes, Dx, Ds, HVx, HVs, [], [] \
             , ii, jj, i0, i1, j0, j1 \
             , dsdxEul, dsdzEul, rbfDerivatives \
-            , Cp(), Cv(), Rd(), g(), gamma )
+            , Cp(), Cv(), Rd(), g(), gamma \
+            , bigNull )
         
     elif rbfDerivatives == 1 :
         
@@ -215,7 +221,8 @@ if formulation == "exner" :
             , setGhostNodes, Dx, [], [], [], Dhv, Dz \
             , ii, jj, i0, i1, j0, j1 \
             , dsdxEul, dsdzEul, rbfDerivatives \
-            , Cp(), Cv(), Rd(), g(), gamma )
+            , Cp(), Cv(), Rd(), g(), gamma \
+            , bigNull )
         
     else :
         
@@ -298,10 +305,12 @@ print()
 
 #Save initial conditions and contour of first frame:
 U, P = setGhostNodes( U )
-np.save( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy', U )
+if saveArrays == 1 :
+    np.save( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy', U )
 Un1 = U
 et = printInfo( U, time.clock(), t )
-saveContourPlot( U, t )
+if saveContours == 1 :
+    saveContourPlot( U, t )
 
 #The actual Eulerian time-stepping from t=0 to t=dt:
 for i in range( np.int( np.round(dt/dtEul) + 1e-12 ) ) :
@@ -322,14 +331,16 @@ for i in range(1,nTimesteps+1) :
         
         if plotFromSaved == 0 :
             U, P = setGhostNodes( U )
-            np.save( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy', U )
+            if saveArrays == 1 :
+                np.save( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy', U )
         elif plotFromSaved == 1 :
             U = np.load( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy' )
         else :
             sys.exit( "\nError: plotFromSaved should be 0 or 1.\n" )
         
         et = printInfo( U, et, t )
-        saveContourPlot( U, t )
+        if saveContours == 1 :
+            saveContourPlot( U, t )
         
     if plotFromSaved == 0 :
         if semiLagrangian == 0 :
