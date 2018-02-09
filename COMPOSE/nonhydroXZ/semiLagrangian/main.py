@@ -12,25 +12,25 @@ from gab import nonhydro, rk, phs2
 
 #"bubble", "igw", "densityCurrent", "doubleDensityCurrent",
 #or "movingDensityCurrent":
-testCase = "doubleDensityCurrent"
+testCase = "movingDensityCurrent"
 
 #"exner" or "hydrostaticPressure":
 formulation = "exner"
 
 semiLagrangian = 0                  #Set this to zero.  SL not working yet.
 rbfDerivatives = 0
-dx = 100.
-ds = 100.
+dx = 200.
+ds = 200.
 FD = 4                                    #Order of lateral FD (2, 4, or 6)
 rbfOrder    = 5
 polyOrder   = 3
 stencilSize = 45
-K           = FD/2+1
-saveDel = 50
-var = 1
-plotFromSaved = 0
+K = FD/2+1                          #determines exponent in HV for RBF case
+saveDel = 50                  #solution will be saved every saveDel seconds
+var = 3                                  #determines what to plot (0,1,2,3)
+plotFromSaved = 0                   #if 1, results are loaded, not computed
 rkStages = 3
-plotNodes = 0
+plotNodes = 0                               #if 1, plot nodes and then exit
 
 ###########################################################################
 
@@ -42,7 +42,18 @@ saveString = './results/' + testCase + '/' \
 
 ###########################################################################
 
+#QUESTION:  Does this weird function thing for constants do anything?
+
 Cp, Cv, Rd, g, Po = nonhydro.getConstants()
+
+# cp, cv, rd, G, po = nonhydro.getConstants()
+# def Cp(): return cp
+# def Cv(): return cv
+# def Rd(): return rd
+# def g() : return G
+# def Po(): return po
+
+###########################################################################
 
 xLeft, xRight, nLev, nCol, zTop, zSurf, zSurfPrime, x, z \
 = nonhydro.getSpaceDomain( testCase, dx, ds, FD )
@@ -67,7 +78,7 @@ Tx, Tz, Nx, Nz = nonhydro.getTanNorm( zSurfPrime, x[0,jj] )
 U, thetaBar, piBar, dpidsBar \
 = nonhydro.getInitialConditions( testCase, formulation \
 , nLev, nCol, FD, x, z \
-, Cp, Cv, Rd, g, Po \
+, Cp(), Cv(), Rd(), g(), Po() \
 , dsdz )
 
 ind = nonhydro.getIndexes( x, z, xLeft, xRight, zSurf, zTop, FD, nLev, nCol )
@@ -182,7 +193,7 @@ if formulation == "exner" :
     def setGhostNodes( U ) :
         U = nonhydro.setGhostNodes1( U \
         , Tx, Tz, Nx, Nz, bigTx, bigTz \
-        , nLev, nCol, thetaBar, g, Cp \
+        , nLev, nCol, thetaBar, g(), Cp() \
         , normGradS, ds, dsdxBottom, dsdzBottom \
         , wx, jj, dx, FD, FDo2 )
         P = []
@@ -195,7 +206,7 @@ if formulation == "exner" :
             , setGhostNodes, Dx, Ds, HVx, HVs, [], [] \
             , ii, jj, i0, i1, j0, j1 \
             , dsdxEul, dsdzEul, rbfDerivatives \
-            , Cp, Cv, Rd, g, gamma )
+            , Cp(), Cv(), Rd(), g(), gamma )
         
     elif rbfDerivatives == 1 :
         
@@ -204,7 +215,7 @@ if formulation == "exner" :
             , setGhostNodes, Dx, [], [], [], Dhv, Dz \
             , ii, jj, i0, i1, j0, j1 \
             , dsdxEul, dsdzEul, rbfDerivatives \
-            , Cp, Cv, Rd, g, gamma )
+            , Cp(), Cv(), Rd(), g(), gamma )
         
     else :
         
@@ -215,7 +226,7 @@ elif formulation == "hydrostaticPressure" :
     def setGhostNodes( U ) :
         U, P = nonhydro.setGhostNodes2( U \
         , Tx, Tz, Nx, Nz, bigTx, bigTz \
-        , nLev, nCol, thetaBar, dpidsBar, g, Cp, Po, Rd, Cv \
+        , nLev, nCol, thetaBar, dpidsBar, g(), Cp(), Po(), Rd(), Cv() \
         , normGradS, ds, dsdxBottom, dsdzBottom, dsdz(x,z) \
         , wx, jj, dx, FD, FDo2 )
         return U, P
@@ -225,7 +236,7 @@ elif formulation == "hydrostaticPressure" :
         , setGhostNodes, Dx, Ds, HVx, HVs \
         , ii, jj, i0, i1, j0, j1 \
         , dsdxEul, dsdzEul, dsdxAll, dsdzAll \
-        , Cp, Cv, Rd, g, gamma )
+        , Cp(), Cv(), Rd(), g(), gamma )
     
 else :
     
@@ -239,7 +250,7 @@ if semiLagrangian == 1 :
         U1, alp, bet = nonhydro.conventionalSemiLagrangianTimestep( Un1, U, alp, bet \
         , setGhostNodes, Dx, Ds \
         , nLev, nCol, FD, FDo2, ds \
-        , Cp, Rd, Cv, g, dt \
+        , Cp(), Rd(), Cv(), g(), dt \
         , x.flatten(), z.flatten(), dsdx, dsdz \
         , ind.m, i0, i1, j0, j1 \
         , rbfOrder, polyOrder, stencilSize )
@@ -248,7 +259,7 @@ if semiLagrangian == 1 :
         # , setGhostNodes, Dx, Ds \
         # , x.flatten(), z.flatten(), ind.m, dt \
         # , nLev, nCol, FD, i0, i1, j0, j1 \
-        # , Cp, Rd, Cv, g, dsdxVec[ind.m], dsdzVec[ind.m] \
+        # , Cp(), Rd(), Cv(), g(), dsdxVec[ind.m], dsdzVec[ind.m] \
         # , rbfOrder, polyOrder, stencilSize )
 
 ###########################################################################
