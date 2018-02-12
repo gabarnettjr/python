@@ -17,8 +17,8 @@ testCase = "bubble"
 #"exner" or "hydrostaticPressure":
 formulation = "exner"
 
-semiLagrangian = 0                  #Set this to zero.  SL not working yet.
-rbfDerivatives = 0                 #Set this to zero.  RBF not working yet.
+semiLagrangian = 0                   #Set this to zero.  SL not working yet
+rbfDerivatives = 0                  #Set this to zero.  RBF not working yet
 dx = 100.
 ds = 100.
 FD = 4                                    #Order of lateral FD (2, 4, or 6)
@@ -273,7 +273,7 @@ if semiLagrangian == 1 :
 
 ###########################################################################
 
-#functions that will not be changed by user:
+#Functions that will not be changed by user:
 
 if rkStages == 3 :
     rk = rk.rk3
