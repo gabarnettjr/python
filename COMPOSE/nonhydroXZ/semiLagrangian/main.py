@@ -4,8 +4,8 @@ import time
 import matplotlib.pyplot as plt
 from scipy import sparse
 
-# sys.path.append( 'C:\\cygwin64\\home\\gabarne\\repos\\python\\site-packages' )
-sys.path.append( 'C:\\cygwin64\\home\\gabarnettjr\\repos\\python\\site-packages' )
+sys.path.append( 'C:\\cygwin64\\home\\gabarne\\repos\\python\\site-packages' )
+# sys.path.append( 'C:\\cygwin64\\home\\gabarnettjr\\repos\\python\\site-packages' )
 from gab import nonhydro, rk, phs2
 
 ###########################################################################
@@ -18,21 +18,21 @@ testCase = "bubble"
 formulation = "exner"
 
 semiLagrangian = 0                  #Set this to zero.  SL not working yet.
-rbfDerivatives = 0
-dx = 50.
-ds = 50.
+rbfDerivatives = 0                 #Set this to zero.  RBF not working yet.
+dx = 100.
+ds = 100.
 FD = 4                                    #Order of lateral FD (2, 4, or 6)
 rbfOrder    = 5
 polyOrder   = 3
 stencilSize = 45
-K = FD/2+1                          #determines exponent in HV for RBF case
+K           = FD/2+1                #determines exponent in HV for RBF case
 var = 2                                  #determines what to plot (0,1,2,3)
 rkStages = 3
 plotNodes = 0                               #if 1, plot nodes and then exit
 saveDel = 50                              #print/save every saveDel seconds
 
-saveArrays    = 0
-saveContours  = 0
+saveArrays    = 1
+saveContours  = 1
 plotFromSaved = 0                   #if 1, results are loaded, not computed
 
 ###########################################################################
@@ -45,16 +45,9 @@ saveString = './results/' + testCase + '/' \
 
 ###########################################################################
 
-#QUESTION:  Does this weird function thing for constants do anything?
+#QUESTION:  Does this weird function thing make a difference?
 
 Cp, Cv, Rd, g, Po = nonhydro.getConstants()
-
-# cp, cv, rd, G, po = nonhydro.getConstants()
-# def Cp(): return cp
-# def Cv(): return cv
-# def Rd(): return rd
-# def g() : return G
-# def Po(): return po
 
 ###########################################################################
 
@@ -93,14 +86,16 @@ if plotNodes == 1 :
     
 ###########################################################################
 
+#Derivatives of height coordinate function s:
+
 dsdxBottom = dsdx( x[0,jj], zSurf(x[0,jj]) )
 dsdzBottom = dsdz( x[0,jj], zSurf(x[0,jj]) )
-dsdxAll = dsdx( x, z )
-dsdzAll = dsdz( x, z )
-dsdxVec = dsdxAll . flatten()
-dsdzVec = dsdzAll . flatten()
-dsdxEul = dsdx( x[ii,:][:,jj], z[ii,:][:,jj] )
-dsdzEul = dsdz( x[ii,:][:,jj], z[ii,:][:,jj] )
+dsdxAll    = dsdx( x, z )
+dsdzAll    = dsdz( x, z )
+dsdxVec    = dsdxAll . flatten()
+dsdzVec    = dsdzAll . flatten()
+dsdxEul    = dsdx( x[ii,:][:,jj], z[ii,:][:,jj] )
+dsdzEul    = dsdz( x[ii,:][:,jj], z[ii,:][:,jj] )
 
 ###########################################################################
 
@@ -120,13 +115,12 @@ elif FD == 6 :
     gamma = 1./60.
 else :
     sys.exit( "\nError: FD should be 2, 4, or 6.\n" )
+wx   = wx   / dx
+wxhv = wxhv / dx
 
 ws = np.array( [ -1./2., 0., 1./2. ] )
 wshv = np.array( [ 1., -2., 1. ] )
-
-wx = wx / dx
-wxhv = wxhv / dx
-ws = ws / ds
+ws   = ws   / ds
 wshv = wshv / ds
 
 ###########################################################################
@@ -145,16 +139,22 @@ bigNull = np.zeros(( 4, nLev+2, nCol+FD ))
 if rbfDerivatives == 0 :
     
     def Dx( U ) :
-        return nonhydro.LxFD_3D( U, wx, j0, j1, dx, FD, FDo2 )
+        return nonhydro.LxFD_3D( U, wx,   j0, j1, dx, FD, FDo2 )
+    
+    def Dx2D( U ) :
+        return nonhydro.LxFD_2D( U, wx,   j0, j1, dx, FD, FDo2 )
     
     def Ds( U ) :
-        return nonhydro.LsFD( U, ws, i0, i1, ds )
+        return nonhydro.LsFD_3D( U, ws,   i0, i1, ds )
+    
+    def Ds2D( U ) :
+        return nonhydro.LsFD_2D( U, ws,   i0, i1, ds )
     
     def HVx( U ) :
         return nonhydro.LxFD_3D( U, wxhv, j0, j1, dx, FD, FDo2 )
     
     def HVs( U ) :
-        return nonhydro.LsFD( U, wshv, i0, i1, ds )
+        return nonhydro.LsFD_3D( U, wshv, i0, i1, ds )
     
 elif rbfDerivatives == 1 :
     
@@ -232,15 +232,15 @@ elif formulation == "hydrostaticPressure" :
     
     def setGhostNodes( U ) :
         U, P = nonhydro.setGhostNodes2( U \
-        , Tx, Tz, Nx, Nz, bigTx, bigTz \
+        , Tx, Tz, Nx, Nz, bigTx, bigTz, jj \
         , nLev, nCol, thetaBar, dpidsBar, g(), Cp(), Po(), Rd(), Cv() \
         , normGradS, ds, dsdxBottom, dsdzBottom, dsdz(x,z) \
-        , wx, jj, dx, FD, FDo2 )
+        , wx, j0, j1, dx, FD, FDo2 )
         return U, P
     
     def odefun( t, U ) :
         return nonhydro.odefun2( t, U \
-        , setGhostNodes, Dx, Ds, HVx, HVs \
+        , setGhostNodes, Dx, Dx2D, Ds, Ds2D, HVx, HVs \
         , ii, jj, i0, i1, j0, j1 \
         , dsdxEul, dsdzEul, dsdxAll, dsdzAll \
         , Cp(), Cv(), Rd(), g(), gamma )
@@ -250,6 +250,8 @@ else :
     sys.exit( "\nError: formulation should be 'exner' or 'hydrostaticPressure'.\n" )
 
 ###########################################################################
+
+#This is not working well yet.  Need to get semi-implicit working first.
 
 if semiLagrangian == 1 :
     
