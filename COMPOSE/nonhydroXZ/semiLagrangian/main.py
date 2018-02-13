@@ -19,12 +19,12 @@ formulation = "exner"
 
 semiLagrangian = 0                   #Set this to zero.  SL not working yet
 rbfDerivatives = 0                  #Set this to zero.  RBF not working yet
-dx = 100.
-ds = 100.
+dx = 200.
+ds = 200.
 FD = 4                                    #Order of lateral FD (2, 4, or 6)
-rbfOrder    = 5
-polyOrder   = 3
-stencilSize = 45
+rbfOrder    = 3
+polyOrder   = 1
+stencilSize = 9
 K           = FD/2+1                #determines exponent in HV for RBF case
 var = 2                                  #determines what to plot (0,1,2,3)
 rkStages = 3
@@ -257,7 +257,7 @@ if semiLagrangian == 1 :
     
     def semiLagrangianTimestep( Un1, U, alp, bet ) :
         U1, alp, bet = nonhydro.conventionalSemiLagrangianTimestep( Un1, U, alp, bet \
-        , setGhostNodes, Dx, Ds \
+        , setGhostNodes, Dx2D, Ds2D \
         , nLev, nCol, FD, FDo2, ds \
         , Cp(), Rd(), Cv(), g(), dt \
         , x.flatten(), z.flatten(), dsdx, dsdz \
