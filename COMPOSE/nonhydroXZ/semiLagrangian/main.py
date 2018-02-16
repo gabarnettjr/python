@@ -1,12 +1,11 @@
 import sys
-# sys.path.append('/cygdrive/c/Anaconda3/Lib/site-packages')
 import numpy as np
 import time
 import matplotlib.pyplot as plt
 from scipy import sparse
 # sys.path.append('/home/gabarnettjr/repos/python/site-packages')
-# sys.path.append( 'C:\\cygwin64\\home\\gabarne\\repos\\python\\site-packages' )
-sys.path.append( 'C:\\cygwin64\\home\\gabarnettjr\\repos\\python\\site-packages' )
+sys.path.append( 'C:\\cygwin64\\home\\gabarne\\repos\\python\\site-packages' )
+# sys.path.append( 'C:\\cygwin64\\home\\gabarnettjr\\repos\\python\\site-packages' )
 from gab import nonhydro, rk, phs2
 
 ###########################################################################
@@ -16,12 +15,12 @@ from gab import nonhydro, rk, phs2
 testCase = "doubleDensityCurrent"
 
 #"exner" or "hydrostaticPressure":
-formulation = "exner"
+formulation = "hydrostaticPressure"
 
 semiLagrangian = 0                   #Set this to zero.  SL not working yet
 rbfDerivatives = 0                  #Set this to zero.  RBF not working yet
-dx = 400.
-ds = 400.
+dx = 100.
+ds = 100.
 FD = 4                                    #Order of lateral FD (2, 4, or 6)
 rbfOrder    = 3
 polyOrder   = 1
@@ -29,10 +28,10 @@ stencilSize = 9
 K           = FD/2+1                #determines exponent in HV for RBF case
 var = 3                                  #determines what to plot (0,1,2,3)
 rkStages = 3
-plotNodes = 1                               #if 1, plot nodes and then exit
+plotNodes = 0                               #if 1, plot nodes and then exit
 saveDel = 50                              #print/save every saveDel seconds
 
-saveArrays    = 1
+saveArrays    = 1 
 saveContours  = 1
 plotFromSaved = 0                   #if 1, results are loaded, not computed
 
