@@ -13,23 +13,23 @@ from gab import nonhydro, rk, phs2
 
 #"bubble", "igw", "densityCurrent", "doubleDensityCurrent",
 #or "movingDensityCurrent":
-testCase = "bubble"
+testCase = "doubleDensityCurrent"
 
 #"exner" or "hydrostaticPressure":
 formulation = "exner"
 
 semiLagrangian = 0                   #Set this to zero.  SL not working yet
 rbfDerivatives = 0                  #Set this to zero.  RBF not working yet
-dx = 200.
-ds = 200.
+dx = 400.
+ds = 400.
 FD = 4                                    #Order of lateral FD (2, 4, or 6)
 rbfOrder    = 3
 polyOrder   = 1
 stencilSize = 9
 K           = FD/2+1                #determines exponent in HV for RBF case
-var = 2                                  #determines what to plot (0,1,2,3)
+var = 3                                  #determines what to plot (0,1,2,3)
 rkStages = 3
-plotNodes = 0                               #if 1, plot nodes and then exit
+plotNodes = 1                               #if 1, plot nodes and then exit
 saveDel = 50                              #print/save every saveDel seconds
 
 saveArrays    = 1
