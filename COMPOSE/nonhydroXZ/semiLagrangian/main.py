@@ -1,11 +1,12 @@
 import sys
+# sys.path.append('/cygdrive/c/Anaconda3/Lib/site-packages')
 import numpy as np
 import time
 import matplotlib.pyplot as plt
 from scipy import sparse
-
-sys.path.append( 'C:\\cygwin64\\home\\gabarne\\repos\\python\\site-packages' )
-# sys.path.append( 'C:\\cygwin64\\home\\gabarnettjr\\repos\\python\\site-packages' )
+# sys.path.append('/home/gabarnettjr/repos/python/site-packages')
+# sys.path.append( 'C:\\cygwin64\\home\\gabarne\\repos\\python\\site-packages' )
+sys.path.append( 'C:\\cygwin64\\home\\gabarnettjr\\repos\\python\\site-packages' )
 from gab import nonhydro, rk, phs2
 
 ###########################################################################
