@@ -18,8 +18,8 @@ formulation = "exner"
 
 semiLagrangian = 0                   #Set this to zero.  SL not working yet
 rbfDerivatives = 0                  #Set this to zero.  RBF not working yet
-dx = 50.
-ds = 50.
+dx = 100.
+ds = 100.
 FD = 4                                    #Order of lateral FD (2, 4, or 6)
 rbfOrder    = 3
 polyOrder   = 1
