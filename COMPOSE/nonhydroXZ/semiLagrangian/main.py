@@ -11,7 +11,7 @@ from gab import nonhydro, rk, phs2
 
 #"bubble", "igw", "densityCurrent", "doubleDensityCurrent",
 #or "movingDensityCurrent":
-testCase = "doubleDensityCurrent"
+testCase = "bubble"
 
 #"exner" or "hydrostaticPressure":
 formulation = "exner"
@@ -30,8 +30,8 @@ plotNodes = 0                               #if 1, plot nodes and then exit
 saveDel = 50                              #print/save every saveDel seconds
 
 var           = 3                        #determines what to plot (0,1,2,3)
-saveArrays    = 1 
-saveContours  = 1
+saveArrays    = 0 
+saveContours  = 0
 plotFromSaved = 0                   #if 1, results are loaded, not computed
 
 ###########################################################################
@@ -287,7 +287,8 @@ def printInfo( U, et, t ) :
     , thetaBar, piBar, dpidsBar )
 
 #Figure size and contour levels for plotting:
-fig, CL = nonhydro.setFigAndContourLevels( testCase )
+if ( saveContours == 1 ) | ( plotFromSaved == 1 ) :
+    fig, CL = nonhydro.setFigAndContourLevels( testCase )
 
 def saveContourPlot( U, t ) :
     nonhydro.saveContourPlot( U, t \
