@@ -7,14 +7,15 @@ import time
 
 sys.path.append('../../../site-packages')
 from gab import semiImplicit, rk
+from gab.nonhydro import setFigAndContourLevels
 
 ###########################################################################
 
-testCase = "bubble"
-dx = 400.
-dz = 400.
+testCase = "doubleDensityCurrent"
+dx = 100.
+dz = 100.
 FD = 4
-dt = 1./8.
+dt = 1./6.
 
 plotNodes   = 0
 spyMatrices = 0
@@ -70,14 +71,30 @@ def rungeKutta( t, U ) :
 
 ###########################################################################
 
+fig, CL = setFigAndContourLevels( testCase )
+
+tmp = ( U[1*N:2*N] )
+print()
+print([np.min(tmp),np.max(tmp)])
+tmp = np.reshape( tmp, (nCol,nLev) )
+tmp = np.transpose( tmp )
+plt.contourf( xx, zz, tmp )
+plt.axis( 'equal' )
+plt.colorbar()
+fig.savefig( '{0:04d}'.format(np.int(np.round(t)+1e-12))+'.png', bbox_inches = 'tight' )
+plt.clf()
+
+###########################################################################
+
 et = semiImplicit.printInfo( U, time.clock(), t, N )
 
 for i in range(nTimesteps+1) :
+
+    if np.mod( i, np.int(np.round(saveDel/dt)) ) == 0 :
+        semiImplicit.printInfo( U, et , t, N )
+        time.sleep(1)
     
     U = rungeKutta( t, U )
     t = t + dt
-    
-    semiImplicit.printInfo( U, et , t, N )
-    time.sleep(1)
 
 ###########################################################################
