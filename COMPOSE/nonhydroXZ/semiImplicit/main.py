@@ -14,7 +14,7 @@ testCase = "bubble"
 dx = 400.
 dz = 400.
 FD = 4
-dt = 1./10.
+dt = 1./8.
 
 plotNodes   = 0
 spyMatrices = 0
@@ -63,7 +63,7 @@ def odeFun( t, U ) :
     return semiImplicit.odeFun( t, U \
     , Lx, Lz, HVx, HVz, Bc1, Bc2 \
     , thetaBar, piBar, dthetabarDz, dpibarDz \
-    , N, gamma, Rd, Cv, Cp, g )
+    , N, gamma, Rd, Cv, Cp, g ) 
 
 def rungeKutta( t, U ) :
     return rk.rk3( t, U, odeFun, dt )
@@ -73,8 +73,10 @@ def rungeKutta( t, U ) :
 et = semiImplicit.printInfo( U, time.clock(), t, N )
 
 for i in range(nTimesteps+1) :
+    
     U = rungeKutta( t, U )
     t = t + dt
+    
     semiImplicit.printInfo( U, et , t, N )
     time.sleep(1)
 
