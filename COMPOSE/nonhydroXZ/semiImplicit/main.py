@@ -44,10 +44,10 @@ testCase = "igw"
 dx       = 500.
 dz       = 500.
 dtExp    = 1./1.
-dtImp    = 20.
+dtImp    = 10.
 saveDel  = 100
 
-implicit    = 0
+implicit    = 1 
 directSolve = 1
 
 gx = -1./12. * 20.
@@ -78,9 +78,11 @@ else :
     + 'dx' + '{0:1d}'.format(np.int(np.round(dx)+1e-12)) \
     + 'dz' + '{0:1d}'.format(np.int(np.round(dz)+1e-12)) + '/'
 
-if os.path.exists( saveString ) :
+if os.path.exists( saveString+'*.npy' ) :
     os.remove( saveString+'*.npy' )
-os.makedirs( saveString )
+
+if not os.path.exists( saveString ) :
+    os.makedirs( saveString )
 
 ###########################################################################
 
@@ -148,13 +150,15 @@ if ( implicit == 1 ) & ( saveArrays == 1 ) :
         , N, Cp, Cv, Rd, g, V )
         return t, U2
 
-fig, CL = setFigAndContourLevels( testCase )
+if savePlots == 1 :
+    
+    fig, CL = setFigAndContourLevels( testCase )
 
-def saveContourPlot( U, t ) :
-    semiImplicit.saveContourPlot( U, t \
-    , testCase, var, nLev, nCol, N \
-    , xx, zz, CL \
-    , xLeft, xRight, zTop, dx, dz )
+    def saveContourPlot( U, t ) :
+        semiImplicit.saveContourPlot( U, t \
+        , testCase, var, nLev, nCol, N \
+        , xx, zz, CL \
+        , xLeft, xRight, zTop, dx, dz )
 
 ###########################################################################
 
