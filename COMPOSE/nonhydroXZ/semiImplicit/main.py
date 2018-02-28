@@ -13,18 +13,18 @@ from gab.nonhydro import setFigAndContourLevels
 
 implicit = 0
 testCase = "igw"
-dx       = 250.
-dz       = 250.
+dx       = 500.
+dz       = 500.
 FD       = 4
-dtExp    = 1./4.
+dtExp    = 1./2.
 dtImp    = 5.
 saveDel  = 100
 
 gx = -1./12. * 20.
 gz =  1./2.  * 0.003
 
-saveArrays  = 1
-savePlots   = 0
+saveArrays  = 0
+savePlots   = 1
 var         = 2
 plotNodes   = 0
 spyMatrices = 0
@@ -32,6 +32,9 @@ spyMatrices = 0
 ###########################################################################
 
 t = 0.
+
+if implicit != 1 :
+    dtImp = dtExp
 
 if implicit == 1 :
     saveString = './implicit/' + testCase + '/' \
@@ -47,10 +50,7 @@ else :
 Cp, Cv, Rd, g = semiImplicit.getConstants()
 
 tf = semiImplicit.getTfinal( testCase )
-if implicit == 1 :
-    nTimesteps = np.int( np.round(tf/dtImp) + 1e-12 )
-else :
-    nTimesteps = np.int( np.round(tf/dtExp) + 1e-12 )
+nTimesteps = np.int( np.round(tf/dtImp) + 1e-12 )
 
 xLeft, xRight, zTop, nLev, nCol, N, xx, zz, x, z \
 = semiImplicit.getSpaceDomain( testCase, dx, dz )
@@ -141,12 +141,7 @@ for i in range( np.int( np.round(dtImp/dtExp) + 1e-12 ) ) :
 
 for i in range(1,nTimesteps+1) :
     
-    if implicit == 1 :
-        tmp = np.mod( i, np.int(np.round(saveDel/dtImp)+1e-12) )
-    else :
-        tmp = np.mod( i, np.int(np.round(saveDel/dtExp)+1e-12) )
-    
-    if tmp == 0 :
+    if np.mod( i, np.int(np.round(saveDel/dtImp)+1e-12) ) == 0 :
         if saveArrays == 1 :
             np.save( saveString+'{0:04d}'.format(np.int(np.round(t)+1e-12))+'.npy', U1 )
         else :
@@ -163,9 +158,6 @@ for i in range(1,nTimesteps+1) :
         U0 = U1
         U1 = U2
     else :
-        if implicit == 1 :
-            t = t + dtImp
-        else :
-            t = t + dtExp
+        t = t + dtImp
 
 ###########################################################################
