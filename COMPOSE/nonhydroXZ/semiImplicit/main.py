@@ -11,12 +11,12 @@ from gab.nonhydro import setFigAndContourLevels
 
 ###########################################################################
 
-implicit = 0
+implicit = 1
 testCase = "igw"
-dx       = 500.
-dz       = 500.
+dx       = 250.
+dz       = 250.
 FD       = 4
-dtExp    = 1./2.
+dtExp    = 1./4.
 dtImp    = 5.
 saveDel  = 100
 
@@ -25,7 +25,7 @@ gz =  1./2.  * 0.003
 
 saveArrays  = 0
 savePlots   = 1
-var         = 2
+var         = 1
 plotNodes   = 0
 spyMatrices = 0
 
@@ -74,11 +74,14 @@ Bc1, Bc2 = semiImplicit.getBoundaryConditionMatrices( thetaBar \
 ###########################################################################
 
 if ( implicit == 1 ) & ( saveArrays == 1 ) :
+    
     A = semiImplicit.getBlockMatrix( Lx, Lz, HVx, HVz, Bc1, Bc2, nLev, nCol \
     , thetaBar, piBar, dthetabarDz, gz \
     , Cp, Cv, Rd, g )
+    
     L = sparse.csc_matrix( sparse.eye(4*N) + dtImp*A )
     R = sparse.csc_matrix( sparse.eye(4*N) - dtImp*A )
+    
     L = splu(L)
 
 if spyMatrices == 1 :
