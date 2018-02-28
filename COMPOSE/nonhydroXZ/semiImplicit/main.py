@@ -4,6 +4,7 @@ from scipy.sparse.linalg import splu
 import matplotlib.pyplot as plt
 import sys
 import time
+import os
 
 sys.path.append('../../../site-packages')
 from gab import semiImplicit, rk
@@ -11,23 +12,55 @@ from gab.nonhydro import setFigAndContourLevels
 
 ###########################################################################
 
-implicit = 1
+#testCase = "igw", "bubble", "densityCurrent", "doubleDensityCurrent",
+#or "movingDensityCurrent"
+
+#dtExp is the time-step for the explicit time-stepper (RK3)
+#dtImp is the time-step for the implicit time-stepper (leapfrog)
+
+#solution will be saved or plotted every saveDel seconds
+
+#implicit and directSolve should be either 0 or 1
+
+#if implicit=1 and directSolve=1, it will take a while because it needs to
+#do the sparse LU factorization before time-stepping.
+
+#gx and gz are the hyperviscosity coefficients (lateral and vertical)
+
+#var determines which variable will be plotted:
+#var=0: u
+#var=1: w
+#var=2: potential temperature perturbation
+#var=3: exner pressure perturbation
+
+#FD determines the order of the lateral finite differences (set to 4)
+
+###########################################################################
+
+#HOW TO RUN:
+#python main.py
+
 testCase = "igw"
-dx       = 250.
-dz       = 250.
-FD       = 4
-dtExp    = 1./4.
-dtImp    = 5.
+dx       = 500.
+dz       = 500.
+dtExp    = 1./1.
+dtImp    = 20.
 saveDel  = 100
 
-gx = -1./12. * 20.
-gz =  1./2.  * 0.003
+implicit    = 0
+directSolve = 1
 
-saveArrays  = 0
-savePlots   = 1
-var         = 1
+gx = -1./12. * 20.
+gz =  1./2.  * .003
+
+saveArrays = 1
+savePlots  = 0
+var        = 2
+
 plotNodes   = 0
 spyMatrices = 0
+
+FD = 4
 
 ###########################################################################
 
@@ -44,6 +77,10 @@ else :
     saveString = './explicit/' + testCase + '/' \
     + 'dx' + '{0:1d}'.format(np.int(np.round(dx)+1e-12)) \
     + 'dz' + '{0:1d}'.format(np.int(np.round(dz)+1e-12)) + '/'
+
+if os.path.exists( saveString ) :
+    os.remove( saveString+'*.npy' )
+os.makedirs( saveString )
 
 ###########################################################################
 
@@ -82,7 +119,8 @@ if ( implicit == 1 ) & ( saveArrays == 1 ) :
     L = sparse.csc_matrix( sparse.eye(4*N) + dtImp*A )
     R = sparse.csc_matrix( sparse.eye(4*N) - dtImp*A )
     
-    L = splu(L)
+    if directSolve == 1 :
+        L = splu(L)
 
 if spyMatrices == 1 :
     plt.spy(Lx)
@@ -99,14 +137,13 @@ def odeFunction( t, U ) :
     , thetaBar, piBar, dthetabarDz, dpibarDz \
     , N, gz, Cp, Cv, Rd, g, V )
 
-def rungeKutta( t, U, odeFun, dt ) :
-    t, U = rk.rk3( t, U, odeFun, dt )
-    return t, U
+rungeKutta = rk.rk3
 
 if ( implicit == 1 ) & ( saveArrays == 1 ) :
+    
     def leapfrogTimestep( t, U0, U1 ) :
         t, U2 = semiImplicit.leapfrogTimestep( t, U0, U1, dtImp, L, R \
-        , Lx, Lz, Bc1 \
+        , Lx, Lz, Bc1, directSolve \
         , thetaBar, dthetabarDz \
         , N, Cp, Cv, Rd, g, V )
         return t, U2
