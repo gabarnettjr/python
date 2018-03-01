@@ -18,22 +18,24 @@ from gab.nonhydro import setFigAndContourLevels
 #dtExp is the time-step for the explicit time-stepper (RK3)
 #dtImp is the time-step for the implicit time-stepper (leapfrog)
 
-#solution will be saved or plotted every saveDel seconds
+#The solution will be saved or plotted every saveDel seconds.
 
-#implicit and directSolve should be either 0 or 1
+#implicit and directSolve should be either 0 or 1.
 
-#if implicit=1 and directSolve=1, it will take a while because it needs to
+#If implicit=1 and directSolve=1, it will take a while because it needs to
 #do the sparse LU factorization before time-stepping.
 
-#gx and gz are the hyperviscosity coefficients (lateral and vertical)
+#gx and gz are the hyperviscosity coefficients (lateral and vertical).
 
-#var determines which variable will be plotted:
+#var determines which variable will be plotted.
 #var=0: u
 #var=1: w
 #var=2: potential temperature perturbation
 #var=3: exner pressure perturbation
 
-#FD determines the order of the lateral finite differences (set to 4)
+#saveArrays and savePlots should not both be zero.
+
+#FD determines the order of the lateral finite differences (keep at 4).
 
 ###########################################################################
 
@@ -42,19 +44,19 @@ from gab.nonhydro import setFigAndContourLevels
 
 testCase = "igw"
 dx       = 500.
-dz       = 500.
-dtExp    = 1./1.
+dz       = 250.
+dtExp    = 1./2.
 dtImp    = 10.
 saveDel  = 100
 
-implicit    = 1 
+implicit    = 1
 directSolve = 1
 
 gx = -1./12. * 20.
 gz =  1./2.  * .003
 
 saveArrays = 1
-savePlots  = 0
+savePlots  = 1
 var        = 2
 
 plotNodes   = 0
@@ -70,13 +72,13 @@ if implicit != 1 :
     dtImp = dtExp
 
 if implicit == 1 :
-    saveString = './implicit/' + testCase + '/' \
-    + 'dx' + '{0:1d}'.format(np.int(np.round(dx)+1e-12)) \
-    + 'dz' + '{0:1d}'.format(np.int(np.round(dz)+1e-12)) + '/'
+    saveString = './implicitResults/'
 else :
-    saveString = './explicit/' + testCase + '/' \
-    + 'dx' + '{0:1d}'.format(np.int(np.round(dx)+1e-12)) \
-    + 'dz' + '{0:1d}'.format(np.int(np.round(dz)+1e-12)) + '/'
+    saveString = './explicitResults/'
+
+saveString = saveString + testCase + '/' \
++ 'dx' + '{0:1d}'.format(np.int(np.round(dx)+1e-12)) \
++ 'dz' + '{0:1d}'.format(np.int(np.round(dz)+1e-12)) + '/'
 
 if os.path.exists( saveString+'*.npy' ) :
     os.remove( saveString+'*.npy' )
