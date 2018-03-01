@@ -44,13 +44,14 @@ from gab.nonhydro import setFigAndContourLevels
 
 testCase = "igw"
 dx       = 500.
-dz       = 250.
-dtExp    = 1./2.
+dz       = 125.
+dtExp    = 1./4.
 dtImp    = 10.
 saveDel  = 100
 
-implicit    = 1
+implicit    = 0
 directSolve = 1
+gmresTol    = 1e-7                                          #default = 1e-5
 
 gx = -1./12. * 20.
 gz =  1./2.  * .003
@@ -147,7 +148,7 @@ if ( implicit == 1 ) & ( saveArrays == 1 ) :
     
     def leapfrogTimestep( t, U0, U1 ) :
         t, U2 = semiImplicit.leapfrogTimestep( t, U0, U1, dtImp, L, R \
-        , Lx, Lz, Bc1, directSolve \
+        , Lx, Lz, Bc1, directSolve, gmresTol \
         , thetaBar, dthetabarDz \
         , N, Cp, Cv, Rd, g, V )
         return t, U2
