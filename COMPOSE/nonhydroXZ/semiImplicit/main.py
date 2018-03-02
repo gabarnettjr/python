@@ -45,20 +45,20 @@ from gab.nonhydro import setFigAndContourLevels
 testCase = "igw"
 dx       = 500.
 dz       = 125.
-dtExp    = 1./4.
+dtExp    = 1./2.
 dtImp    = 10.
 saveDel  = 100
 
-implicit    = 0
+implicit    = 1
 directSolve = 1
-gmresTol    = 1e-7                                          #default = 1e-5
+gmresTol    = 1e-7                                           #default: 1e-5
 
 gx = -1./12. * 20.
 gz =  1./2.  * .003
 
-saveArrays = 1
+saveArrays = 0
 savePlots  = 1
-var        = 2
+var        = 0
 
 plotNodes   = 0
 spyMatrices = 0
@@ -142,7 +142,7 @@ def odeFunction( t, U ) :
     , thetaBar, piBar, dthetabarDz, dpibarDz \
     , N, gz, Cp, Cv, Rd, g, V )
 
-rungeKutta = rk.rk3
+rungeKutta = rk.rk4
 
 if ( implicit == 1 ) & ( saveArrays == 1 ) :
     
