@@ -11,15 +11,15 @@ from gab import nonhydro, rk, phs2
 
 #"bubble", "igw", "densityCurrent", "doubleDensityCurrent",
 #or "movingDensityCurrent":
-testCase = "bubble"
+testCase = "igw"
 
 #"exner" or "hydrostaticPressure":
 formulation = "exner"
 
 semiLagrangian = 0                   #Set this to zero.  SL not working yet
 rbfDerivatives = 0                  #Set this to zero.  RBF not working yet
-dx = 100.
-ds = 100.
+dx = 500.
+ds = 500.
 FD = 4                                    #Order of lateral FD (2, 4, or 6)
 rbfOrder    = 3
 polyOrder   = 1
@@ -27,11 +27,11 @@ stencilSize = 9
 K           = FD/2+1                #determines exponent in HV for RBF case
 rkStages = 3
 plotNodes = 0                               #if 1, plot nodes and then exit
-saveDel = 50                              #print/save every saveDel seconds
+saveDel = 100                             #print/save every saveDel seconds
 
-var           = 3                        #determines what to plot (0,1,2,3)
-saveArrays    = 0 
-saveContours  = 0
+var           = 2                        #determines what to plot (0,1,2,3)
+saveArrays    = 1 
+saveContours  = 1
 plotFromSaved = 0                   #if 1, results are loaded, not computed
 
 ###########################################################################
@@ -316,8 +316,7 @@ if saveContours == 1 :
 
 #The actual Eulerian time-stepping from t=0 to t=dt:
 for i in range( np.int( np.round(dt/dtEul) + 1e-12 ) ) :
-    U = rk( t, U, odefun, dtEul )
-    t = t + dtEul
+    t, U = rk( t, U, odefun, dtEul )
 
 U, P = setGhostNodes( U )
 alp = 0.
@@ -346,14 +345,14 @@ for i in range(1,nTimesteps+1) :
         
     if plotFromSaved == 0 :
         if semiLagrangian == 0 :
-            U = rk( t, U, odefun, dt )
+            t, U = rk( t, U, odefun, dt )
         elif semiLagrangian == 1 :
             U1, alp, bet = semiLagrangianTimestep( Un1, U, alp, bet )
             Un1 = U
             U = U1
         else :
             sys.exit( "\nError: semiLagrangian should be 0 or 1.\n" )
-    
-    t = t + dt
+    else :
+        t = t + dt
 
 ############################################################################
