@@ -70,7 +70,7 @@ j1 = jj[-1] + 1
 
 Tx, Tz, Nx, Nz = nonhydro.getTanNorm( zSurfPrime, x[0,jj] )
 
-U, thetaBar, piBar, dpidsBar \
+U, thetaBar, piBar, dthetabarDz, dpidsBar \
 = nonhydro.getInitialConditions( testCase, formulation \
 , nLev, nCol, FD, x, z \
 , Cp(), Cv(), Rd(), g(), Po() \
