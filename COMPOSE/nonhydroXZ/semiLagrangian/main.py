@@ -1,62 +1,73 @@
 import sys
+import os
 import numpy as np
 import time
 import matplotlib.pyplot as plt
 from scipy import sparse
 
 sys.path.append( '../../../site-packages' )
-from gab import nonhydro, rk, phs2
+from gab import nonhydro, rk
 
 ###########################################################################
 
 #"bubble", "igw", "densityCurrent", "doubleDensityCurrent",
 #or "movingDensityCurrent":
-testCase = "igw"
+testCase = "bubble"
 
 #"exner" or "hydrostaticPressure":
-formulation = "exner"
+formulation  = "exner"
 
-semiLagrangian = 0                   #Set this to zero.  SL not working yet
-rbfDerivatives = 0                  #Set this to zero.  RBF not working yet
-dx = 500.
-ds = 500.
+semiImplicit = 0
+
+dx    = 200.
+ds    = 200.
+dtExp = 1./4.
+dtImp = 1.
+
 FD = 4                                    #Order of lateral FD (2, 4, or 6)
-rbfOrder    = 3
-polyOrder   = 1
-stencilSize = 9
-K           = FD/2+1                #determines exponent in HV for RBF case
+gx = 10.                                   #avg lateral velocity (estimate)
+gs = 10.                                  #avg vertical velocity (estimate)
+
 rkStages = 3
 plotNodes = 0                               #if 1, plot nodes and then exit
 saveDel = 100                             #print/save every saveDel seconds
 
-var           = 3                        #determines what to plot (0,1,2,3)
-saveArrays    = 1 
-saveContours  = 1
+var           = 2                        #determines what to plot (0,1,2,3)
+saveArrays    = 0 
+saveContours  = 0
 plotFromSaved = 0                   #if 1, results are loaded, not computed
 
 ###########################################################################
 
 t = 0.
 
-saveString = './results/' + testCase + '/' \
+if semiImplicit == 1 :
+    saveString = './semiImplicitResults/'
+elif semiImplicit == 0 :
+    dtImp = dtExp
+    saveString = './explicitResults/'
+else :
+    sys.exit( "Error: semiImplicit should be 0 or 1." )
+
+saveString = saveString + testCase + '/' \
 + 'dx' + '{0:1d}'.format(np.int(np.round(dx)+1e-12)) \
 + 'ds' + '{0:1d}'.format(np.int(np.round(ds)+1e-12)) + '/'
 
-###########################################################################
+if os.path.exists( saveString+'*.npy' ) :
+    os.remove( saveString+'*.npy' )
 
-#QUESTION:  Does this weird function thing make a difference?
+if not os.path.exists( saveString ) :
+    os.makedirs( saveString )
+
+###########################################################################
 
 Cp, Cv, Rd, g, Po = nonhydro.getConstants()
 
-###########################################################################
+tf = nonhydro.getTfinal( testCase )
+nTimesteps = np.int( np.round(tf/dtImp) + 1e-12 )
 
 xLeft, xRight, nLev, nCol, zTop, zSurf, zSurfPrime, x, z \
 = nonhydro.getSpaceDomain( testCase, dx, ds, FD )
-
-xVec = x.flatten()
-zVec = z.flatten()
-
-tf, dt, dtEul, nTimesteps = nonhydro.getTimeDomain( testCase, dx, ds )
 
 s, dsdx, dsdz = nonhydro.getHeightCoordinate( zTop, zSurf, zSurfPrime )
 
@@ -70,31 +81,36 @@ j1 = jj[-1] + 1
 
 Tx, Tz, Nx, Nz = nonhydro.getTanNorm( zSurfPrime, x[0,jj] )
 
-U, thetaBar, piBar, dthetabarDz, dpidsBar \
+U0, thetaBar, piBar, dthetabarDz, dpidsBar \
 = nonhydro.getInitialConditions( testCase, formulation \
 , nLev, nCol, FD, x, z \
-, Cp(), Cv(), Rd(), g(), Po() \
+, Cp, Cv, Rd, g, Po \
 , dsdz )
 
-ind = nonhydro.getIndexes( x, z, xLeft, xRight, zSurf, zTop, FD \
-, nLev, nCol )
+thetaBarBot = ( thetaBar[0,   jj] + thetaBar[1,     jj] ) / 2.
+thetaBarTop = ( thetaBar[nLev,jj] + thetaBar[nLev+1,jj] ) / 2.
 
 if plotNodes == 1 :
+    
+    ind = nonhydro.getIndexes( x, z, xLeft, xRight, zSurf, zTop, FD \
+    , nLev, nCol )
+    
     nonhydro.plotNodes( x, z, ind, testCase )
+    
     sys.exit( "\nDone plotting nodes.\n" )
     
 ###########################################################################
 
-#Derivatives of height coordinate function s:
+#Derivatives of height coordinate function s, and stuff on interior only:
 
-dsdxBottom = dsdx( x[0,jj], zSurf(x[0,jj]) )
-dsdzBottom = dsdz( x[0,jj], zSurf(x[0,jj]) )
-dsdxAll    = dsdx( x, z )
-dsdzAll    = dsdz( x, z )
-dsdxVec    = dsdxAll . flatten()
-dsdzVec    = dsdzAll . flatten()
-dsdxEul    = dsdx( x[ii,:][:,jj], z[ii,:][:,jj] )
-dsdzEul    = dsdz( x[ii,:][:,jj], z[ii,:][:,jj] )
+dsdxBot = dsdx( x[0,jj], zSurf(x[0,jj]) )
+dsdzBot = dsdz( x[0,jj], zSurf(x[0,jj]) )
+dsdxEul = dsdx( x[ii,:][:,jj], z[ii,:][:,jj] )
+dsdzEul = dsdz( x[ii,:][:,jj], z[ii,:][:,jj] )
+
+thetaBarEul    = thetaBar   [ii,:][:,jj]
+piBarEul       = piBar      [ii,:][:,jj]
+dthetabarDzEul = dthetabarDz[ii,:][:,jj]
 
 ###########################################################################
 
@@ -114,79 +130,42 @@ elif FD == 6 :
     gamma = 1./60.
 else :
     sys.exit( "\nError: FD should be 2, 4, or 6.\n" )
-wx   = wx   / dx
-wxhv = wxhv / dx
+wx   = wx / dx
+wxhv = gamma * gx * wxhv / dx
 
 ws = np.array( [ -1./2., 0., 1./2. ] )
 wshv = np.array( [ 1., -2., 1. ] )
-ws   = ws   / ds
-wshv = wshv / ds
+ws   = ws / ds
+wshv = 1./2. * gs * wshv / ds
 
 ###########################################################################
 
 bigTx = np.tile( Tx, (2,1) )
 bigTz = np.tile( Tz, (2,1) )
 
-normGradS = np.sqrt( dsdxBottom**2. + dsdzBottom**2. )
-
-bigNull = np.zeros(( 4, nLev+2, nCol+FD ))
+normGradS = np.sqrt( dsdxBot**2. + dsdzBot**2. )
 
 ###########################################################################
 
 #Define functions for approximating derivatives:
 
-if rbfDerivatives == 0 :
-    
-    def Dx( U ) :
-        return nonhydro.LxFD_3D( U, wx,   j0, j1, dx, FD, FDo2 )
-    
-    def Dx2D( U ) :
-        return nonhydro.LxFD_2D( U, wx,   j0, j1, dx, FD, FDo2 )
-    
-    def Ds( U ) :
-        return nonhydro.LsFD_3D( U, ws,   i0, i1, ds )
-    
-    def Ds2D( U ) :
-        return nonhydro.LsFD_2D( U, ws,   i0, i1, ds )
-    
-    def HVx( U ) :
-        return nonhydro.LxFD_3D( U, wxhv, j0, j1, dx, FD, FDo2 )
-    
-    def HVs( U ) :
-        return nonhydro.LsFD_3D( U, wshv, i0, i1, ds )
-    
-elif rbfDerivatives == 1 :
-    
-    stencils = phs2.getStencils( xVec, zVec, xVec[ind.m], zVec[ind.m], stencilSize )
-    A = phs2.getAmatrices( stencils, rbfOrder, polyOrder )
-    Wx  = phs2.getWeights( stencils, A, "1",  0 )
-    Wz  = phs2.getWeights( stencils, A, "2",  0 )
-    Whv = phs2.getWeights( stencils, A, "hv", K )
-    
-    ib = np.transpose( np.tile( np.arange(len(xVec[ind.m])), (stencilSize,1) ) )
-    ib = ib.flatten()
-    jb = stencils.idx
-    jb = jb.flatten()
-    Wx  = sparse.coo_matrix( (Wx.flatten(), (ib,jb)) \
-    , shape = ( len(xVec[ind.m]), len(xVec) ) )
-    Wz  = sparse.coo_matrix( (Wz.flatten(), (ib,jb)) \
-    , shape = ( len(xVec[ind.m]), len(xVec) ) )
-    Whv = sparse.coo_matrix( (Whv.flatten(),(ib,jb)) \
-    , shape = ( len(xVec[ind.m]), len(xVec) ) )
-    
-    def Dx( U ) :
-        return nonhydro.Lphs( U, Wx, nLev, nCol, FD, ind.m, ii, jj )
-    
-    def Dz( U ) :
-        return nonhydro.Lphs( U, Wz, nLev, nCol, FD, ind.m, ii, jj )
-    
-    def Dhv( U ) :
-        U = nonhydro.Lphs( U, Whv, nLev, nCol, FD, ind.m, ii, jj )
-        return dx**(2*K-1) * U
-    
-else :
-    
-    sys.exit( "\nError: rbfDerivatives should be 0 or 1.\n" )
+# def Dx( U ) :
+    # return nonhydro.LxFD_3D( U, wx,   j0, j1, dx, FD, FDo2 )
+
+def Dx( U ) :
+    return nonhydro.LxFD_2D( U, wx,   j0, j1, dx, FD, FDo2 )
+
+# def Ds( U ) :
+    # return nonhydro.LsFD_3D( U, ws,   i0, i1, ds )
+
+def Ds( U ) :
+    return nonhydro.LsFD_2D( U, ws,   i0, i1, ds )
+
+def HVx( U ) :
+    return nonhydro.LxFD_2D( U, wxhv, j0, j1, dx, FD, FDo2 )
+
+def HVs( U ) :
+    return nonhydro.LsFD_2D( U, wshv, i0, i1, ds )
 
 ###########################################################################
 
@@ -197,35 +176,48 @@ if formulation == "exner" :
     def setGhostNodes( U ) :
         U = nonhydro.setGhostNodes1( U \
         , Tx, Tz, Nx, Nz, bigTx, bigTz, jj \
-        , nLev, nCol, thetaBar, g(), Cp() \
-        , normGradS, ds, dsdxBottom, dsdzBottom \
+        , nLev, nCol, ds, thetaBarBot, thetaBarTop \
+        , g, Cp, normGradS, dsdxBot, dsdzBot \
         , wx, j0, j1, dx, FD, FDo2 )
         P = []
         return U, P
     
-    if rbfDerivatives == 0 :
+    def implicitPart( U ) :
+        return nonhydro.implicitPart( U \
+        , Dx, Ds, HVx, HVs \
+        , nLev, nCol, i0, i1, j0, j1, Cp, Cv, Rd, g \
+        , dsdxEul, dsdzEul, thetaBarEul, piBarEul, dthetabarDzEul )
+    
+    def explicitPart( U ) :
+        return nonhydro.explicitPart( U \
+        , Dx, Ds \
+        , nLev, nCol, i0, i1, j0, j1, Cp, Cv, Rd \
+        , dsdxEul, dsdzEul )
         
+    if semiImplicit == 0 :
+    
         def odefun( t, U ) :
-            return nonhydro.odefun1( t, U \
-            , setGhostNodes, Dx, Ds, HVx, HVs, [], [] \
-            , ii, jj, i0, i1, j0, j1 \
-            , dsdxEul, dsdzEul, rbfDerivatives \
-            , Cp(), Cv(), Rd(), g(), gamma \
-            , bigNull )
+            U, P = setGhostNodes( U )
+            V = np.zeros(( 4, nLev+2, nCol+FD ))
+            V[:,i0:i1,j0:j1] = implicitPart(U) + explicitPart(U)
+            return V
+    
+    elif semiImplicit == 1 :
         
-    elif rbfDerivatives == 1 :
+        def L( U ) :
+            return nonhydro.L( U \
+            , dtImp, setGhostNodes, implicitPart, nLev, nCol \
+            , i0, i1, j0, j1 )
         
-        def odefun( t, U ) :
-            return nonhydro.odefun1( t, U \
-            , setGhostNodes, Dx, [], [], [], Dhv, Dz \
-            , ii, jj, i0, i1, j0, j1 \
-            , dsdxEul, dsdzEul, rbfDerivatives \
-            , Cp(), Cv(), Rd(), g(), gamma \
-            , bigNull )
-        
+        def leapfrogTimestep( t, U0, U1, dt ) :
+            t, U2 = nonhydro.leapfrogTimestep( t, U0, U1, dt \
+            , nLev, nCol, FD, i0, i1, j0, j1 \
+            , L, implicitPart, explicitPart, gmresTol )
+            return t, U2
+    
     else :
         
-        sys.exit( "\nError: rbfDerivatives should be 0 or 1.\n" )
+        sys.exit( "\nError: semiImplicit should be 0 or 1.\n" )
     
 elif formulation == "hydrostaticPressure" :
     
@@ -250,28 +242,6 @@ else :
 
 ###########################################################################
 
-#This is not working well yet.  Need to get semi-implicit working first.
-
-if semiLagrangian == 1 :
-    
-    def semiLagrangianTimestep( Un1, U, alp, bet ) :
-        U1, alp, bet = nonhydro.conventionalSemiLagrangianTimestep( Un1, U, alp, bet \
-        , setGhostNodes, Dx2D, Ds2D \
-        , nLev, nCol, FD, FDo2, ds \
-        , Cp(), Rd(), Cv(), g(), dt \
-        , x.flatten(), z.flatten(), dsdx, dsdz \
-        , ind.m, i0, i1, j0, j1 \
-        , rbfOrder, polyOrder, stencilSize )
-        return U1, alp, bet
-        # return nonhydro.mySemiLagrangianTimestep( Un1, U \
-        # , setGhostNodes, Dx, Ds \
-        # , x.flatten(), z.flatten(), ind.m, dt \
-        # , nLev, nCol, FD, i0, i1, j0, j1 \
-        # , Cp(), Rd(), Cv(), g(), dsdxVec[ind.m], dsdzVec[ind.m] \
-        # , rbfOrder, polyOrder, stencilSize )
-
-###########################################################################
-
 #Functions that will not be changed by user:
 
 if rkStages == 3 :
@@ -282,9 +252,7 @@ else :
     sys.exit( "\nError: rkStages should be 3 or 4.  rk2 is not stable for this problem.\n" )
 
 def printInfo( U, et, t ) :
-    return nonhydro.printInfo( U, et , t \
-    , formulation \
-    , thetaBar, piBar, dpidsBar )
+    return nonhydro.printInfo( U, et , t, formulation )
 
 #Figure size and contour levels for plotting:
 if ( saveContours == 1 ) | ( plotFromSaved == 1 ) :
@@ -293,34 +261,27 @@ if ( saveContours == 1 ) | ( plotFromSaved == 1 ) :
 def saveContourPlot( U, t ) :
     nonhydro.saveContourPlot( U, t \
     , formulation, testCase, var, fig \
-    , x, z, thetaBar, piBar, dpidsBar, CL, FDo2 \
+    , x, z, CL, FDo2 \
     , xLeft, xRight, zTop, dx, ds )
 
 ###########################################################################
 
-#Eulerian time-stepping for first large time step:
-
-print()
-print("dt =",dt)
-print("dtEul =",dtEul)
-print()
+#Eulerian time-stepping for first large time step
 
 #Save initial conditions and contour of first frame:
-U, P = setGhostNodes( U )
+U0, P = setGhostNodes( U0 )
 if saveArrays == 1 :
-    np.save( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy', U )
-Un1 = U
-et = printInfo( U, time.clock(), t )
+    np.save( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy', U0 )
+U1 = U0
+et = printInfo( U1, time.clock(), t )
 if saveContours == 1 :
-    saveContourPlot( U, t )
+    saveContourPlot( U1, t )
 
 #The actual Eulerian time-stepping from t=0 to t=dt:
-for i in range( np.int( np.round(dt/dtEul) + 1e-12 ) ) :
-    t, U = rk( t, U, odefun, dtEul )
+for i in range( np.int( np.round(dtImp/dtExp) + 1e-12 ) ) :
+    t, U1 = rk( t, U1, odefun, dtExp )
 
-U, P = setGhostNodes( U )
-alp = 0.
-bet = 0.
+U1, P = setGhostNodes( U1 )
 
 ###########################################################################
 
@@ -328,31 +289,31 @@ bet = 0.
 
 for i in range(1,nTimesteps+1) :
     
-    if np.mod( i, np.int(np.round(saveDel/dt)) ) == 0 :
+    if np.mod( i, np.int(np.round(saveDel/dtImp)) ) == 0 :
         
         if plotFromSaved == 0 :
-            U, P = setGhostNodes( U )
+            U1, P = setGhostNodes( U1 )
             if saveArrays == 1 :
-                np.save( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy', U )
+                np.save( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy', U1 )
         elif plotFromSaved == 1 :
-            U = np.load( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy' )
+            U1 = np.load( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy' )
         else :
             sys.exit( "\nError: plotFromSaved should be 0 or 1.\n" )
         
-        et = printInfo( U, et, t )
+        et = printInfo( U1, et, t )
         if saveContours == 1 :
-            saveContourPlot( U, t )
+            saveContourPlot( U1, t )
         
     if plotFromSaved == 0 :
-        if semiLagrangian == 0 :
-            t, U = rk( t, U, odefun, dt )
-        elif semiLagrangian == 1 :
-            U1, alp, bet = semiLagrangianTimestep( Un1, U, alp, bet )
-            Un1 = U
-            U = U1
+        if semiImplicit == 0 :
+            t, U2 = rk( t, U1, odefun, dtImp )
+        elif semiImplicit == 1 :
+            t, U2 = leapfrogTimestep( t, U0, U1, dtImp )
         else :
-            sys.exit( "\nError: semiLagrangian should be 0 or 1.\n" )
+            sys.exit( "\nError: semiImplicit should be 0 or 1.\n" )
+        U0 = U1
+        U1 = U2
     else :
-        t = t + dt
+        t = t + dtImp
 
 ############################################################################
