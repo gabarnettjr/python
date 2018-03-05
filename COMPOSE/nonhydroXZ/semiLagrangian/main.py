@@ -4,6 +4,7 @@ import numpy as np
 import time
 import matplotlib.pyplot as plt
 from scipy import sparse
+from scipy.sparse.linalg import LinearOperator
 
 sys.path.append( '../../../site-packages' )
 from gab import nonhydro, rk
@@ -12,28 +13,29 @@ from gab import nonhydro, rk
 
 #"bubble", "igw", "densityCurrent", "doubleDensityCurrent",
 #or "movingDensityCurrent":
-testCase = "bubble"
+testCase = "igw"
 
 #"exner" or "hydrostaticPressure":
 formulation  = "exner"
 
-semiImplicit = 0
+semiImplicit = 1
+gmresTol     = 1e-7
 
-dx    = 200.
-ds    = 200.
-dtExp = 1./4.
-dtImp = 1.
+dx    = 500.
+ds    = 500.
+dtExp = 1./2.
+dtImp = 8.
 
 FD = 4                                    #Order of lateral FD (2, 4, or 6)
-gx = 10.                                   #avg lateral velocity (estimate)
-gs = 10.                                  #avg vertical velocity (estimate)
+gx = 20                                    #avg lateral velocity (estimate)
+gs = .003                                 #avg vertical velocity (estimate)
 
-rkStages = 3
+rkStages  = 3
 plotNodes = 0                               #if 1, plot nodes and then exit
-saveDel = 100                             #print/save every saveDel seconds
+saveDel   = 100                           #print/save every saveDel seconds
 
 var           = 2                        #determines what to plot (0,1,2,3)
-saveArrays    = 0 
+saveArrays    = 1 
 saveContours  = 0
 plotFromSaved = 0                   #if 1, results are loaded, not computed
 
@@ -71,7 +73,7 @@ xLeft, xRight, nLev, nCol, zTop, zSurf, zSurfPrime, x, z \
 
 s, dsdx, dsdz = nonhydro.getHeightCoordinate( zTop, zSurf, zSurfPrime )
 
-FDo2 = np.int( FD/2 )
+FDo2 = np.int( FD/2 + 1e-12 )
 ii = np.arange( 1, nLev+1 )
 jj = np.arange( FDo2, nCol+FDo2 )
 i0 = ii[0]
@@ -149,14 +151,8 @@ normGradS = np.sqrt( dsdxBot**2. + dsdzBot**2. )
 
 #Define functions for approximating derivatives:
 
-# def Dx( U ) :
-    # return nonhydro.LxFD_3D( U, wx,   j0, j1, dx, FD, FDo2 )
-
 def Dx( U ) :
     return nonhydro.LxFD_2D( U, wx,   j0, j1, dx, FD, FDo2 )
-
-# def Ds( U ) :
-    # return nonhydro.LsFD_3D( U, ws,   i0, i1, ds )
 
 def Ds( U ) :
     return nonhydro.LsFD_2D( U, ws,   i0, i1, ds )
@@ -193,21 +189,21 @@ if formulation == "exner" :
         , Dx, Ds \
         , nLev, nCol, i0, i1, j0, j1, Cp, Cv, Rd \
         , dsdxEul, dsdzEul )
-        
-    if semiImplicit == 0 :
     
-        def odefun( t, U ) :
-            U, P = setGhostNodes( U )
-            V = np.zeros(( 4, nLev+2, nCol+FD ))
-            V[:,i0:i1,j0:j1] = implicitPart(U) + explicitPart(U)
-            return V
+    def odefun( t, U ) :
+        U, P = setGhostNodes( U )
+        V = np.zeros(( 4, nLev+2, nCol+FD ))
+        V[:,i0:i1,j0:j1] = implicitPart(U) + explicitPart(U)
+        return V
     
-    elif semiImplicit == 1 :
+    if semiImplicit == 1 :
         
         def L( U ) :
             return nonhydro.L( U \
             , dtImp, setGhostNodes, implicitPart, nLev, nCol \
             , i0, i1, j0, j1 )
+        
+        
         
         def leapfrogTimestep( t, U0, U1, dt ) :
             t, U2 = nonhydro.leapfrogTimestep( t, U0, U1, dt \
