@@ -18,25 +18,25 @@ testCase = "bubble"
 #"exner" or "hydrostaticPressure":
 formulation  = "exner"
 
-semiImplicit = 1
+semiImplicit = 0
 gmresTol     = 1e-5
 
-dx    = 200.
-ds    = 200.
-dtExp = 1./3.
+dx    = 25.
+ds    = 25.
+dtExp = 1./20.
 dtImp = 5.
 
 FD = 4                                    #Order of lateral FD (2, 4, or 6)
-gx = 5                                     #avg lateral velocity (estimate)
-gs = 5                                    #avg vertical velocity (estimate)
+gx = 1                                     #avg lateral velocity (estimate)
+gs = 1                                    #avg vertical velocity (estimate)
 
 rkStages  = 3
 plotNodes = 0                               #if 1, plot nodes and then exit
-saveDel   = 100                           #print/save every saveDel seconds
+saveDel   = 50                            #print/save every saveDel seconds
 
-var           = 3                        #determines what to plot (0,1,2,3)
+var           = 2                        #determines what to plot (0,1,2,3)
 saveArrays    = 1 
-saveContours  = 1
+saveContours  = 0
 plotFromSaved = 0                   #if 1, results are loaded, not computed
 
 ###########################################################################
@@ -198,12 +198,12 @@ if formulation == "exner" :
     
     if semiImplicit == 1 :
         
-        def L( U ) :
+        def ell( U ) :
             return nonhydro.L( U \
             , dtImp, setGhostNodes, implicitPart, nLev, nCol, FD \
             , i0, i1, j0, j1 )
         
-        L = LinearOperator( ( 4*(nLev+2)*(nCol+FD), 4*(nLev+2)*(nCol+FD) ), matvec = L )
+        L = LinearOperator( ( 4*(nLev+2)*(nCol+FD), 4*(nLev+2)*(nCol+FD) ), matvec=ell, dtype=float )
         
         def leapfrogTimestep( t, U0, U1, dt ) :
             t, U2 = nonhydro.leapfrogTimestep( t, U0, U1, dt \
@@ -281,8 +281,8 @@ U1, P = setGhostNodes( U1 )
 
 for i in range(1,nTimesteps+1) :
     
-    print()
-    print(i)
+    # print()
+    # print(i)
     
     if np.mod( i, np.int(np.round(saveDel/dtImp)) ) == 0 :
         
