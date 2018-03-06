@@ -13,31 +13,31 @@ from gab import nonhydro, rk
 
 #"bubble", "igw", "densityCurrent", "doubleDensityCurrent",
 #or "movingDensityCurrent":
-testCase = "bubble"
+testCase = "igw"
+gx       = 20.                             #avg lateral velocity (estimate)
+gs       = .003                           #avg vertical velocity (estimate)
 
 #"exner" or "hydrostaticPressure":
 formulation  = "exner"
 
-semiImplicit = 1
-gmresTol     = 1e-5
+semiImplicit = 0
+gmresTol     = 1e-7                                          #default: 1e-5
 
-dx    = 200.
-ds    = 200.
-dtExp = 1./5.
-dtImp = 2.
+dx    = 500.
+ds    = 125.
+dtExp = 1./4.                                           #explicit time-step
+dtImp = 4.                                              #implicit time-step
 
 FD = 4                                    #Order of lateral FD (2, 4, or 6)
-gx = 1                                     #avg lateral velocity (estimate)
-gs = 1                                    #avg vertical velocity (estimate)
 
 rkStages  = 3
 plotNodes = 0                               #if 1, plot nodes and then exit
-saveDel   = 50                            #print/save every saveDel seconds
+saveDel   = 100                           #print/save every saveDel seconds
 
-var           = 2                        #determines what to plot (0,1,2,3)
-saveArrays    = 1 
+var           = 1                        #determines what to plot (0,1,2,3)
+saveArrays    = 0
 saveContours  = 1
-plotFromSaved = 0                   #if 1, results are loaded, not computed
+plotFromSaved = 1                   #if 1, results are loaded, not computed
 
 ###########################################################################
 
@@ -107,12 +107,12 @@ if plotNodes == 1 :
 
 dsdxBot = dsdx( x[0,jj], zSurf(x[0,jj]) )
 dsdzBot = dsdz( x[0,jj], zSurf(x[0,jj]) )
-dsdxEul = dsdx( x[ii,:][:,jj], z[ii,:][:,jj] )
-dsdzEul = dsdz( x[ii,:][:,jj], z[ii,:][:,jj] )
+dsdxInt = dsdx( x[ii,:][:,jj], z[ii,:][:,jj] )
+dsdzInt = dsdz( x[ii,:][:,jj], z[ii,:][:,jj] )
 
-thetaBarEul    = thetaBar   [ii,:][:,jj]
-piBarEul       = piBar      [ii,:][:,jj]
-dthetabarDzEul = dthetabarDz[ii,:][:,jj]
+thetaBarInt    = thetaBar   [ii,:][:,jj]
+piBarInt       = piBar      [ii,:][:,jj]
+dthetabarDzInt = dthetabarDz[ii,:][:,jj]
 
 ###########################################################################
 
@@ -165,7 +165,7 @@ def HVs( U ) :
 
 ###########################################################################
 
-#Important functions for time stepping, which may be chosen by user:
+#Important functions for time stepping:
 
 if formulation == "exner" :
     
@@ -182,13 +182,13 @@ if formulation == "exner" :
         return nonhydro.implicitPart( U \
         , Dx, Ds, HVx, HVs \
         , nLev, nCol, i0, i1, j0, j1, Cp, Cv, Rd, g \
-        , dsdxEul, dsdzEul, thetaBarEul, piBarEul, dthetabarDzEul )
+        , dsdxInt, dsdzInt, thetaBarInt, piBarInt, dthetabarDzInt )
     
     def explicitPart( U ) :
         return nonhydro.explicitPart( U \
         , Dx, Ds \
         , nLev, nCol, i0, i1, j0, j1, Cp, Cv, Rd \
-        , dsdxEul, dsdzEul )
+        , dsdxInt, dsdzInt )
     
     def odefun( t, U ) :
         U, P = setGhostNodes( U )
@@ -216,8 +216,8 @@ elif formulation == "hydrostaticPressure" :
     def setGhostNodes( U ) :
         U, P = nonhydro.setGhostNodes2( U \
         , Tx, Tz, Nx, Nz, bigTx, bigTz, jj \
-        , nLev, nCol, thetaBar, dpidsBar, g(), Cp(), Po(), Rd(), Cv() \
-        , normGradS, ds, dsdxBottom, dsdzBottom, dsdz(x,z) \
+        , nLev, nCol, thetaBar, dpidsBar, g, Cp, Po, Rd, Cv \
+        , normGradS, ds, dsdxBot, dsdzBot, dsdz(x,z) \
         , wx, j0, j1, dx, FD, FDo2 )
         return U, P
     
@@ -225,7 +225,7 @@ elif formulation == "hydrostaticPressure" :
         return nonhydro.odefun2( t, U \
         , setGhostNodes, Dx, Dx2D, Ds, Ds2D, HVx, HVs \
         , ii, jj, i0, i1, j0, j1 \
-        , dsdxEul, dsdzEul, dsdxAll, dsdzAll \
+        , dsdxInt, dsdzInt, dsdxAll, dsdzAll \
         , Cp(), Cv(), Rd(), g(), gamma )
     
 else :
