@@ -13,30 +13,30 @@ from gab import nonhydro, rk
 
 #"bubble", "igw", "densityCurrent", "doubleDensityCurrent",
 #or "movingDensityCurrent":
-testCase = "igw"
+testCase = "bubble"
 
 #"exner" or "hydrostaticPressure":
 formulation  = "exner"
 
 semiImplicit = 1
-gmresTol     = 1e-7
+gmresTol     = 1e-5
 
-dx    = 500.
-ds    = 500.
-dtExp = 1./2.
-dtImp = 8.
+dx    = 200.
+ds    = 200.
+dtExp = 1./3.
+dtImp = 5.
 
 FD = 4                                    #Order of lateral FD (2, 4, or 6)
-gx = 20                                    #avg lateral velocity (estimate)
-gs = .003                                 #avg vertical velocity (estimate)
+gx = 5                                     #avg lateral velocity (estimate)
+gs = 5                                    #avg vertical velocity (estimate)
 
 rkStages  = 3
 plotNodes = 0                               #if 1, plot nodes and then exit
 saveDel   = 100                           #print/save every saveDel seconds
 
-var           = 2                        #determines what to plot (0,1,2,3)
+var           = 3                        #determines what to plot (0,1,2,3)
 saveArrays    = 1 
-saveContours  = 0
+saveContours  = 1
 plotFromSaved = 0                   #if 1, results are loaded, not computed
 
 ###########################################################################
@@ -200,20 +200,16 @@ if formulation == "exner" :
         
         def L( U ) :
             return nonhydro.L( U \
-            , dtImp, setGhostNodes, implicitPart, nLev, nCol \
+            , dtImp, setGhostNodes, implicitPart, nLev, nCol, FD \
             , i0, i1, j0, j1 )
         
-        
+        L = LinearOperator( ( 4*(nLev+2)*(nCol+FD), 4*(nLev+2)*(nCol+FD) ), matvec = L )
         
         def leapfrogTimestep( t, U0, U1, dt ) :
             t, U2 = nonhydro.leapfrogTimestep( t, U0, U1, dt \
             , nLev, nCol, FD, i0, i1, j0, j1 \
             , L, implicitPart, explicitPart, gmresTol )
             return t, U2
-    
-    else :
-        
-        sys.exit( "\nError: semiImplicit should be 0 or 1.\n" )
     
 elif formulation == "hydrostaticPressure" :
     
@@ -285,6 +281,9 @@ U1, P = setGhostNodes( U1 )
 
 for i in range(1,nTimesteps+1) :
     
+    print()
+    print(i)
+    
     if np.mod( i, np.int(np.round(saveDel/dtImp)) ) == 0 :
         
         if plotFromSaved == 0 :
@@ -305,6 +304,7 @@ for i in range(1,nTimesteps+1) :
             t, U2 = rk( t, U1, odefun, dtImp )
         elif semiImplicit == 1 :
             t, U2 = leapfrogTimestep( t, U0, U1, dtImp )
+            U2, P = setGhostNodes( U2 )
         else :
             sys.exit( "\nError: semiImplicit should be 0 or 1.\n" )
         U0 = U1
