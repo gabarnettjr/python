@@ -18,13 +18,13 @@ testCase = "bubble"
 #"exner" or "hydrostaticPressure":
 formulation  = "exner"
 
-semiImplicit = 0
+semiImplicit = 1
 gmresTol     = 1e-5
 
-dx    = 25.
-ds    = 25.
-dtExp = 1./20.
-dtImp = 5.
+dx    = 200.
+ds    = 200.
+dtExp = 1./5.
+dtImp = 2.
 
 FD = 4                                    #Order of lateral FD (2, 4, or 6)
 gx = 1                                     #avg lateral velocity (estimate)
@@ -36,7 +36,7 @@ saveDel   = 50                            #print/save every saveDel seconds
 
 var           = 2                        #determines what to plot (0,1,2,3)
 saveArrays    = 1 
-saveContours  = 0
+saveContours  = 1
 plotFromSaved = 0                   #if 1, results are loaded, not computed
 
 ###########################################################################
