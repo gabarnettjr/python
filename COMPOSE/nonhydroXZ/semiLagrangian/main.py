@@ -13,28 +13,28 @@ from gab import nonhydro, rk
 
 #"bubble", "igw", "densityCurrent", "doubleDensityCurrent",
 #or "movingDensityCurrent":
-testCase = "bubble"
-gx       = 2.                              #avg lateral velocity (estimate)
-gs       = 2.                             #avg vertical velocity (estimate)
+testCase = "igw"
+gx       = 20.                             #avg lateral velocity (estimate)
+gs       = .003                           #avg vertical velocity (estimate)
 
 #"exner" or "hydrostaticPressure" (not working yet):
 formulation  = "exner"
 
-semiImplicit = 0
-gmresTol     = 1e-5                                          #default: 1e-5
+semiImplicit = 1
+gmresTol     = 1e-8                                          #default: 1e-5
 
-dx    = 100.
-ds    = 100.
-dtExp = 1./5.                                           #explicit time-step
-dtImp = 2.                                              #implicit time-step
+dx    = 500.
+ds    = 250.
+dtExp = 1./2.                                           #explicit time-step
+dtImp = 5.                                              #implicit time-step
 
-FD = 4                                    #Order of lateral FD (2, 4, or 6)
+FD = 6                                    #Order of lateral FD (2, 4, or 6)
 
 rkStages  = 3
 plotNodes = 0                               #if 1, plot nodes and then exit
 saveDel   = 100                           #print/save every saveDel seconds
 
-var           = 3                        #determines what to plot (0,1,2,3)
+var           = 2                        #determines what to plot (0,1,2,3)
 saveArrays    = 0
 saveContours  = 1
 plotFromSaved = 1                   #if 1, results are loaded, not computed
