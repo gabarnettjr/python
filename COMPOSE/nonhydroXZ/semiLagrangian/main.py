@@ -3,7 +3,6 @@ import os
 import numpy as np
 import time
 import matplotlib.pyplot as plt
-# from scipy import sparse
 from scipy.sparse.linalg import LinearOperator
 
 sys.path.append( '../../../site-packages' )
@@ -20,7 +19,7 @@ gs       = .003                           #avg vertical velocity (estimate)
 #"exner" or "hydrostaticPressure" (not working yet):
 formulation  = "exner"
 
-semiImplicit = 1
+semiImplicit = 0
 gmresTol     = 1e-8                                          #default: 1e-5
 
 dx    = 500.
@@ -36,8 +35,8 @@ saveDel   = 100                           #print/save every saveDel seconds
 
 var           = 2                        #determines what to plot (0,1,2,3)
 saveArrays    = 0
-saveContours  = 1
-plotFromSaved = 1                   #if 1, results are loaded, not computed
+saveContours  = 0
+plotFromSaved = 0                   #if 1, results are loaded, not computed
 
 ###########################################################################
 
