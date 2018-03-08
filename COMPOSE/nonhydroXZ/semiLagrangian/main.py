@@ -6,26 +6,27 @@ import matplotlib.pyplot as plt
 from scipy.sparse.linalg import LinearOperator
 
 sys.path.append( '../../../site-packages' )
-from gab import nonhydro, rk
+from gab import rk
+from gab.nonhydro import common, exner
 
 ###########################################################################
 
 #"bubble", "igw", "densityCurrent", "doubleDensityCurrent",
 #or "movingDensityCurrent":
-testCase = "igw"
-gx       = 20.                             #avg lateral velocity (estimate)
-gs       = .003                           #avg vertical velocity (estimate)
+testCase = "doubleDensityCurrent"
+gx       = 5.                              #avg lateral velocity (estimate)
+gs       = 5.                             #avg vertical velocity (estimate)
 
-#"exner" or "hydrostaticPressure" (not working yet):
+#"exner" or "pseudoDensity" (not working yet):
 formulation  = "exner"
 
 semiImplicit = 0
-gmresTol     = 1e-8                                          #default: 1e-5
+gmresTol     = 1e-5                                          #default: 1e-5
 
-dx    = 500.
-ds    = 250.
-dtExp = 1./2.                                           #explicit time-step
-dtImp = 5.                                              #implicit time-step
+dx    = 100.
+ds    = 100.
+dtExp = 1./6.                                           #explicit time-step
+dtImp = 1.                                              #implicit time-step
 
 FD = 6                                    #Order of lateral FD (2, 4, or 6)
 
@@ -33,10 +34,10 @@ rkStages  = 3
 plotNodes = 0                               #if 1, plot nodes and then exit
 saveDel   = 100                           #print/save every saveDel seconds
 
-var           = 2                        #determines what to plot (0,1,2,3)
+var           = 1                        #determines what to plot (0,1,2,3)
 saveArrays    = 0
-saveContours  = 0
-plotFromSaved = 0                   #if 1, results are loaded, not computed
+saveContours  = 1
+plotFromSaved = 1                   #if 1, results are loaded, not computed
 
 ###########################################################################
 
@@ -62,15 +63,15 @@ if not os.path.exists( saveString ) :
 
 ###########################################################################
 
-Cp, Cv, Rd, g, Po = nonhydro.getConstants()
+Cp, Cv, Rd, g, Po = common.getConstants()
 
-tf = nonhydro.getTfinal( testCase )
+tf = common.getTfinal( testCase )
 nTimesteps = np.int( np.round(tf/dtImp) + 1e-12 )
 
 xLeft, xRight, nLev, nCol, zTop, zSurf, zSurfPrime, x, z \
-= nonhydro.getSpaceDomain( testCase, dx, ds, FD )
+= common.getSpaceDomain( testCase, dx, ds, FD )
 
-s, dsdx, dsdz = nonhydro.getHeightCoordinate( zTop, zSurf, zSurfPrime )
+s, dsdx, dsdz = common.getHeightCoordinate( zTop, zSurf, zSurfPrime )
 
 FDo2 = np.int( FD/2 + 1e-12 )
 
@@ -79,10 +80,10 @@ i1 = nLev+1                                        #last interior row index
 j0 = FDo2                                      #first interior column index
 j1 = nCol+FDo2                                  #last interior column index
 
-Tx, Tz, Nx, Nz = nonhydro.getTanNorm( zSurfPrime, x[0,j0:j1] )
+Tx, Tz, Nx, Nz = common.getTanNorm( zSurfPrime, x[0,j0:j1] )
 
 U0, thetaBar, piBar, dthetabarDz, dpidsBar \
-= nonhydro.getInitialConditions( testCase, formulation \
+= common.getInitialConditions( testCase, formulation \
 , nLev, nCol, FD, x, z \
 , Cp, Cv, Rd, g, Po \
 , dsdz )
@@ -92,10 +93,10 @@ thetaBarTop = ( thetaBar[nLev,j0:j1] + thetaBar[nLev+1,j0:j1] ) / 2.
 
 if plotNodes == 1 :
     
-    ind = nonhydro.getIndexes( x, z, xLeft, xRight, zSurf, zTop, FD \
+    ind = common.getIndexes( x, z, xLeft, xRight, zSurf, zTop, FD \
     , nLev, nCol )
     
-    nonhydro.plotNodes( x, z, ind, testCase )
+    common.plotNodes( x, z, ind, testCase )
     
     sys.exit( "\nDone plotting nodes.\n" )
     
@@ -150,16 +151,16 @@ normGradS = np.sqrt( dsdxBot**2. + dsdzBot**2. )
 #Define functions for approximating derivatives:
 
 def Dx( U ) :
-    return nonhydro.LxFD_2D( U, wx,   j0, j1, FD, FDo2 )
+    return common.LxFD_2D( U, wx,   j0, j1, FD, FDo2 )
 
 def Ds( U ) :
-    return nonhydro.LsFD_2D( U, ws,   i0, i1 )
+    return common.LsFD_2D( U, ws,   i0, i1 )
 
 def HVx( U ) :
-    return nonhydro.LxFD_2D( U, wxhv, j0, j1, FD, FDo2 )
+    return common.LxFD_2D( U, wxhv, j0, j1, FD, FDo2 )
 
 def HVs( U ) :
-    return nonhydro.LsFD_2D( U, wshv, i0, i1 )
+    return common.LsFD_2D( U, wshv, i0, i1 )
 
 ###########################################################################
 
@@ -168,72 +169,59 @@ def HVs( U ) :
 if formulation == "exner" :
     
     def setGhostNodes( U ) :
-        U = nonhydro.setGhostNodes1( U, Dx \
+        return exner.setGhostNodes( U, Dx \
         , Tx, Tz, Nx, Nz, bigTx, bigTz, j0, j1 \
         , nLev, nCol, FD, FDo2, ds, thetaBarBot, thetaBarTop \
         , g, Cp, normGradS, dsdxBot, dsdzBot )
-        P = []
-        return U, P
     
     def implicitPart( U ) :
-        return nonhydro.implicitPart1( U \
+        return exner.implicitPart( U \
         , Dx, Ds, HVx, HVs \
         , nLev, nCol, i0, i1, j0, j1, Cp, Cv, Rd, g \
         , dsdxInt, dsdzInt, thetaBarInt, piBarInt, dthetabarDzInt )
     
     def explicitPart( U ) :
-        return nonhydro.explicitPart1( U \
+        return exner.explicitPart( U \
         , Dx, Ds \
         , nLev, nCol, i0, i1, j0, j1, Cp, Cv, Rd \
         , dsdxInt, dsdzInt )
     
-elif formulation == "hydrostaticPressure" :
-    
-    def setGhostNodes( U ) :
-        U, P = nonhydro.setGhostNodes2( U \
-        , Tx, Tz, Nx, Nz, bigTx, bigTz, jj \
-        , nLev, nCol, thetaBar, dpidsBar, g, Cp, Po, Rd, Cv \
-        , normGradS, ds, dsdxBot, dsdzBot, dsdz(x,z) \
-        , wx, j0, j1, dx, FD, FDo2 )
-        return U, P
-    
     def odefun( t, U ) :
-        return nonhydro.odefun2( t, U \
-        , setGhostNodes, Dx, Dx2D, Ds, Ds2D, HVx, HVs \
-        , ii, jj, i0, i1, j0, j1 \
-        , dsdxInt, dsdzInt, dsdxAll, dsdzAll \
-        , Cp(), Cv(), Rd(), g(), gamma )
+        U = setGhostNodes( U )
+        V = np.zeros(( 4, nLev+2, nCol+FD ))
+        V[:,i0:i1,j0:j1] = implicitPart(U) + explicitPart(U)
+        return V
     
 else :
     
-    sys.exit( "\nError: formulation should be 'exner' or 'hydrostaticPressure'.\n" )
+    sys.exit( "\nError: formulation should be 'exner'.\n" )
 
 ###########################################################################
-
-def odefun( t, U ) :
-    U, P = setGhostNodes( U )
-    V = np.zeros(( 4, nLev+2, nCol+FD ))
-    V[:,i0:i1,j0:j1] = implicitPart(U) + explicitPart(U)
-    return V
 
 if semiImplicit == 1 :
+    
+    if formulation == "exner" :
+    
+        def ell( U ) :
+            return exner.L( U \
+            , dtImp, setGhostNodes, implicitPart, nLev, nCol, FD \
+            , i0, i1, j0, j1 )
         
-    def ell( U ) :
-        return nonhydro.L( U \
-        , dtImp, setGhostNodes, implicitPart, nLev, nCol, FD \
-        , i0, i1, j0, j1 )
+        L = LinearOperator( ( 4*(nLev+2)*(nCol+FD), 4*(nLev+2)*(nCol+FD) ), matvec=ell, dtype=float )
+        
+        def leapfrogTimestep( t, U0, U1, dt ) :
+            t, U2 = exner.leapfrogTimestep( t, U0, U1, dt \
+            , nLev, nCol, FD, i0, i1, j0, j1 \
+            , L, implicitPart, explicitPart, gmresTol )
+            return t, U2
     
-    L = LinearOperator( ( 4*(nLev+2)*(nCol+FD), 4*(nLev+2)*(nCol+FD) ), matvec=ell, dtype=float )
-    
-    def leapfrogTimestep( t, U0, U1, dt ) :
-        t, U2 = nonhydro.leapfrogTimestep( t, U0, U1, dt \
-        , nLev, nCol, FD, i0, i1, j0, j1 \
-        , L, implicitPart, explicitPart, gmresTol )
-        return t, U2
+    else :
+        
+        sys.exit( "\nError: formulation should be 'exner'.\n" )
 
 ###########################################################################
 
-#Functions that will not be changed by user:
+#Other functions:
 
 if rkStages == 3 :
     rk = rk.rk3
@@ -243,15 +231,15 @@ else :
     sys.exit( "\nError: rkStages should be 3 or 4.  rk2 is not stable for this problem.\n" )
 
 def printInfo( U, et, t ) :
-    return nonhydro.printInfo( U, et , t, formulation )
+    return common.printInfo( U, et , t, formulation )
 
 #Figure size and contour levels for plotting:
 if ( saveContours == 1 ) | ( plotFromSaved == 1 ) :
-    fig, CL = nonhydro.setFigAndContourLevels( testCase )
+    fig, CL = common.setFigAndContourLevels( testCase )
 
 def saveContourPlot( U, t ) :
-    nonhydro.saveContourPlot( U, t \
-    , formulation, testCase, var, fig \
+    common.saveContourPlot( U, t \
+    , testCase, var, fig \
     , x, z, CL, FDo2 \
     , xLeft, xRight, zTop, dx, ds )
 
@@ -260,7 +248,7 @@ def saveContourPlot( U, t ) :
 #Eulerian time-stepping for first large time step
 
 #Save initial conditions and contour of first frame:
-U0, P = setGhostNodes( U0 )
+U0 = setGhostNodes( U0 )
 if saveArrays == 1 :
     np.save( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy', U0 )
 U1 = U0
@@ -272,7 +260,7 @@ if saveContours == 1 :
 for i in range( np.int( np.round(dtImp/dtExp) + 1e-12 ) ) :
     t, U1 = rk( t, U1, odefun, dtExp )
 
-U1, P = setGhostNodes( U1 )
+U1 = setGhostNodes( U1 )
 
 ###########################################################################
 
@@ -283,7 +271,7 @@ for i in range(1,nTimesteps+1) :
     if np.mod( i, np.int(np.round(saveDel/dtImp)) ) == 0 :
         
         if plotFromSaved == 0 :
-            U1, P = setGhostNodes( U1 )
+            U1 = setGhostNodes( U1 )
             if saveArrays == 1 :
                 np.save( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy', U1 )
         elif plotFromSaved == 1 :
@@ -300,7 +288,7 @@ for i in range(1,nTimesteps+1) :
             t, U2 = rk( t, U1, odefun, dtImp )
         elif semiImplicit == 1 :
             t, U2 = leapfrogTimestep( t, U0, U1, dtImp )
-            U2, P = setGhostNodes( U2 )
+            U2 = setGhostNodes( U2 )
         else :
             sys.exit( "\nError: semiImplicit should be 0 or 1.\n" )
         U0 = U1
