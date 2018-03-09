@@ -7,20 +7,20 @@ from scipy.sparse.linalg import LinearOperator
 
 sys.path.append( '../../../site-packages' )
 from gab import rk
-from gab.nonhydro import common, exner
+from gab.nonhydro import common, exner, pdt
 
 ###########################################################################
 
 #"bubble", "igw", "densityCurrent", "doubleDensityCurrent",
 #or "movingDensityCurrent":
-testCase = "doubleDensityCurrent"
-gx       = 5.                              #avg lateral velocity (estimate)
-gs       = 5.                             #avg vertical velocity (estimate)
+testCase = "bubble"
+gx       = 2.                              #avg lateral velocity (estimate)
+gs       = 2.                             #avg vertical velocity (estimate)
 
-#"exner" or "pseudoDensity" (not working yet):
-formulation  = "exner"
+#"exner" or "pdt" (pressure,density,temperature):
+formulation  = "pdt"
 
-semiImplicit = 0
+semiImplicit = 1
 gmresTol     = 1e-5                                          #default: 1e-5
 
 dx    = 100.
@@ -34,10 +34,10 @@ rkStages  = 3
 plotNodes = 0                               #if 1, plot nodes and then exit
 saveDel   = 100                           #print/save every saveDel seconds
 
-var           = 1                        #determines what to plot (0,1,2,3)
-saveArrays    = 0
-saveContours  = 1
-plotFromSaved = 1                   #if 1, results are loaded, not computed
+var           = 3                        #determines what to plot (0,1,2,3)
+saveArrays    = 1
+saveContours  = 0
+plotFromSaved = 0                   #if 1, results are loaded, not computed
 
 ###########################################################################
 
@@ -51,7 +51,7 @@ elif semiImplicit == 0 :
 else :
     sys.exit( "Error: semiImplicit should be 0 or 1." )
 
-saveString = saveString + testCase + '/' \
+saveString = saveString + formulation + '/' + testCase + '/' \
 + 'dx' + '{0:1d}'.format(np.int(np.round(dx)+1e-12)) \
 + 'ds' + '{0:1d}'.format(np.int(np.round(ds)+1e-12)) + '/'
 
@@ -82,7 +82,8 @@ j1 = nCol+FDo2                                  #last interior column index
 
 Tx, Tz, Nx, Nz = common.getTanNorm( zSurfPrime, x[0,j0:j1] )
 
-U0, thetaBar, piBar, dthetabarDz, dpidsBar \
+U0, thetaBar, piBar, dpidsBar, Pbar, rhoBar, Tbar \
+, dthetaBarDz, dpiBarDz, dTbarDz, dPbarDz, drhoBarDz \
 = common.getInitialConditions( testCase, formulation \
 , nLev, nCol, FD, x, z \
 , Cp, Cv, Rd, g, Po \
@@ -92,13 +93,10 @@ thetaBarBot = ( thetaBar[0,   j0:j1] + thetaBar[1,     j0:j1] ) / 2.
 thetaBarTop = ( thetaBar[nLev,j0:j1] + thetaBar[nLev+1,j0:j1] ) / 2.
 
 if plotNodes == 1 :
-    
     ind = common.getIndexes( x, z, xLeft, xRight, zSurf, zTop, FD \
     , nLev, nCol )
-    
     common.plotNodes( x, z, ind, testCase )
-    
-    sys.exit( "\nDone plotting nodes.\n" )
+    sys.exit( "\nDone plotting nodes." )
     
 ###########################################################################
 
@@ -111,7 +109,11 @@ dsdzInt = dsdz( x[i0:i1,j0:j1], z[i0:i1,j0:j1] )
 
 thetaBarInt    = thetaBar   [i0:i1,j0:j1]
 piBarInt       = piBar      [i0:i1,j0:j1]
-dthetabarDzInt = dthetabarDz[i0:i1,j0:j1]
+dthetaBarDzInt = dthetaBarDz[i0:i1,j0:j1]
+rhoBarInt      = rhoBar     [i0:i1,j0:j1]
+TbarInt        = Tbar       [i0:i1,j0:j1]
+drhoBarDzInt   = drhoBarDz  [i0:i1,j0:j1]
+dTbarDzInt     = dTbarDz    [i0:i1,j0:j1]
 
 ###########################################################################
 
@@ -169,55 +171,72 @@ def HVs( U ) :
 if formulation == "exner" :
     
     def setGhostNodes( U ) :
-        return exner.setGhostNodes( U, Dx \
+        U = exner.setGhostNodes( U, Dx \
         , Tx, Tz, Nx, Nz, bigTx, bigTz, j0, j1 \
         , nLev, nCol, FD, FDo2, ds, thetaBarBot, thetaBarTop \
         , g, Cp, normGradS, dsdxBot, dsdzBot )
+        P = []
+        return U, P
     
-    def implicitPart( U ) :
+    def implicitPart( U, P ) :
         return exner.implicitPart( U \
         , Dx, Ds, HVx, HVs \
         , nLev, nCol, i0, i1, j0, j1, Cp, Cv, Rd, g \
-        , dsdxInt, dsdzInt, thetaBarInt, piBarInt, dthetabarDzInt )
+        , dsdxInt, dsdzInt, thetaBarInt, piBarInt, dthetaBarDzInt )
     
-    def explicitPart( U ) :
+    def explicitPart( U, P ) :
         return exner.explicitPart( U \
         , Dx, Ds \
         , nLev, nCol, i0, i1, j0, j1, Cp, Cv, Rd \
         , dsdxInt, dsdzInt )
     
-    def odefun( t, U ) :
-        U = setGhostNodes( U )
-        V = np.zeros(( 4, nLev+2, nCol+FD ))
-        V[:,i0:i1,j0:j1] = implicitPart(U) + explicitPart(U)
-        return V
+elif formulation == "pdt" :
+    
+    def setGhostNodes( U ) :
+        U, P = pdt.setGhostNodes( U, Dx \
+        , Tx, Tz, Nx, Nz, bigTx, bigTz, j0, j1 \
+        , nLev, nCol, FD, FDo2, ds, Pbar, rhoBar, Tbar \
+        , g, Rd, normGradS, dsdxBot, dsdzBot )
+        return U, P
+    
+    def implicitPart( U, P ) :
+        return pdt.implicitPart( U, P \
+        , Dx, Ds, HVx, HVs \
+        , nLev, nCol, i0, i1, j0, j1, Cp, Cv, Rd, g \
+        , dsdxInt, dsdzInt, rhoBarInt, TbarInt, drhoBarDzInt, dTbarDzInt )
+    
+    def explicitPart( U, P ) :
+        return pdt.explicitPart( U, P \
+        , Dx, Ds \
+        , nLev, nCol, i0, i1, j0, j1, Cv, Rd, g \
+        , dsdxInt, dsdzInt, rhoBarInt )
     
 else :
     
-    sys.exit( "\nError: formulation should be 'exner'.\n" )
+    sys.exit( "\nError: formulation should be 'exner' or 'pdt'.\n" )
+
+def odefun( t, U ) :
+    U, P = setGhostNodes( U )
+    V = np.zeros(( 4, nLev+2, nCol+FD ))
+    V[:,i0:i1,j0:j1] = implicitPart(U,P) + explicitPart(U,P)
+    return V
 
 ###########################################################################
 
 if semiImplicit == 1 :
     
-    if formulation == "exner" :
+    def ell( U ) :
+        return common.L( U \
+        , dtImp, setGhostNodes, implicitPart, nLev, nCol, FD \
+        , i0, i1, j0, j1 )
     
-        def ell( U ) :
-            return exner.L( U \
-            , dtImp, setGhostNodes, implicitPart, nLev, nCol, FD \
-            , i0, i1, j0, j1 )
-        
-        L = LinearOperator( ( 4*(nLev+2)*(nCol+FD), 4*(nLev+2)*(nCol+FD) ), matvec=ell, dtype=float )
-        
-        def leapfrogTimestep( t, U0, U1, dt ) :
-            t, U2 = exner.leapfrogTimestep( t, U0, U1, dt \
-            , nLev, nCol, FD, i0, i1, j0, j1 \
-            , L, implicitPart, explicitPart, gmresTol )
-            return t, U2
+    L = LinearOperator( ( 4*(nLev+2)*(nCol+FD), 4*(nLev+2)*(nCol+FD) ), matvec=ell, dtype=float )
     
-    else :
-        
-        sys.exit( "\nError: formulation should be 'exner'.\n" )
+    def leapfrogTimestep( t, U0, P0, U1, P1, dt ) :
+        t, U2 = common.leapfrogTimestep( t, U0, P0, U1, P1, dt \
+        , nLev, nCol, FD, i0, i1, j0, j1 \
+        , L, implicitPart, explicitPart, gmresTol )
+        return t, U2
 
 ###########################################################################
 
@@ -248,7 +267,7 @@ def saveContourPlot( U, t ) :
 #Eulerian time-stepping for first large time step
 
 #Save initial conditions and contour of first frame:
-U0 = setGhostNodes( U0 )
+U0, P0 = setGhostNodes( U0 )
 if saveArrays == 1 :
     np.save( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy', U0 )
 U1 = U0
@@ -260,7 +279,7 @@ if saveContours == 1 :
 for i in range( np.int( np.round(dtImp/dtExp) + 1e-12 ) ) :
     t, U1 = rk( t, U1, odefun, dtExp )
 
-U1 = setGhostNodes( U1 )
+U1, P1 = setGhostNodes( U1 )
 
 ###########################################################################
 
@@ -271,7 +290,7 @@ for i in range(1,nTimesteps+1) :
     if np.mod( i, np.int(np.round(saveDel/dtImp)) ) == 0 :
         
         if plotFromSaved == 0 :
-            U1 = setGhostNodes( U1 )
+            U1, P1 = setGhostNodes( U1 )
             if saveArrays == 1 :
                 np.save( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy', U1 )
         elif plotFromSaved == 1 :
@@ -286,13 +305,17 @@ for i in range(1,nTimesteps+1) :
     if plotFromSaved == 0 :
         if semiImplicit == 0 :
             t, U2 = rk( t, U1, odefun, dtImp )
+            U0 = U1
+            U1 = U2
         elif semiImplicit == 1 :
-            t, U2 = leapfrogTimestep( t, U0, U1, dtImp )
-            U2 = setGhostNodes( U2 )
+            t, U2 = leapfrogTimestep( t, U0, P0, U1, P1, dtImp )
+            U2, P2 = setGhostNodes( U2 )
+            U0 = U1
+            U1 = U2
+            P0 = P1
+            P1 = P2
         else :
             sys.exit( "\nError: semiImplicit should be 0 or 1.\n" )
-        U0 = U1
-        U1 = U2
     else :
         t = t + dtImp
 
