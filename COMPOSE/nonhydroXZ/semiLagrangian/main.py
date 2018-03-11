@@ -2,7 +2,6 @@ import sys
 import os
 import numpy as np
 import time
-import matplotlib.pyplot as plt
 from scipy.sparse.linalg import LinearOperator
 
 sys.path.append( '../../../site-packages' )
@@ -14,19 +13,19 @@ from gab.nonhydro import common, exner, pdt
 #"bubble", "igw", "densityCurrent", "doubleDensityCurrent",
 #or "movingDensityCurrent":
 testCase = "bubble"
-gx       = 2.                              #avg lateral velocity (estimate)
-gs       = 2.                             #avg vertical velocity (estimate)
+gx       = 5.                              #avg lateral velocity (estimate)
+gs       = 5.                             #avg vertical velocity (estimate)
 
 #"exner" or "pdt" (pressure,density,temperature):
 formulation  = "pdt"
 
-semiImplicit = 1
-gmresTol     = 1e-5                                          #default: 1e-5
+semiImplicit = 0
+gmresTol     = 1e-9                                          #default: 1e-5
 
-dx    = 100.
+dx    = 200.
 ds    = 100.
-dtExp = 1./6.                                           #explicit time-step
-dtImp = 1.                                              #implicit time-step
+dtExp = 1./10.                                          #explicit time-step
+dtImp = 2.                                              #implicit time-step
 
 FD = 6                                    #Order of lateral FD (2, 4, or 6)
 
@@ -36,7 +35,7 @@ saveDel   = 100                           #print/save every saveDel seconds
 
 var           = 3                        #determines what to plot (0,1,2,3)
 saveArrays    = 1
-saveContours  = 0
+saveContours  = 1
 plotFromSaved = 0                   #if 1, results are loaded, not computed
 
 ###########################################################################
