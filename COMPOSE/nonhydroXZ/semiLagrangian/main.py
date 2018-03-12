@@ -6,25 +6,25 @@ from scipy.sparse.linalg import LinearOperator
 
 sys.path.append( '../../../site-packages' )
 from gab import rk
-from gab.nonhydro import common, exner, pdt
+from gab.nonhydro import common
 
 ###########################################################################
 
 #"bubble", "igw", "densityCurrent", "doubleDensityCurrent",
 #or "movingDensityCurrent":
 testCase = "bubble"
-gx       = 5.                              #avg lateral velocity (estimate)
-gs       = 5.                             #avg vertical velocity (estimate)
+gx       = 2.                              #avg lateral velocity (estimate)
+gs       = 2.                             #avg vertical velocity (estimate)
 
-#"exner" or "pdt" (pressure,density,temperature):
-formulation  = "pdt"
+#"theta_pi" or "T_rho_P" or "theta_rho_P":
+formulation  = "T_rho_P"
 
-semiImplicit = 0
-gmresTol     = 1e-9                                          #default: 1e-5
+semiImplicit = 1
+gmresTol     = 1e-5                                          #default: 1e-5
 
-dx    = 200.
+dx    = 100.
 ds    = 100.
-dtExp = 1./10.                                          #explicit time-step
+dtExp = 1./5.                                           #explicit time-step
 dtImp = 2.                                              #implicit time-step
 
 FD = 6                                    #Order of lateral FD (2, 4, or 6)
@@ -35,7 +35,7 @@ saveDel   = 100                           #print/save every saveDel seconds
 
 var           = 3                        #determines what to plot (0,1,2,3)
 saveArrays    = 1
-saveContours  = 1
+saveContours  = 0
 plotFromSaved = 0                   #if 1, results are loaded, not computed
 
 ###########################################################################
@@ -105,6 +105,7 @@ dsdxBot = dsdx( x[0,j0:j1], zSurf(x[0,j0:j1]) )
 dsdzBot = dsdz( x[0,j0:j1], zSurf(x[0,j0:j1]) )
 dsdxInt = dsdx( x[i0:i1,j0:j1], z[i0:i1,j0:j1] )
 dsdzInt = dsdz( x[i0:i1,j0:j1], z[i0:i1,j0:j1] )
+dsdzAll = dsdz( x, z )
 
 thetaBarInt    = thetaBar   [i0:i1,j0:j1]
 piBarInt       = piBar      [i0:i1,j0:j1]
@@ -167,10 +168,12 @@ def HVs( U ) :
 
 #Important functions for time stepping:
 
-if formulation == "exner" :
+if formulation == "theta_pi" :
+    
+    from gab.nonhydro import theta_pi
     
     def setGhostNodes( U ) :
-        U = exner.setGhostNodes( U, Dx \
+        U = theta_pi.setGhostNodes( U, Dx \
         , Tx, Tz, Nx, Nz, bigTx, bigTz, j0, j1 \
         , nLev, nCol, FD, FDo2, ds, thetaBarBot, thetaBarTop \
         , g, Cp, normGradS, dsdxBot, dsdzBot )
@@ -178,41 +181,66 @@ if formulation == "exner" :
         return U, P
     
     def implicitPart( U, P ) :
-        return exner.implicitPart( U \
+        return theta_pi.implicitPart( U \
         , Dx, Ds, HVx, HVs \
         , nLev, nCol, i0, i1, j0, j1, Cp, Cv, Rd, g \
         , dsdxInt, dsdzInt, thetaBarInt, piBarInt, dthetaBarDzInt )
     
     def explicitPart( U, P ) :
-        return exner.explicitPart( U \
+        return theta_pi.explicitPart( U \
         , Dx, Ds \
         , nLev, nCol, i0, i1, j0, j1, Cp, Cv, Rd \
         , dsdxInt, dsdzInt )
     
-elif formulation == "pdt" :
+elif formulation == "T_rho_P" :
+    
+    from gab.nonhydro import T_rho_P
     
     def setGhostNodes( U ) :
-        U, P = pdt.setGhostNodes( U, Dx \
+        U, P = T_rho_P.setGhostNodes( U, Dx \
         , Tx, Tz, Nx, Nz, bigTx, bigTz, j0, j1 \
         , nLev, nCol, FD, FDo2, ds, Pbar, rhoBar, Tbar \
         , g, Rd, normGradS, dsdxBot, dsdzBot )
         return U, P
     
     def implicitPart( U, P ) :
-        return pdt.implicitPart( U, P \
+        return T_rho_P.implicitPart( U, P \
         , Dx, Ds, HVx, HVs \
         , nLev, nCol, i0, i1, j0, j1, Cp, Cv, Rd, g \
         , dsdxInt, dsdzInt, rhoBarInt, TbarInt, drhoBarDzInt, dTbarDzInt )
     
     def explicitPart( U, P ) :
-        return pdt.explicitPart( U, P \
+        return T_rho_P.explicitPart( U, P \
+        , Dx, Ds \
+        , nLev, nCol, i0, i1, j0, j1, Cv, Rd, g \
+        , dsdxInt, dsdzInt, rhoBarInt )
+    
+elif formulation == "theta_rho_P" :
+    
+    from gab.nonhydro import theta_rho_P
+    
+    def setGhostNodes( U ) :
+        U, P = theta_rho_P.setGhostNodes( U, Dx \
+        , Tx, Tz, Nx, Nz, bigTx, bigTz, j0, j1 \
+        , nLev, nCol, FD, FDo2, ds, Pbar, rhoBar, thetaBar \
+        , g, Rd, Cp, Cv, Po, normGradS, dsdxBot, dsdzBot )
+        return U, P
+    
+    def implicitPart( U, P ) :
+        return theta_rho_P.implicitPart( U, P \
+        , Dx, Ds, HVx, HVs \
+        , nLev, nCol, i0, i1, j0, j1, Cp, Cv, Rd, g \
+        , dsdxInt, dsdzInt, rhoBarInt, drhoBarDzInt, dthetaBarDzInt )
+    
+    def explicitPart( U, P ) :
+        return theta_rho_P.explicitPart( U, P \
         , Dx, Ds \
         , nLev, nCol, i0, i1, j0, j1, Cv, Rd, g \
         , dsdxInt, dsdzInt, rhoBarInt )
     
 else :
     
-    sys.exit( "\nError: formulation should be 'exner' or 'pdt'.\n" )
+    sys.exit( "\nError: formulation should be 'theta_pi', 'T_rho_P' or 'theta_rho_P'.\n" )
 
 def odefun( t, U ) :
     U, P = setGhostNodes( U )
@@ -248,14 +276,21 @@ elif rkStages == 4 :
 else :
     sys.exit( "\nError: rkStages should be 3 or 4.  rk2 is not stable for this problem.\n" )
 
-def printInfo( U, et, t ) :
-    return common.printInfo( U, et , t, formulation )
+def getStandardVariables( U ) :
+    return common.getStandardVariables( U \
+    , setGhostNodes, formulation, Tbar, Pbar, thetaBar, piBar, dpidsBar, dsdzAll \
+    , Po, Rd, Cp, Cv, g )
+
+def printInfo( U, P, et, t ) :
+    U = getStandardVariables( U )
+    return common.printInfo( U, P, et , t )
 
 #Figure size and contour levels for plotting:
 if ( saveContours == 1 ) | ( plotFromSaved == 1 ) :
     fig, CL = common.setFigAndContourLevels( testCase )
 
 def saveContourPlot( U, t ) :
+    U = getStandardVariables( U )
     common.saveContourPlot( U, t \
     , testCase, var, fig \
     , x, z, CL, FDo2 \
@@ -270,9 +305,9 @@ U0, P0 = setGhostNodes( U0 )
 if saveArrays == 1 :
     np.save( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy', U0 )
 U1 = U0
-et = printInfo( U1, time.clock(), t )
+et = printInfo( U0, P0, time.clock(), t )
 if saveContours == 1 :
-    saveContourPlot( U1, t )
+    saveContourPlot( U0, t )
 
 #The actual Eulerian time-stepping from t=0 to t=dtImp:
 for i in range( np.int( np.round(dtImp/dtExp) + 1e-12 ) ) :
@@ -289,7 +324,6 @@ for i in range(1,nTimesteps+1) :
     if np.mod( i, np.int(np.round(saveDel/dtImp)) ) == 0 :
         
         if plotFromSaved == 0 :
-            U1, P1 = setGhostNodes( U1 )
             if saveArrays == 1 :
                 np.save( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy', U1 )
         elif plotFromSaved == 1 :
@@ -297,24 +331,23 @@ for i in range(1,nTimesteps+1) :
         else :
             sys.exit( "\nError: plotFromSaved should be 0 or 1.\n" )
         
-        et = printInfo( U1, et, t )
+        et = printInfo( U1, P1, et, t )
+        
         if saveContours == 1 :
             saveContourPlot( U1, t )
         
     if plotFromSaved == 0 :
         if semiImplicit == 0 :
             t, U2 = rk( t, U1, odefun, dtImp )
-            U0 = U1
-            U1 = U2
         elif semiImplicit == 1 :
             t, U2 = leapfrogTimestep( t, U0, P0, U1, P1, dtImp )
-            U2, P2 = setGhostNodes( U2 )
-            U0 = U1
-            U1 = U2
-            P0 = P1
-            P1 = P2
         else :
             sys.exit( "\nError: semiImplicit should be 0 or 1.\n" )
+        U2, P2 = setGhostNodes( U2 )
+        U0 = U1
+        U1 = U2
+        P0 = P1
+        P1 = P2
     else :
         t = t + dtImp
 
