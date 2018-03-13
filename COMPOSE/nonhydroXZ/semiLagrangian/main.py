@@ -12,9 +12,9 @@ from gab.nonhydro import common
 
 #"bubble", "igw", "densityCurrent", "doubleDensityCurrent",
 #or "movingDensityCurrent":
-testCase = "bubble"
-gx       = 2.                              #avg lateral velocity (estimate)
-gs       = 2.                             #avg vertical velocity (estimate)
+testCase = "doubleDensityCurrent"
+gx       = 10.                             #avg lateral velocity (estimate)
+gs       = 5.                             #avg vertical velocity (estimate)
 
 #"theta_pi" or "T_rho_P" or "theta_rho_P":
 formulation  = "T_rho_P"
@@ -23,9 +23,9 @@ semiImplicit = 1
 gmresTol     = 1e-5                                          #default: 1e-5
 
 dx    = 100.
-ds    = 100.
-dtExp = 1./5.                                           #explicit time-step
-dtImp = 2.                                              #implicit time-step
+ds    = 25.
+dtExp = 1./24.                                          #explicit time-step
+dtImp = 1./2.                                           #implicit time-step
 
 FD = 6                                    #Order of lateral FD (2, 4, or 6)
 
@@ -33,10 +33,10 @@ rkStages  = 3
 plotNodes = 0                               #if 1, plot nodes and then exit
 saveDel   = 100                           #print/save every saveDel seconds
 
-var           = 3                        #determines what to plot (0,1,2,3)
-saveArrays    = 1
-saveContours  = 0
-plotFromSaved = 0                   #if 1, results are loaded, not computed
+var           = 2                        #determines what to plot (0,1,2,3)
+saveArrays    = 0
+saveContours  = 1
+plotFromSaved = 1                   #if 1, results are loaded, not computed
 
 ###########################################################################
 
