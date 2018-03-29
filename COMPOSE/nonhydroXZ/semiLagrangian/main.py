@@ -34,9 +34,9 @@ plotNodes = 0                               #if 1, plot nodes and then exit
 saveDel   = 100                           #print/save every saveDel seconds
 
 var           = 2                        #determines what to plot (0,1,2,3)
-saveArrays    = 1
+saveArrays    = 0
 saveContours  = 1
-plotFromSaved = 0                   #if 1, results are loaded, not computed
+plotFromSaved = 1                   #if 1, results are loaded, not computed
 
 ###########################################################################
 
