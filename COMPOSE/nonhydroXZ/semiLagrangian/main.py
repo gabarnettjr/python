@@ -17,23 +17,23 @@ gx       = 20.                             #avg lateral velocity (estimate)
 gs       = .003                           #avg vertical velocity (estimate)
 
 #"theta_pi" or "T_rho_P" or "theta_rho_P":
-formulation  = "theta_rho_P"
+formulation  = "theta_pi"
 
-semiImplicit = 1
+semiImplicit = 0
 gmresTol     = 1e-9                                          #default: 1e-5
 
 dx    = 500.
-ds    = 500.
+ds    = 100.
 dtExp = 1./2.                                           #explicit time-step
 dtImp = 5.                                              #implicit time-step
 
 FD = 6                                    #Order of lateral FD (2, 4, or 6)
 
-rkStages  = 3
+rkStages  = 4
 plotNodes = 0                               #if 1, plot nodes and then exit
 saveDel   = 100                           #print/save every saveDel seconds
 
-var           = 2                        #determines what to plot (0,1,2,3)
+var           = 0                        #determines what to plot (0,1,2,3)
 saveArrays    = 0
 saveContours  = 1
 plotFromSaved = 1                   #if 1, results are loaded, not computed
