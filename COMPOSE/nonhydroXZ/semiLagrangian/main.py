@@ -17,23 +17,23 @@ gx       = 20.                             #avg lateral velocity (estimate)
 gs       = .003                           #avg vertical velocity (estimate)
 
 #"theta_pi" or "T_rho_P" or "theta_rho_P":
-formulation  = "theta_pi"
+formulation  = "theta_rho_P"
 
 semiImplicit = 0
 gmresTol     = 1e-9                                          #default: 1e-5
 
 dx    = 500.
 ds    = 100.
-dtExp = 1./2.                                           #explicit time-step
-dtImp = 5.                                              #implicit time-step
+dtExp = 1./3.                                           #explicit time-step
+dtImp = 1./2.                                           #implicit time-step
 
 FD = 6                                    #Order of lateral FD (2, 4, or 6)
 
-rkStages  = 4
+rkStages  = 3
 plotNodes = 0                               #if 1, plot nodes and then exit
 saveDel   = 100                           #print/save every saveDel seconds
 
-var           = 0                        #determines what to plot (0,1,2,3)
+var           = 2                        #determines what to plot (0,1,2,3)
 saveArrays    = 0
 saveContours  = 1
 plotFromSaved = 1                   #if 1, results are loaded, not computed
@@ -84,7 +84,7 @@ Tx, Tz, Nx, Nz = common.getTanNorm( zSurfPrime, x[0,j0:j1] )
 U0, thetaBar, piBar, dpidsBar, Pbar, rhoBar, Tbar \
 , dthetaBarDz, dpiBarDz, dTbarDz, dPbarDz, drhoBarDz \
 = common.getInitialConditions( testCase, formulation \
-, nLev, nCol, FD, x, z \
+, FD, x, z \
 , Cp, Cv, Rd, g, Po \
 , dsdz )
 
