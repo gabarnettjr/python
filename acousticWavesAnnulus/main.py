@@ -1,30 +1,36 @@
 import sys
 import os
+import time
 import numpy as np
 import matplotlib.pyplot as plt
 
 sys.path.append( '../site-packages' )
 
 from gab import rk
-from gab.finiteDifferences import annulus
+from gab.acousticWaveEquation import annulus
 
 ###########################################################################
 
 innerRadius   = 1.
 outerRadius   = 2.
-rkStages      = 3                    #number of Runge-Kutta stages (3 or 4)
+rkStages      = 4                    #number of Runge-Kutta stages (3 or 4)
 saveDel       = 5                          #time interval to save snapshots
-plotFromSaved = 1                            #if 1, load instead of compute
+plotFromSaved = 0                            #if 1, load instead of compute
 
 c    = 1./10.                                                   #wave speed
-nr   = 128+2                                       #number of radial levels
-FDr  = 2                                         #order of radial FD approx
-FDth = 4                                        #order of angular FD approx
-dt   = 1./16.                                                      #delta t
+nr   = 64+2                                  #total number of radial levels
+FDr  = 4                                #order of radial FD approx (2 or 4)
+FDth = 6                          #order of angular FD approx (2 or 4 or 6)
+dt   = 1./6.                                                       #delta t
 tf   = 100.                                                     #final time
 
-alp = 1.                                             #radial HV coefficient
-bet = 1.                                            #angular HV coefficient
+alp = 1.                                  #radial HV coefficient (not used)
+bet = 1.                                 #angular HV coefficient (not used)
+
+xc = 0.                                                 #x-coord of GA bell
+yc = ( innerRadius + outerRadius ) / 2.                 #y-coord of GA bell
+def initialCondition( x, y ) :
+    return np.exp( -20.*( (x-xc)**2. + (y-yc)**2. ) )
 
 ###########################################################################
 
@@ -38,10 +44,12 @@ if not os.path.exists( saveString ) :
 
 ###########################################################################
 
-t = 0.
-nTimesteps = np.int(np.round( tf / dt ))
+t = 0.                                                       #starting time
+nTimesteps = np.int(np.round( tf / dt ))         #total number of timesteps
 
-nth = np.int(np.round(2*np.pi*innerRadius*(nr-2)))#number of angular levels
+nth = np.int(np.round(  \
+2*np.pi * innerRadius * \
+(nr-2)/(outerRadius-innerRadius) ))               #number of angular levels
 dth = 2.*np.pi / nth                                  #constant delta theta
 th = np.linspace( 0., 2.*np.pi, nth+1 )                       #angle vector
 th = th[0:-1]                            #remove last angle (same as first)
@@ -54,28 +62,38 @@ thth, rr = np.meshgrid( th, r )                   #mesh of radii and angles
 xx = rr * np.cos(thth)                               #mesh of x-coordinates
 yy = rr * np.sin(thth)                               #mesh of y-coordinates
 
-# plt.plot( xx.flatten(), yy.flatten(), "." )
+###########################################################################
+
+#Set initial conditions:
+
+U = np.zeros(( 3, nr, nth ))
+U[0,:,:] = initialCondition( xx, yy )
+
+xB = ( xx[0,:] + xx[1,:] ) / 2.
+yB = ( yy[0,:] + yy[1,:] ) / 2.
+rhoB = initialCondition( xB, yB )
+
+xT = ( xx[-2,:] + xx[-1,:] ) / 2.
+yT = ( yy[-2,:] + yy[-1,:] ) / 2.
+rhoT = initialCondition( xT, yT )
+
+###########################################################################
+
+# plt.plot( xx.flatten(), yy.flatten(), "." \
+# , xB, yB, "-" \
+# , xT, yT, "-" )
 # plt.axis('equal')
 # plt.show()
 # sys.exit("\nStop here for now.\n")
 
 ###########################################################################
 
-#Set initial conditions:
+wr    = annulus.getFDweights( 1,    FDr  )               #radial derivative
+wth   = annulus.getFDweights( 1,    FDth )              #angular derivative
+wHVr  = annulus.getFDweights( FDr,  FDr  )                       #radial HV
+wHVth = annulus.getFDweights( FDth, FDth )                      #angular HV
 
-xc = 0.                                                 #x-coord of IC bell
-yc = ( innerRadius + outerRadius ) / 2.                 #y-coord of IC bell
-U = np.zeros(( 3, nr, nth ))
-U[0,:,:] = np.exp( -10.*( (xx-xc)**2. + (yy-yc)**2. ) )             #set IC
-rhoB = ( U[0,0,:] + U[0,1,:] ) / 2.
-rhoT = ( U[0,-1,:] + U[0,-2,:] ) / 2.
-
-###########################################################################
-
-wr    = annulus.getCenteredWeights( 1,    FDr  )         #radial derivative
-wHVr  = annulus.getCenteredWeights( FDr,  FDr  )                 #radial HV
-wth   = annulus.getCenteredWeights( 1,    FDth )        #angular derivative
-wHVth = annulus.getCenteredWeights( FDth, FDth )                #angular HV
+wI, wE = annulus.getInterpExtrapWeights( FDr )             #weights for BCs
 
 ii, jj = annulus.getMainIndex( FDr, FDth, nr, nth )
 
@@ -94,7 +112,7 @@ def Dr( U ) :
 
 def Dth( U ) :
     return annulus.Lth( U \
-    , FDth, jj, wth, dth )
+    , FDth, jj, wth[np.int(np.round(FDth/2-1)),:], dth )
 
 def HVr( U ) :
     return alp * annulus.Lr( U \
@@ -102,11 +120,16 @@ def HVr( U ) :
 
 def HVth( U ) :
     return bet * annulus.Lth( U \
-    , FDth, jj, wHVth, dth )
+    , FDth, jj, wHVth[np.int(np.round(FDth/2-1)),:], dth )
+
+def setGhostNodes( U ) :
+    return annulus.setGhostNodes( U \
+    , rhoB, rhoT, FDr, wI, wE )
 
 def odefun( t, U ) :
     return annulus.odefun( t, U \
-    , Dr, Dth, HVr, HVth, thth[ii,:], rr[ii,:], ii, c, rhoB, rhoT )
+    , setGhostNodes, Dr, Dth, HVr, HVth \
+    , thth[1:-1,:], rr[1:-1,:], c )
 
 if rkStages == 3 :
     rk = rk.rk3
@@ -120,16 +143,18 @@ else :
 #Main time-stepping loop:
 
 fig = plt.figure( figsize = (18,14) )
+et = time.clock()
 
 for i in np.arange(0,nTimesteps+1) :
     
     if np.mod( i, np.int(np.round(saveDel/dt)) ) == 0 :
-        print( "t =", t )
+        print( "t =", np.int(np.round(t)), ",  et =", time.clock()-et )
+        et = time.clock()
         if plotFromSaved == 1 :
             U = np.load( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy' )
         else :
             np.save( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy', U )
-        plt.contourf( xx, yy, U[1,:,:], np.arange(-2,2.1,.1) )
+        plt.contourf( xx, yy, U[0,:,:], np.arange(-.4,.425,.025) )
         plt.axis('equal')
         plt.colorbar()
         fig.savefig( '{0:04d}'.format(np.int(np.round(t)+1e-12))+'.png', bbox_inches = 'tight' )
