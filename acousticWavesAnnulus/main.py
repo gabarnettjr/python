@@ -6,31 +6,31 @@ import matplotlib.pyplot as plt
 
 sys.path.append( '../site-packages' )
 
-from gab import rk
+from gab import rk, phs1
 from gab.acousticWaveEquation import annulus
 
 ###########################################################################
 
-innerRadius   = 1.
-outerRadius   = 2.
-rkStages      = 4                    #number of Runge-Kutta stages (3 or 4)
-saveDel       = 5                          #time interval to save snapshots
+innerRadius   = 2.
+outerRadius   = 3.
+rkStages      = 3                    #number of Runge-Kutta stages (3 or 4)
+saveDel       = 20                         #time interval to save snapshots
 plotFromSaved = 0                            #if 1, load instead of compute
 
 c    = 1./10.                                                   #wave speed
 nr   = 64+2                                  #total number of radial levels
 FDr  = 4                                #order of radial FD approx (2 or 4)
-FDth = 6                          #order of angular FD approx (2 or 4 or 6)
-dt   = 1./6.                                                       #delta t
-tf   = 100.                                                     #final time
+FDth = 8                        #order of angular FD approx (2, 4, 6, or 8)
+dt   = 1./16.                                                      #delta t
+tf   = 500.                                                     #final time
 
 alp = 1.                                  #radial HV coefficient (not used)
 bet = 1.                                 #angular HV coefficient (not used)
 
-xc = 0.                                                 #x-coord of GA bell
-yc = ( innerRadius + outerRadius ) / 2.                 #y-coord of GA bell
+xc1 = 0.                                                #x-coord of GA bell
+yc1 = ( innerRadius + outerRadius ) / 2.                #y-coord of GA bell
 def initialCondition( x, y ) :
-    return np.exp( -20.*( (x-xc)**2. + (y-yc)**2. ) )
+    return np.exp( -20.*( (x-xc1)**2. + (y-yc1)**2. ) )
 
 ###########################################################################
 
@@ -88,12 +88,20 @@ rhoT = initialCondition( xT, yT )
 
 ###########################################################################
 
-wr    = annulus.getFDweights( 1,    FDr  )               #radial derivative
+# wr    = annulus.getFDweights( 1,    FDr  )               #radial derivative
 wth   = annulus.getFDweights( 1,    FDth )              #angular derivative
-wHVr  = annulus.getFDweights( FDr,  FDr  )                       #radial HV
+# wHVr  = annulus.getFDweights( FDr,  FDr  )                       #radial HV
 wHVth = annulus.getFDweights( FDth, FDth )                      #angular HV
 
-wI, wE = annulus.getInterpExtrapWeights( FDr )             #weights for BCs
+phs = 5
+pol = 5
+stc = 13
+Wr  = phs1.getDM( r, 1, phs, pol, stc )
+Wr  = Wr[1:-1,:]
+
+wI = phs1.getWeights( (r[0]+r[1])/2.,    r[0:stc],   0, phs, pol )
+wE = phs1.getWeights( r[0],              r[1:stc+1], 0, phs, pol )
+# wI, wE = annulus.getInterpExtrapWeights( FDr )             #weights for BCs
 
 ii, jj = annulus.getMainIndex( FDr, FDth, nr, nth )
 
@@ -107,8 +115,9 @@ ii, jj = annulus.getMainIndex( FDr, FDth, nr, nth )
 ###########################################################################
 
 def Dr( U ) :
-    return annulus.Lr( U \
-    , FDr, ii, wr, dr )
+    return Wr.dot(U)
+    # return annulus.Lr( U \
+    # , FDr, ii, wr, dr )
 
 def Dth( U ) :
     return annulus.Lth( U \
@@ -154,7 +163,7 @@ for i in np.arange(0,nTimesteps+1) :
             U = np.load( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy' )
         else :
             np.save( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy', U )
-        plt.contourf( xx, yy, U[0,:,:], np.arange(-.4,.425,.025) )
+        plt.contourf( xx, yy, U[0,:,:], np.arange(-.25,.2625,.0125) )
         plt.axis('equal')
         plt.colorbar()
         fig.savefig( '{0:04d}'.format(np.int(np.round(t)+1e-12))+'.png', bbox_inches = 'tight' )
