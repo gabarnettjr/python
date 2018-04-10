@@ -15,17 +15,16 @@ innerRadius   = 2.
 outerRadius   = 3.
 rkStages      = 3                    #number of Runge-Kutta stages (3 or 4)
 saveDel       = 20                         #time interval to save snapshots
-plotFromSaved = 0                            #if 1, load instead of compute
+plotFromSaved = 1                            #if 1, load instead of compute
 
 c    = 1./10.                                                   #wave speed
 nr   = 64+2                                  #total number of radial levels
-FDr  = 4                                #order of radial FD approx (2 or 4)
-FDth = 8                        #order of angular FD approx (2, 4, 6, or 8)
 dt   = 1./16.                                                      #delta t
 tf   = 500.                                                     #final time
 
-alp = 1.                                  #radial HV coefficient (not used)
-bet = 1.                                 #angular HV coefficient (not used)
+phs = 9
+pol = 7
+stc = 25
 
 xc1 = 0.                                                #x-coord of GA bell
 yc1 = ( innerRadius + outerRadius ) / 2.                #y-coord of GA bell
@@ -34,7 +33,12 @@ def initialCondition( x, y ) :
 
 ###########################################################################
 
-saveString = './results/' + 'nr' + '{0:1d}'.format(nr-2) + '/'
+saveString = './results/' \
++ 'nr'   + '{0:1d}'.format(nr-2) \
++ '_phs' + '{0:1d}'.format(phs)  \
++ '_pol' + '{0:1d}'.format(pol)  \
++ '_stc' + '{0:1d}'.format(stc)  \
++ '/'
 
 if os.path.exists( saveString+'*.npy' ) :
     os.remove( saveString+'*.npy' )
@@ -51,7 +55,7 @@ nth = np.int(np.round(  \
 2*np.pi * innerRadius * \
 (nr-2)/(outerRadius-innerRadius) ))               #number of angular levels
 dth = 2.*np.pi / nth                                  #constant delta theta
-th = np.linspace( 0., 2.*np.pi, nth+1 )                       #angle vector
+th = np.linspace( 0., 2.*np.pi, nth+1 )               #vector of all angles
 th = th[0:-1]                            #remove last angle (same as first)
 
 dr = ( outerRadius - innerRadius ) / (nr-2)               #constant delta r
@@ -64,7 +68,7 @@ yy = rr * np.sin(thth)                               #mesh of y-coordinates
 
 ###########################################################################
 
-#Set initial conditions:
+#Set initial condition:
 
 U = np.zeros(( 3, nr, nth ))
 U[0,:,:] = initialCondition( xx, yy )
@@ -88,22 +92,45 @@ rhoT = initialCondition( xT, yT )
 
 ###########################################################################
 
-# wr    = annulus.getFDweights( 1,    FDr  )               #radial derivative
-wth   = annulus.getFDweights( 1,    FDth )              #angular derivative
-# wHVr  = annulus.getFDweights( FDr,  FDr  )                       #radial HV
-wHVth = annulus.getFDweights( FDth, FDth )                      #angular HV
+#Radial weights arranged in a differentiation matrix:
 
-phs = 5
-pol = 5
-stc = 13
-Wr  = phs1.getDM( r, 1, phs, pol, stc )
-Wr  = Wr[1:-1,:]
+Wr   = phs1.getDM( isPeriodic=0, period=0, X=r, m=1 \
+, phsDegree=phs, polyDegree=pol, stencilSize=stc )
+Whvr = phs1.getDM( isPeriodic=0, period=0, X=r, m=pol+1 \
+, phsDegree=phs, polyDegree=pol, stencilSize=stc )
+Wr   = Wr[1:-1,:]
+Whvr = Whvr[1:-1,:]
 
-wI = phs1.getWeights( (r[0]+r[1])/2.,    r[0:stc],   0, phs, pol )
-wE = phs1.getWeights( r[0],              r[1:stc+1], 0, phs, pol )
-# wI, wE = annulus.getInterpExtrapWeights( FDr )             #weights for BCs
+###########################################################################
 
-ii, jj = annulus.getMainIndex( FDr, FDth, nr, nth )
+#Radial hyperviscosity coefficient alp:
+
+if pol == 3 :
+    alp = -2.**-15.
+elif pol == 5 :
+    alp = 2**-17
+elif pol == 7 :
+    alp = -2**-19
+else :
+    sys.exit("\nError: pol should be 3, 5, or 7.\n")
+
+###########################################################################
+
+#Angular FD weights arranged in a differentiation matrix:
+
+Wth   = phs1.getDM( isPeriodic=1, period=2*np.pi, X=th \
+, m=1,  phsDegree=3,  polyDegree=10, stencilSize=11 )
+Whvth = phs1.getDM( isPeriodic=1, period=2*np.pi, X=th \
+, m=10, phsDegree=11, polyDegree=10, stencilSize=11 )
+
+###########################################################################
+
+#Interpolation to boundary and extrapolation to ghost-node weights:
+
+wI = phs1.getWeights( (r[0]+r[1])/2., r[0:stc],   0, phs, pol )
+wE = phs1.getWeights( r[0],           r[1:stc+1], 0, phs, pol )
+
+###########################################################################
 
 # app = annulus.Lr( U[0,:,:], FDr, ii, wr, dr )
 # plt.contourf( xx[ii,:], yy[ii,:], app, 20 )
@@ -114,26 +141,23 @@ ii, jj = annulus.getMainIndex( FDr, FDth, nr, nth )
 
 ###########################################################################
 
+#Functions to approximate differential operators and other things:
+
 def Dr( U ) :
-    return Wr.dot(U)
-    # return annulus.Lr( U \
-    # , FDr, ii, wr, dr )
+    return Wr.dot( U )
 
 def Dth( U ) :
-    return annulus.Lth( U \
-    , FDth, jj, wth[np.int(np.round(FDth/2-1)),:], dth )
+    return np.transpose( Wth.dot( np.transpose(U) ) )
 
 def HVr( U ) :
-    return alp * annulus.Lr( U \
-    , FDr, ii, wHVr, dr )
+    return alp*dr**pol * Whvr.dot( U )
 
 def HVth( U ) :
-    return bet * annulus.Lth( U \
-    , FDth, jj, wHVth[np.int(np.round(FDth/2-1)),:], dth )
+    np.transpose( Whvth.dot( np.transpose(U) ) )
 
 def setGhostNodes( U ) :
     return annulus.setGhostNodes( U \
-    , rhoB, rhoT, FDr, wI, wE )
+    , rhoB, rhoT, wI, wE )
 
 def odefun( t, U ) :
     return annulus.odefun( t, U \
@@ -154,16 +178,21 @@ else :
 fig = plt.figure( figsize = (18,14) )
 et = time.clock()
 
-for i in np.arange(0,nTimesteps+1) :
+for i in np.arange( 0, nTimesteps+1 ) :
     
     if np.mod( i, np.int(np.round(saveDel/dt)) ) == 0 :
+        
         print( "t =", np.int(np.round(t)), ",  et =", time.clock()-et )
         et = time.clock()
+        
         if plotFromSaved == 1 :
             U = np.load( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy' )
         else :
             np.save( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy', U )
-        plt.contourf( xx, yy, U[0,:,:], np.arange(-.25,.2625,.0125) )
+        
+        # plt.contourf( xx, yy, U[0,:,:], np.arange(-.25,.2625,.0125) )
+        # plt.contourf( xx, yy, U[1,:,:], 20 )
+        plt.contourf( xx, yy, U[2,:,:], np.arange(-1.,1.025,.025) )
         plt.axis('equal')
         plt.colorbar()
         fig.savefig( '{0:04d}'.format(np.int(np.round(t)+1e-12))+'.png', bbox_inches = 'tight' )
