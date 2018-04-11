@@ -3,6 +3,7 @@ import os
 import time
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.sparse import spdiags
 
 sys.path.append( '../site-packages' )
 
@@ -11,20 +12,21 @@ from gab.acousticWaveEquation import annulus
 
 ###########################################################################
 
-innerRadius   = 2.
-outerRadius   = 3.
+innerRadius   = 1.
+outerRadius   = 5.
 rkStages      = 3                    #number of Runge-Kutta stages (3 or 4)
-saveDel       = 20                         #time interval to save snapshots
-plotFromSaved = 1                            #if 1, load instead of compute
+saveDel       = 10                         #time interval to save snapshots
+plotFromSaved = 0                            #if 1, load instead of compute
 
-c    = 1./10.                                                   #wave speed
-nr   = 64+2                                  #total number of radial levels
-dt   = 1./16.                                                      #delta t
-tf   = 500.                                                     #final time
+c  = 1./10.                                                     #wave speed
+nr = 128+2                                   #total number of radial levels
+dt = 1./16.                                                        #delta t
+tf = 200.                                                       #final time
 
-phs = 9
-pol = 7
-stc = 25
+phs = 7                                      #PHS RBF exponent (odd number)
+pol = 5                                                  #polynomial degree
+stc = 13                                                      #stencil size
+ptb = .25                            #random radial perturbation percentage
 
 xc1 = 0.                                                #x-coord of GA bell
 yc1 = ( innerRadius + outerRadius ) / 2.                #y-coord of GA bell
@@ -33,11 +35,12 @@ def initialCondition( x, y ) :
 
 ###########################################################################
 
-saveString = './results/' \
-+ 'nr'   + '{0:1d}'.format(nr-2) \
-+ '_phs' + '{0:1d}'.format(phs)  \
-+ '_pol' + '{0:1d}'.format(pol)  \
-+ '_stc' + '{0:1d}'.format(stc)  \
+saveString = './results/'          \
++ 'nr'   + '{0:1d}'.format(nr-2)   \
++ '_phs' + '{0:1d}'.format(phs)    \
++ '_pol' + '{0:1d}'.format(pol)    \
++ '_stc' + '{0:1d}'.format(stc)    \
++ '_ptb' + '{0:1.2f}'.format(ptb)  \
 + '/'
 
 if os.path.exists( saveString+'*.npy' ) :
@@ -60,6 +63,10 @@ th = th[0:-1]                            #remove last angle (same as first)
 
 dr = ( outerRadius - innerRadius ) / (nr-2)               #constant delta r
 r  = np.linspace( innerRadius-dr/2, outerRadius+dr/2, nr )   #radius vector
+ptb = ptb * dr
+ran = -ptb + 2*ptb*np.random.rand(len(r))
+r = r + ran                               #radius vector after perturbation
+dr = (r[2:len(r)]-r[0:len(r)-2])/2.                   #non-constant delta r
 
 thth, rr = np.meshgrid( th, r )                   #mesh of radii and angles
 
@@ -73,12 +80,12 @@ yy = rr * np.sin(thth)                               #mesh of y-coordinates
 U = np.zeros(( 3, nr, nth ))
 U[0,:,:] = initialCondition( xx, yy )
 
-xB = ( xx[0,:] + xx[1,:] ) / 2.
-yB = ( yy[0,:] + yy[1,:] ) / 2.
+xB = innerRadius * np.cos(th)
+yB = innerRadius * np.sin(th)
 rhoB = initialCondition( xB, yB )
 
-xT = ( xx[-2,:] + xx[-1,:] ) / 2.
-yT = ( yy[-2,:] + yy[-1,:] ) / 2.
+xT = outerRadius * np.cos(th)
+yT = outerRadius * np.sin(th)
 rhoT = initialCondition( xT, yT )
 
 ###########################################################################
@@ -92,27 +99,37 @@ rhoT = initialCondition( xT, yT )
 
 ###########################################################################
 
+#Radial hyperviscosity coefficient (alp):
+
+if pol == 3 :
+    alp = -2.**-11.
+elif pol == 5 :
+    alp = 2**-14
+elif pol == 7 :
+    alp = -2**-15
+else :
+    alp = 0.
+
+###########################################################################
+
 #Radial weights arranged in a differentiation matrix:
 
 Wr   = phs1.getDM( isPeriodic=0, period=0, X=r, m=1 \
+, phsDegree=3,   polyDegree=pol, stencilSize=stc )
+
+Whvr = phs1.getDM( isPeriodic=0, period=0, X=r, m=phs-1 \
 , phsDegree=phs, polyDegree=pol, stencilSize=stc )
-Whvr = phs1.getDM( isPeriodic=0, period=0, X=r, m=pol+1 \
-, phsDegree=phs, polyDegree=pol, stencilSize=stc )
+
 Wr   = Wr[1:-1,:]
 Whvr = Whvr[1:-1,:]
 
 ###########################################################################
 
-#Radial hyperviscosity coefficient alp:
+#Modify the radial HV matrix to take into account the varying radii:
 
-if pol == 3 :
-    alp = -2.**-15.
-elif pol == 5 :
-    alp = 2**-17
-elif pol == 7 :
-    alp = -2**-19
-else :
-    sys.exit("\nError: pol should be 3, 5, or 7.\n")
+drPol = spdiags( dr**pol, np.array([0]), len(dr), len(dr) )
+
+Whvr = alp * drPol.dot(Whvr)
 
 ###########################################################################
 
@@ -120,6 +137,7 @@ else :
 
 Wth   = phs1.getDM( isPeriodic=1, period=2*np.pi, X=th \
 , m=1,  phsDegree=3,  polyDegree=10, stencilSize=11 )
+
 Whvth = phs1.getDM( isPeriodic=1, period=2*np.pi, X=th \
 , m=10, phsDegree=11, polyDegree=10, stencilSize=11 )
 
@@ -127,8 +145,8 @@ Whvth = phs1.getDM( isPeriodic=1, period=2*np.pi, X=th \
 
 #Interpolation to boundary and extrapolation to ghost-node weights:
 
-wI = phs1.getWeights( (r[0]+r[1])/2., r[0:stc],   0, phs, pol )
-wE = phs1.getWeights( r[0],           r[1:stc+1], 0, phs, pol )
+wI = phs1.getWeights( innerRadius, r[0:stc],   0, 3, pol )
+wE = phs1.getWeights( r[0],        r[1:stc+1], 0, 3, pol )
 
 ###########################################################################
 
@@ -150,7 +168,7 @@ def Dth( U ) :
     return np.transpose( Wth.dot( np.transpose(U) ) )
 
 def HVr( U ) :
-    return alp*dr**pol * Whvr.dot( U )
+    return Whvr.dot( U )
 
 def HVth( U ) :
     np.transpose( Whvth.dot( np.transpose(U) ) )
@@ -190,13 +208,16 @@ for i in np.arange( 0, nTimesteps+1 ) :
         else :
             np.save( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy', U )
         
-        # plt.contourf( xx, yy, U[0,:,:], np.arange(-.25,.2625,.0125) )
+        plt.contourf( xx, yy, U[0,:,:], np.arange(-.255,.255+.01,.01) )
         # plt.contourf( xx, yy, U[1,:,:], 20 )
-        plt.contourf( xx, yy, U[2,:,:], np.arange(-1.,1.025,.025) )
+        # plt.contourf( xx, yy, U[2,:,:], np.arange(-1.,1.025,.025) )
         plt.axis('equal')
         plt.colorbar()
         fig.savefig( '{0:04d}'.format(np.int(np.round(t)+1e-12))+'.png', bbox_inches = 'tight' )
         plt.clf()
+        
+        if np.max(np.abs(U[0,:,:])) > 5. :
+            sys.exit("\nUnstable in time.\n")
         
     if plotFromSaved == 1 :
         t = t + dt
