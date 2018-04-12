@@ -13,20 +13,20 @@ from gab.acousticWaveEquation import annulus
 ###########################################################################
 
 innerRadius   = 1.
-outerRadius   = 5.
+outerRadius   = 2.
 rkStages      = 3                    #number of Runge-Kutta stages (3 or 4)
 saveDel       = 10                         #time interval to save snapshots
 plotFromSaved = 0                            #if 1, load instead of compute
 
 c  = 1./10.                                                     #wave speed
-nr = 128+2                                   #total number of radial levels
-dt = 1./16.                                                        #delta t
-tf = 200.                                                       #final time
+nr = 32+2                                    #total number of radial levels
+dt = 1./20.                                                        #delta t
+tf = 100.                                                       #final time
 
 phs = 7                                      #PHS RBF exponent (odd number)
 pol = 5                                                  #polynomial degree
-stc = 13                                                      #stencil size
-ptb = .25                            #random radial perturbation percentage
+stc = 15                                                      #stencil size
+ptb = .30                            #random radial perturbation percentage
 
 xc1 = 0.                                                #x-coord of GA bell
 yc1 = ( innerRadius + outerRadius ) / 2.                #y-coord of GA bell
@@ -35,12 +35,12 @@ def initialCondition( x, y ) :
 
 ###########################################################################
 
-saveString = './results/'          \
-+ 'nr'   + '{0:1d}'.format(nr-2)   \
-+ '_phs' + '{0:1d}'.format(phs)    \
-+ '_pol' + '{0:1d}'.format(pol)    \
-+ '_stc' + '{0:1d}'.format(stc)    \
-+ '_ptb' + '{0:1.2f}'.format(ptb)  \
+saveString = './shortResults/'    \
++ 'nr'   + '{0:1d}'.format(nr-2)  \
++ '_phs' + '{0:1d}'.format(phs)   \
++ '_pol' + '{0:1d}'.format(pol)   \
++ '_stc' + '{0:1d}'.format(stc)   \
++ '_ptb' + '{0:1.2f}'.format(ptb) \
 + '/'
 
 if os.path.exists( saveString+'*.npy' ) :
@@ -62,20 +62,37 @@ th = np.linspace( 0., 2.*np.pi, nth+1 )               #vector of all angles
 th = th[0:-1]                            #remove last angle (same as first)
 
 dr = ( outerRadius - innerRadius ) / (nr-2)               #constant delta r
-r  = np.linspace( innerRadius-dr/2, outerRadius+dr/2, nr )   #radius vector
+r0 = np.linspace( innerRadius-dr/2, outerRadius+dr/2, nr )   #radius vector
 ptb = ptb * dr
-ran = -ptb + 2*ptb*np.random.rand(len(r))
+ran = -ptb + 2*ptb*np.random.rand(len(r0))             #perturbation vector
+r = np.linspace( innerRadius-dr/2, outerRadius+dr/2, nr )
 r = r + ran                               #radius vector after perturbation
 dr = (r[2:len(r)]-r[0:len(r)-2])/2.                   #non-constant delta r
 
 thth, rr = np.meshgrid( th, r )                   #mesh of radii and angles
-
 xx = rr * np.cos(thth)                               #mesh of x-coordinates
 yy = rr * np.sin(thth)                               #mesh of y-coordinates
 
+thth0, rr0 = np.meshgrid( th, r0[1:-1] )         #regular mesh for plotting
+xx0 = rr0 * np.cos(thth0)
+yy0 = rr0 * np.sin(thth0)
+
 ###########################################################################
 
-#Set initial condition:
+#Plot showing how much the radii have been perturbed:
+
+fig, ax = plt.subplots( 1, 2, figsize=(10,5) )
+ax[0].plot( r0, r0, '-', r0, r, '.' )   #plot of initial vs perturbed radii
+plt.xlabel('r0')
+plt.ylabel('r')
+ax[1].plot( r[1:-1], dr, '-' )                #plot of r vs non-constant dr
+plt.xlabel('r')
+plt.ylabel('dr')
+plt.show()
+
+###########################################################################
+
+#Set initial condition and fixed Dirichlet BC for U[0,:,:] (rho):
 
 U = np.zeros(( 3, nr, nth ))
 U[0,:,:] = initialCondition( xx, yy )
@@ -90,6 +107,8 @@ rhoT = initialCondition( xT, yT )
 
 ###########################################################################
 
+#Plot the nodes:
+
 # plt.plot( xx.flatten(), yy.flatten(), "." \
 # , xB, yB, "-" \
 # , xT, yT, "-" )
@@ -101,12 +120,14 @@ rhoT = initialCondition( xT, yT )
 
 #Radial hyperviscosity coefficient (alp):
 
-if pol == 3 :
-    alp = -2.**-11.
+if pol == 1 :
+    alp = 2^-9000
+elif pol == 3 :
+    alp = -2.**-10.
 elif pol == 5 :
-    alp = 2**-14
+    alp = 2**-12
 elif pol == 7 :
-    alp = -2**-15
+    alp = -2**-14
 else :
     alp = 0.
 
@@ -114,48 +135,45 @@ else :
 
 #Radial weights arranged in a differentiation matrix:
 
-Wr   = phs1.getDM( isPeriodic=0, period=0, X=r, m=1 \
-, phsDegree=3,   polyDegree=pol, stencilSize=stc )
-
-Whvr = phs1.getDM( isPeriodic=0, period=0, X=r, m=phs-1 \
+Wr   = phs1.getDM( x=r, X=r[1:-1], m=1 \
 , phsDegree=phs, polyDegree=pol, stencilSize=stc )
 
-Wr   = Wr[1:-1,:]
-Whvr = Whvr[1:-1,:]
+Whvr = phs1.getDM( x=r, X=r[1:-1], m=phs-1 \
+, phsDegree=phs, polyDegree=pol, stencilSize=stc )
 
 ###########################################################################
 
 #Modify the radial HV matrix to take into account the varying radii:
 
 drPol = spdiags( dr**pol, np.array([0]), len(dr), len(dr) )
-
 Whvr = alp * drPol.dot(Whvr)
 
 ###########################################################################
 
 #Angular FD weights arranged in a differentiation matrix:
 
-Wth   = phs1.getDM( isPeriodic=1, period=2*np.pi, X=th \
-, m=1,  phsDegree=3,  polyDegree=10, stencilSize=11 )
+Wth   = phs1.getPeriodicDM( period=2*np.pi, X=th, m=1  \
+, phsDegree=3,  polyDegree=10, stencilSize=11 )
 
-Whvth = phs1.getDM( isPeriodic=1, period=2*np.pi, X=th \
-, m=10, phsDegree=11, polyDegree=10, stencilSize=11 )
-
-###########################################################################
-
-#Interpolation to boundary and extrapolation to ghost-node weights:
-
-wI = phs1.getWeights( innerRadius, r[0:stc],   0, 3, pol )
-wE = phs1.getWeights( r[0],        r[1:stc+1], 0, 3, pol )
+Whvth = phs1.getPeriodicDM( period=2*np.pi, X=th, m=10 \
+, phsDegree=11, polyDegree=10, stencilSize=11 )
 
 ###########################################################################
 
-# app = annulus.Lr( U[0,:,:], FDr, ii, wr, dr )
-# plt.contourf( xx[ii,:], yy[ii,:], app, 20 )
-# plt.axis('equal')
-# plt.colorbar()
-# plt.show()
-# sys.exit("\nStop here for now.\n")
+#Weights for interpolation to boundary and extrapolation to ghost-nodes:
+
+wIinner = phs1.getWeights( innerRadius, r[0:stc],   0, phs, pol )
+wEinner = phs1.getWeights( r[0],        r[1:stc+1], 0, phs, pol )
+
+wIouter = phs1.getWeights( outerRadius, r[-1:-stc-1:-1], 0, phs, pol )
+wEouter = phs1.getWeights( r[-1],       r[-2:-stc-2:-1], 0, phs, pol )
+
+###########################################################################
+
+#Interpolation from perturbed nodes to regular nodes for plotting:
+
+W = phs1.getDM( x=r, X=r0[1:-1], m=0 \
+, phsDegree=phs, polyDegree=pol, stencilSize=stc )
 
 ###########################################################################
 
@@ -175,7 +193,7 @@ def HVth( U ) :
 
 def setGhostNodes( U ) :
     return annulus.setGhostNodes( U \
-    , rhoB, rhoT, wI, wE )
+    , rhoB, rhoT, wIinner, wEinner, wIouter, wEouter )
 
 def odefun( t, U ) :
     return annulus.odefun( t, U \
@@ -208,15 +226,17 @@ for i in np.arange( 0, nTimesteps+1 ) :
         else :
             np.save( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy', U )
         
-        plt.contourf( xx, yy, U[0,:,:], np.arange(-.255,.255+.01,.01) )
-        # plt.contourf( xx, yy, U[1,:,:], 20 )
-        # plt.contourf( xx, yy, U[2,:,:], np.arange(-1.,1.025,.025) )
+        # Uplot = np.zeros(( 3, nr-2, nth ))
+        # for k in range(3) :
+            # Uplot[k,:,:] = W.dot(U[k,:,:])
+        
+        plt.contourf( xx0, yy0, W.dot(U[0,:,:]), np.arange(-.255,.255+.01,.01) )
         plt.axis('equal')
         plt.colorbar()
         fig.savefig( '{0:04d}'.format(np.int(np.round(t)+1e-12))+'.png', bbox_inches = 'tight' )
         plt.clf()
         
-        if np.max(np.abs(U[0,:,:])) > 5. :
+        if np.max(np.abs(U)) > 10. :
             sys.exit("\nUnstable in time.\n")
         
     if plotFromSaved == 1 :
