@@ -9,24 +9,26 @@ sys.path.append( '../site-packages' )
 
 from gab import rk, phs1
 from gab.acousticWaveEquation import annulus
+from gab.pseudospectral import periodic
 
 ###########################################################################
 
 innerRadius   = 1.
 outerRadius   = 2.
-rkStages      = 3                    #number of Runge-Kutta stages (3 or 4)
+tf            = 100.                                            #final time
+
+rkStages      = 4                    #number of Runge-Kutta stages (3 or 4)
 saveDel       = 10                         #time interval to save snapshots
 plotFromSaved = 0                            #if 1, load instead of compute
 
 c  = 1./10.                                                     #wave speed
-nr = 32+2                                    #total number of radial levels
-dt = 1./20.                                                        #delta t
-tf = 100.                                                       #final time
+nr = 256+2                                   #total number of radial levels
+dt = 1./32.                                                        #delta t
 
 phs = 7                                      #PHS RBF exponent (odd number)
-pol = 5                                                  #polynomial degree
-stc = 15                                                      #stencil size
-ptb = .30                            #random radial perturbation percentage
+pol = 6                                                  #polynomial degree
+stc = 7                                                      #stencil size
+ptb = .00                            #random radial perturbation percentage
 
 xc1 = 0.                                                #x-coord of GA bell
 yc1 = ( innerRadius + outerRadius ) / 2.                #y-coord of GA bell
@@ -54,9 +56,7 @@ if not os.path.exists( saveString ) :
 t = 0.                                                       #starting time
 nTimesteps = np.int(np.round( tf / dt ))         #total number of timesteps
 
-nth = np.int(np.round(  \
-2*np.pi * innerRadius * \
-(nr-2)/(outerRadius-innerRadius) ))               #number of angular levels
+nth = annulus.getNth( innerRadius, outerRadius, nr )#nmbr of angular levels
 dth = 2.*np.pi / nth                                  #constant delta theta
 th = np.linspace( 0., 2.*np.pi, nth+1 )               #vector of all angles
 th = th[0:-1]                            #remove last angle (same as first)
@@ -68,6 +68,8 @@ ran = -ptb + 2*ptb*np.random.rand(len(r0))             #perturbation vector
 r = np.linspace( innerRadius-dr/2, outerRadius+dr/2, nr )
 r = r + ran                               #radius vector after perturbation
 dr = (r[2:len(r)]-r[0:len(r)-2])/2.                   #non-constant delta r
+
+np.save( saveString+'radius'+'.npy', r )
 
 thth, rr = np.meshgrid( th, r )                   #mesh of radii and angles
 xx = rr * np.cos(thth)                               #mesh of x-coordinates
@@ -81,14 +83,14 @@ yy0 = rr0 * np.sin(thth0)
 
 #Plot showing how much the radii have been perturbed:
 
-fig, ax = plt.subplots( 1, 2, figsize=(10,5) )
-ax[0].plot( r0, r0, '-', r0, r, '.' )   #plot of initial vs perturbed radii
-plt.xlabel('r0')
-plt.ylabel('r')
-ax[1].plot( r[1:-1], dr, '-' )                #plot of r vs non-constant dr
-plt.xlabel('r')
-plt.ylabel('dr')
-plt.show()
+# fig, ax = plt.subplots( 1, 2, figsize=(10,5) )
+# ax[0].plot( r0, r0, '-', r0, r, '.' )   #plot of initial vs perturbed radii
+# plt.xlabel('r0')
+# plt.ylabel('r')
+# ax[1].plot( r[1:-1], dr, '-' )                #plot of r vs non-constant dr
+# plt.xlabel('r')
+# plt.ylabel('dr')
+# plt.show()
 
 ###########################################################################
 
@@ -107,7 +109,7 @@ rhoT = initialCondition( xT, yT )
 
 ###########################################################################
 
-#Plot the nodes:
+#Plot the nodes and exit:
 
 # plt.plot( xx.flatten(), yy.flatten(), "." \
 # , xB, yB, "-" \
@@ -135,7 +137,7 @@ else :
 
 #Radial weights arranged in a differentiation matrix:
 
-Wr   = phs1.getDM( x=r, X=r[1:-1], m=1 \
+Wr   = phs1.getDM( x=r, X=r[1:-1], m=1     \
 , phsDegree=phs, polyDegree=pol, stencilSize=stc )
 
 Whvr = phs1.getDM( x=r, X=r[1:-1], m=phs-1 \
@@ -152,11 +154,12 @@ Whvr = alp * drPol.dot(Whvr)
 
 #Angular FD weights arranged in a differentiation matrix:
 
-Wth   = phs1.getPeriodicDM( period=2*np.pi, X=th, m=1  \
-, phsDegree=3,  polyDegree=10, stencilSize=11 )
+# Wth = periodic.getDM( th, th, 1 )
+Wth   = phs1.getPeriodicDM( period=2*np.pi, X=th, m=1     \
+, phsDegree=phs, polyDegree=pol, stencilSize=stc )
 
-Whvth = phs1.getPeriodicDM( period=2*np.pi, X=th, m=10 \
-, phsDegree=11, polyDegree=10, stencilSize=11 )
+Whvth = phs1.getPeriodicDM( period=2*np.pi, X=th, m=phs-1 \
+, phsDegree=phs, polyDegree=pol, stencilSize=stc )
 
 ###########################################################################
 
