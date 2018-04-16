@@ -17,28 +17,37 @@ innerRadius   = 1.
 outerRadius   = 2.
 tf            = 100.                                            #final time
 
-rkStages      = 4                    #number of Runge-Kutta stages (3 or 4)
+rkStages      = 3                    #number of Runge-Kutta stages (3 or 4)
 saveDel       = 10                         #time interval to save snapshots
 plotFromSaved = 0                            #if 1, load instead of compute
 
 c  = 1./10.                                                     #wave speed
-nr = 256+2                                   #total number of radial levels
-dt = 1./32.                                                        #delta t
+ns = 128+2                                        #total number of s levels
+dt = 1./48.                                                        #delta t
 
 phs = 7                                      #PHS RBF exponent (odd number)
-pol = 6                                                  #polynomial degree
-stc = 7                                                      #stencil size
-ptb = .00                            #random radial perturbation percentage
+pol = 5                                                  #polynomial degree
+stc = 13                                                      #stencil size
+ptb = .30                            #random radial perturbation percentage
 
 xc1 = 0.                                                #x-coord of GA bell
 yc1 = ( innerRadius + outerRadius ) / 2.                #y-coord of GA bell
 def initialCondition( x, y ) :
-    return np.exp( -20.*( (x-xc1)**2. + (y-yc1)**2. ) )
+    return np.exp( -50.*( (x-xc1)**2. + (y-yc1)**2. ) )
+
+k = innerRadius
+amp = .02
+def rSurf( th ) :
+    return innerRadius
+    # return innerRadius + amp*np.sin(k*th)
+def rSurfPrime( th ) :
+    return 0.
+    # return amp*k*np.cos(k*th)
 
 ###########################################################################
 
-saveString = './shortResults/'    \
-+ 'nr'   + '{0:1d}'.format(nr-2)  \
+saveString = './results/'    \
++ 'ns'   + '{0:1d}'.format(ns-2)  \
 + '_phs' + '{0:1d}'.format(phs)   \
 + '_pol' + '{0:1d}'.format(pol)   \
 + '_stc' + '{0:1d}'.format(stc)   \
@@ -56,47 +65,47 @@ if not os.path.exists( saveString ) :
 t = 0.                                                       #starting time
 nTimesteps = np.int(np.round( tf / dt ))         #total number of timesteps
 
-nth = annulus.getNth( innerRadius, outerRadius, nr )#nmbr of angular levels
+nth = annulus.getNth( innerRadius, outerRadius, ns )#nmbr of angular levels
 dth = 2.*np.pi / nth                                  #constant delta theta
 th = np.linspace( 0., 2.*np.pi, nth+1 )               #vector of all angles
 th = th[0:-1]                            #remove last angle (same as first)
 
-dr = ( outerRadius - innerRadius ) / (nr-2)               #constant delta r
-r0 = np.linspace( innerRadius-dr/2, outerRadius+dr/2, nr )   #radius vector
-ptb = ptb * dr
-ran = -ptb + 2*ptb*np.random.rand(len(r0))             #perturbation vector
-r = np.linspace( innerRadius-dr/2, outerRadius+dr/2, nr )
-r = r + ran                               #radius vector after perturbation
-dr = (r[2:len(r)]-r[0:len(r)-2])/2.                   #non-constant delta r
+ds = ( outerRadius - innerRadius ) / (ns-2)               #constant delta s
+s0 = np.linspace( innerRadius-ds/2, outerRadius+ds/2, ns )        #s vector
+ptb = ptb * ds
+ran = -ptb + 2*ptb*np.random.rand(len(s0))             #perturbation vector
+s = np.linspace( innerRadius-ds/2, outerRadius+ds/2, ns )
+s = s + ran                                    #s vector after perturbation
+ds = (s[2:len(s)]-s[0:len(s)-2])/2.                   #non-constant delta s
 
-np.save( saveString+'radius'+'.npy', r )
+np.save( saveString+'s'+'.npy', s )
 
-thth, rr = np.meshgrid( th, r )                   #mesh of radii and angles
-xx = rr * np.cos(thth)                               #mesh of x-coordinates
-yy = rr * np.sin(thth)                               #mesh of y-coordinates
+thth, ss = np.meshgrid( th, s )                   #mesh of radii and angles
+xx = ss * np.cos(thth)                               #mesh of x-coordinates
+yy = ss * np.sin(thth)                               #mesh of y-coordinates
 
-thth0, rr0 = np.meshgrid( th, r0[1:-1] )         #regular mesh for plotting
-xx0 = rr0 * np.cos(thth0)
-yy0 = rr0 * np.sin(thth0)
+thth0, ss0 = np.meshgrid( th, s0[1:-1] )         #regular mesh for plotting
+xx0 = ss0 * np.cos(thth0)
+yy0 = ss0 * np.sin(thth0)
 
 ###########################################################################
 
 #Plot showing how much the radii have been perturbed:
 
 # fig, ax = plt.subplots( 1, 2, figsize=(10,5) )
-# ax[0].plot( r0, r0, '-', r0, r, '.' )   #plot of initial vs perturbed radii
-# plt.xlabel('r0')
-# plt.ylabel('r')
-# ax[1].plot( r[1:-1], dr, '-' )                #plot of r vs non-constant dr
-# plt.xlabel('r')
-# plt.ylabel('dr')
+# ax[0].plot( s0, s0, '-', s0, s, '.' )       #plot of initial vs perturbed s
+# plt.xlabel('s0')
+# plt.ylabel('s')
+# ax[1].plot( s[1:-1], ds, '-' )                #plot of s vs non-constant ds
+# plt.xlabel('s')
+# plt.ylabel('ds')
 # plt.show()
 
 ###########################################################################
 
 #Set initial condition and fixed Dirichlet BC for U[0,:,:] (rho):
 
-U = np.zeros(( 3, nr, nth ))
+U = np.zeros(( 3, ns, nth ))
 U[0,:,:] = initialCondition( xx, yy )
 
 xB = innerRadius * np.cos(th)
@@ -122,33 +131,34 @@ rhoT = initialCondition( xT, yT )
 
 #Radial hyperviscosity coefficient (alp):
 
-if pol == 1 :
+if ( pol == 1 ) | ( pol == 2 ) :
     alp = 2^-9000
-elif pol == 3 :
+elif ( pol == 3 ) | ( pol == 4 ) :
     alp = -2.**-10.
-elif pol == 5 :
-    alp = 2**-12
-elif pol == 7 :
+elif ( pol == 5 ) | ( pol == 6 ) :
+    alp = 2.**-12.
+elif ( pol == 7 ) | ( pol == 8 ) :
     alp = -2**-14
-else :
+
+if stc == pol+1 :
     alp = 0.
 
 ###########################################################################
 
 #Radial weights arranged in a differentiation matrix:
 
-Wr   = phs1.getDM( x=r, X=r[1:-1], m=1     \
+Ws   = phs1.getDM( x=s, X=s[1:-1], m=1     \
 , phsDegree=phs, polyDegree=pol, stencilSize=stc )
 
-Whvr = phs1.getDM( x=r, X=r[1:-1], m=phs-1 \
+Whvs = phs1.getDM( x=s, X=s[1:-1], m=phs-1 \
 , phsDegree=phs, polyDegree=pol, stencilSize=stc )
 
 ###########################################################################
 
 #Modify the radial HV matrix to take into account the varying radii:
 
-drPol = spdiags( dr**pol, np.array([0]), len(dr), len(dr) )
-Whvr = alp * drPol.dot(Whvr)
+dsPol = spdiags( ds**pol, np.array([0]), len(ds), len(ds) )
+Whvs = alp * dsPol.dot(Whvs)
 
 ###########################################################################
 
@@ -165,31 +175,31 @@ Whvth = phs1.getPeriodicDM( period=2*np.pi, X=th, m=phs-1 \
 
 #Weights for interpolation to boundary and extrapolation to ghost-nodes:
 
-wIinner = phs1.getWeights( innerRadius, r[0:stc],   0, phs, pol )
-wEinner = phs1.getWeights( r[0],        r[1:stc+1], 0, phs, pol )
+wIinner = phs1.getWeights( innerRadius, s[0:stc],   0, phs, pol )
+wEinner = phs1.getWeights( s[0],        s[1:stc+1], 0, phs, pol )
 
-wIouter = phs1.getWeights( outerRadius, r[-1:-stc-1:-1], 0, phs, pol )
-wEouter = phs1.getWeights( r[-1],       r[-2:-stc-2:-1], 0, phs, pol )
+wIouter = phs1.getWeights( outerRadius, s[-1:-stc-1:-1], 0, phs, pol )
+wEouter = phs1.getWeights( s[-1],       s[-2:-stc-2:-1], 0, phs, pol )
 
 ###########################################################################
 
 #Interpolation from perturbed nodes to regular nodes for plotting:
 
-W = phs1.getDM( x=r, X=r0[1:-1], m=0 \
+W = phs1.getDM( x=s, X=s0[1:-1], m=0 \
 , phsDegree=phs, polyDegree=pol, stencilSize=stc )
 
 ###########################################################################
 
 #Functions to approximate differential operators and other things:
 
-def Dr( U ) :
-    return Wr.dot( U )
+def Ds( U ) :
+    return Ws.dot( U )
 
 def Dth( U ) :
     return np.transpose( Wth.dot( np.transpose(U) ) )
 
-def HVr( U ) :
-    return Whvr.dot( U )
+def HVs( U ) :
+    return Whvs.dot( U )
 
 def HVth( U ) :
     np.transpose( Whvth.dot( np.transpose(U) ) )
@@ -200,8 +210,8 @@ def setGhostNodes( U ) :
 
 def odefun( t, U ) :
     return annulus.odefun( t, U \
-    , setGhostNodes, Dr, Dth, HVr, HVth \
-    , thth[1:-1,:], rr[1:-1,:], c )
+    , setGhostNodes, Ds, Dth, HVs, HVth \
+    , thth[1:-1,:], ss[1:-1,:], c )
 
 if rkStages == 3 :
     rk = rk.rk3
@@ -228,10 +238,6 @@ for i in np.arange( 0, nTimesteps+1 ) :
             U = np.load( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy' )
         else :
             np.save( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy', U )
-        
-        # Uplot = np.zeros(( 3, nr-2, nth ))
-        # for k in range(3) :
-            # Uplot[k,:,:] = W.dot(U[k,:,:])
         
         plt.contourf( xx0, yy0, W.dot(U[0,:,:]), np.arange(-.255,.255+.01,.01) )
         plt.axis('equal')
