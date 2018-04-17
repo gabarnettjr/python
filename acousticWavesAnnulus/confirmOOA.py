@@ -13,7 +13,7 @@ from gab.acousticWaveEquation import annulus
 ord = np.inf                                   #norm to use for error check
 
 innerRadius = 1.
-outerRadius = 2.
+outerRadius = 5.
 tf          = 100.
 
 phs = 5
@@ -23,20 +23,22 @@ ptb = .30
 
 ns0 = 256+2                                          #reference resolution
 
-phs0 = 7
-pol0 = 6
+phs0 = 5
+pol0 = 3
 stc0 = 7
-ptb0 = .00
+ptb0 = .30
 
 ns1 = 16+2
-ns2 = 2*(ns1-2)+2
-ns3 = 2*(ns2-2)+2
-ns4 = 2*(ns3-2)+2
+ns2 = 32+2
+ns3 = 64+2
+ns4 = 128+2
+
+rSurf, rSurfPrime = annulus.getTopoFunc( innerRadius )
 
 ###########################################################################
 
 def loadResult( ns, phs, pol, stc, ptb, tf ) :
-    saveString = './results/'     \
+    saveString = './tmp/'   \
     + 'ns'   + '{0:1d}'.format(ns-2)   \
     + '_phs' + '{0:1d}'.format(phs)    \
     + '_pol' + '{0:1d}'.format(pol)    \
@@ -113,12 +115,12 @@ U4 = np.transpose( W4.dot(np.transpose(U4)) )
 
 ###########################################################################
 
-#Plot the error:
+#Plot the error to check convergence:
 
-err1 = np.linalg.norm( U1 - U0, ord )
-err2 = np.linalg.norm( U2 - U0, ord )
-err3 = np.linalg.norm( U3 - U0, ord )
-err4 = np.linalg.norm( U4 - U0, ord )
+err1 = np.linalg.norm( U1-U0, ord )
+err2 = np.linalg.norm( U2-U0, ord )
+err3 = np.linalg.norm( U3-U0, ord )
+err4 = np.linalg.norm( U4-U0, ord )
 err = np.hstack(( err1, err2, err3, err4 ))
 err = err / np.linalg.norm(U0,ord)
 
@@ -131,6 +133,39 @@ plt.plot( np.array([3.,5.]), np.array([-1.,-9.]), '-' )
 # plt.axis( 'equal' )
 plt.xlabel( 'log(ns)' )
 plt.ylabel( 'log(relMaxNormErr)' )
+plt.show()
+
+###########################################################################
+
+#Contour plot of differences at final time:
+
+thth0, ss0 = np.meshgrid( th0, s0[1:-1] )
+rr0 = annulus.getRadii( thth0, ss0, innerRadius, outerRadius, rSurf )
+xx0 = rr0 * np.cos(thth0)
+yy0 = rr0 * np.sin(thth0)
+
+nContours = 20
+
+plt.figure(1)
+plt.contourf( xx0, yy0, U1-U0, nContours )
+plt.axis('equal')
+plt.colorbar()
+
+plt.figure(2)
+plt.contourf( xx0, yy0, U2-U0, nContours )
+plt.axis('equal')
+plt.colorbar()
+
+plt.figure(3)
+plt.contourf( xx0, yy0, U3-U0, nContours )
+plt.axis('equal')
+plt.colorbar()
+
+plt.figure(4)
+plt.contourf( xx0, yy0, U4-U0, nContours )
+plt.axis('equal')
+plt.colorbar()
+
 plt.show()
 
 ###########################################################################
