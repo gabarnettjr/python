@@ -13,39 +13,46 @@ from gab.pseudospectral import periodic
 
 ###########################################################################
 
+c           = .1                                                #wave speed
 innerRadius = 1.
-outerRadius = 5.
-tf          = 100.                                              #final time
+outerRadius = 2.
+tf          = 10.                                               #final time
+k           = 100.                 #controls steepness of initial condition
 
 rkStages      = 3                    #number of Runge-Kutta stages (3 or 4)
-saveDel       = 10                         #time interval to save snapshots
+saveDel       = 1                          #time interval to save snapshots
 plotFromSaved = 0                            #if 1, load instead of compute
 
-c  = 1./10.                                                     #wave speed
-ns = 16+2                                         #total number of s levels
-dt = 1./2.                                                         #delta t
+ns = 256+2                                        #total number of s levels
+dt = 1./80                                                         #delta t
 
-phs = 5                                      #PHS RBF exponent (odd number)
-pol = 3                                                  #polynomial degree
-stc = 7                                                       #stencil size
-ptb = .30                            #random radial perturbation percentage
+phs = 7                                      #PHS RBF exponent (odd number)
+pol = 5                                                  #polynomial degree
+stc = 13                                                      #stencil size
+ptb = .00                            #random radial perturbation percentage
 
-xc1 = 0.                                                #x-coord of GA bell
-yc1 = ( innerRadius + outerRadius ) / 2.                #y-coord of GA bell
+xc1 = (innerRadius+outerRadius)/2.*np.cos(np.pi/4)      #x-coord of GA bell
+yc1 = (innerRadius+outerRadius)/2.*np.sin(np.pi/4)      #y-coord of GA bell
 def initialCondition( x, y ) :
-    return np.exp( -5.*( (x-xc1)**2. + (y-yc1)**2. ) )
+    return np.exp( -k*( (x-xc1)**2. + (y-yc1)**2. ) )
 
 rSurf, dsdth, dsdr \
 = annulus.getHeightCoordinate( outerRadius, innerRadius )
 
 ###########################################################################
 
-saveString = './tmp/'  \
-+ 'ns'   + '{0:1d}'.format(ns-2)  \
-+ '_phs' + '{0:1d}'.format(phs)   \
+saveString = 'c' + '{0:1.2f}'.format(c)  \
++ '_ri' + '{0:1.0f}'.format(innerRadius) \
++ '_ro' + '{0:1.0f}'.format(outerRadius) \
++ '_tf' + '{0:04.0f}'.format(tf)         \
++ '_k'  + '{0:03.0f}'.format(k)
+
+saveString = saveString + '/'     \
++ 'phs'  + '{0:1d}'.format(phs)   \
 + '_pol' + '{0:1d}'.format(pol)   \
 + '_stc' + '{0:1d}'.format(stc)   \
 + '_ptb' + '{0:1.2f}'.format(ptb) \
++ '_ns'  + '{0:1d}'.format(ns-2)  \
 + '/'
 
 if os.path.exists( saveString+'*.npy' ) :
@@ -67,12 +74,14 @@ th = th[0:-1]                            #remove last angle (same as first)
 ds = ( outerRadius - innerRadius ) / (ns-2)               #constant delta s
 s0 = np.linspace( innerRadius-ds/2, outerRadius+ds/2, ns )        #s vector
 ptb = ptb * ds                                #relative perturbation factor
-ran = -ptb + 2*ptb*np.random.rand(len(s0))             #perturbation vector
+ran = -ptb + 2*ptb*np.random.rand(len(s0))      #random perturbation vector
 s = s0.copy()
 s = s + ran                                    #s vector after perturbation
-ds = (s[2:len(s)]-s[0:len(s)-2])/2.                   #non-constant delta s
+ds = ( s[2:len(s)] - s[0:len(s)-2] ) / 2.             #non-constant delta s
 
 np.save( saveString+'s'+'.npy', s )                #save vector of s values
+
+###########################################################################
 
 thth, ss = np.meshgrid( th, s )      #mesh of perturbed s values and angles
 rr = annulus.getRadii( thth, ss \
@@ -90,7 +99,7 @@ yy0 = rr0 * np.sin(thth0)                             #mesh of reg x-coords
 
 #Plot showing how much the radii have been perturbed:
 
-# fig, ax = plt.subplots( 1, 2, figsize=(10,5) )
+# fig, ax = plt.subplots( 1, 2, figsize=(8,4) )
 # ax[0].plot( s0, s0, '-', s0, s, '.' )       #plot of initial vs perturbed s
 # plt.xlabel('s0')
 # plt.ylabel('s')
@@ -98,6 +107,7 @@ yy0 = rr0 * np.sin(thth0)                             #mesh of reg x-coords
 # plt.xlabel('s')
 # plt.ylabel('ds')
 # plt.show()
+# sys.exit("\nStop here for now.\n")
 
 ###########################################################################
 
@@ -202,8 +212,15 @@ def HVth( U ) :
     return np.transpose( Whvth.dot( np.transpose(U) ) )
 
 def setGhostNodes( U ) :
-    return annulus.setGhostNodes( U \
-    , rhoB, rhoT, wIinner, wEinner, wIouter, wEouter, stc )
+    return annulus.setGhostNodesNoLoop( U \
+    , rhoB, rhoT \
+    , np.transpose(np.tile(wIinner,(nth,1))) \
+    , np.transpose(np.tile(wEinner,(nth,1))) \
+    , np.transpose(np.tile(wIouter,(nth,1))) \
+    , np.transpose(np.tile(wEouter,(nth,1))) \
+    , stc )
+    # return annulus.setGhostNodes( U \
+    # , rhoB, rhoT, wIinner, wEinner, wIouter, wEouter, stc )
 
 def odefun( t, U ) :
     return annulus.odefun( t, U \
