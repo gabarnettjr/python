@@ -14,9 +14,12 @@ c           = .1                                                #wave speed
 innerRadius = 1.
 outerRadius = 2.
 tf          = 10.                                               #final time
-k           = 100.                 #controls steepness of initial condition
+k           = 200.                 #controls steepness of initial condition
+amp         = .05                 #amplitude of trigonometric topo function
 
 ord = np.inf                                   #norm to use for error check
+
+contourErrors = 1
 
 phsA = 5
 polA = 3
@@ -31,26 +34,25 @@ ptbB = .30
 phs0 = 7
 pol0 = 5
 stc0 = 13
-ptb0 = .30
+ptb0 = .00
 
 ns0 = 256+2                                           #reference resolution
 ns1 = 16+2
-ns2 = 32+2
-ns3 = 64+2
-ns4 = 128+2
+ns2 = 16+2
+ns3 = 32+2
+ns4 = 64+2
 ns5 = 128+2
-
-rSurf, rSurfPrime = annulus.getTopoFunc( innerRadius )
 
 ###########################################################################
 
 def loadSingleResult( ns, phs, pol, stc, ptb ) :
     
-    saveString = 'c' + '{0:1.2f}'.format(c)  \
-    + '_ri' + '{0:1.0f}'.format(innerRadius) \
-    + '_ro' + '{0:1.0f}'.format(outerRadius) \
-    + '_tf' + '{0:04.0f}'.format(tf)         \
-    + '_k'  + '{0:03.0f}'.format(k)
+    saveString = 'c' + '{0:1.2f}'.format(c)   \
+    + '_ri'  + '{0:1.0f}'.format(innerRadius) \
+    + '_ro'  + '{0:1.0f}'.format(outerRadius) \
+    + '_tf'  + '{0:04.0f}'.format(tf)         \
+    + '_k'   + '{0:03.0f}'.format(k)          \
+    + '_amp' + '{0:1.2f}'.format(amp)
 
     saveString = saveString + '/'     \
     + 'phs'  + '{0:1d}'.format(phs)   \
@@ -188,14 +190,17 @@ def getErrorVector( ns0, ns1, ns2, ns3, ns4, ns5, phs, pol, stc, ptb ) :
 
     err = gatherErrors( U0, U1, U2, U3, U4, U5 )
     
-    return err
+    return err, U0, U1, U2, U3, U4, U5, th0, s0
 
 ###########################################################################
 
 #Plot the error to check convergence:
 
-errA = getErrorVector( ns0, ns1, ns2, ns3, ns4, ns5, phsA, polA, stcA, ptbA )
-errB = getErrorVector( ns0, ns1, ns2, ns3, ns4, ns5, phsB, polB, stcB, ptbB )
+errA, U0, U1, U2, U3, U4, U5, th0, s0 \
+= getErrorVector( ns0, ns1, ns2, ns3, ns4, ns5, phsA, polA, stcA, ptbA )
+
+errB, U0, U1, U2, U3, U4, U5, th0, s0 \
+= getErrorVector( ns0, ns1, ns2, ns3, ns4, ns5, phsB, polB, stcB, ptbB )
 
 ns= np.hstack(( ns1, ns2, ns3, ns4, ns5 ))
 ns = ns - 2
@@ -216,38 +221,42 @@ plt.show()
 
 #Contour plot of differences at final time:
 
-# thth0, ss0 = np.meshgrid( th0, s0[1:-1] )
-# rr0 = annulus.getRadii( thth0, ss0, innerRadius, outerRadius, rSurf )
-# xx0 = rr0 * np.cos(thth0)
-# yy0 = rr0 * np.sin(thth0)
+if contourErrors == 1 :
 
-# nContours = 20
+    rSurf, rSurfPrime = annulus.getTopoFunc( innerRadius, amp )
 
-# plt.figure(1)
-# plt.contourf( xx0, yy0, U1-U0, nContours )
-# plt.axis('equal')
-# plt.colorbar()
+    thth0, ss0 = np.meshgrid( th0, s0[1:-1] )
+    rr0 = annulus.getRadii( thth0, ss0, innerRadius, outerRadius, rSurf )
+    xx0 = rr0 * np.cos(thth0)
+    yy0 = rr0 * np.sin(thth0)
 
-# plt.figure(2)
-# plt.contourf( xx0, yy0, U2-U0, nContours )
-# plt.axis('equal')
-# plt.colorbar()
+    nContours = 20
 
-# plt.figure(3)
-# plt.contourf( xx0, yy0, U3-U0, nContours )
-# plt.axis('equal')
-# plt.colorbar()
+    plt.figure(1)
+    plt.contourf( xx0, yy0, U1-U0, nContours )
+    plt.axis('equal')
+    plt.colorbar()
 
-# plt.figure(4)
-# plt.contourf( xx0, yy0, U4-U0, nContours )
-# plt.axis('equal')
-# plt.colorbar()
+    plt.figure(2)
+    plt.contourf( xx0, yy0, U2-U0, nContours )
+    plt.axis('equal')
+    plt.colorbar()
 
-# plt.figure(5)
-# plt.contourf( xx0, yy0, U5-U0, nContours )
-# plt.axis('equal')
-# plt.colorbar()
+    plt.figure(3)
+    plt.contourf( xx0, yy0, U3-U0, nContours )
+    plt.axis('equal')
+    plt.colorbar()
 
-# plt.show()
+    plt.figure(4)
+    plt.contourf( xx0, yy0, U4-U0, nContours )
+    plt.axis('equal')
+    plt.colorbar()
+
+    plt.figure(5)
+    plt.contourf( xx0, yy0, U5-U0, nContours )
+    plt.axis('equal')
+    plt.colorbar()
+
+    plt.show()
 
 ###########################################################################
