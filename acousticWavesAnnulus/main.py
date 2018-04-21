@@ -16,7 +16,7 @@ from gab.pseudospectral import periodic
 c           = .1                                                #wave speed
 innerRadius = 1.
 outerRadius = 2.
-tf          = 40.                                               #final time
+tf          = 20.                                               #final time
 k           = 200.                 #controls steepness of initial condition
 amp         = .10                 #amplitude of trigonometric topo function
 
@@ -36,7 +36,7 @@ dt = np.float64(sys.argv[7])                                       #delta t
 rSurf, dsdth, dsdr \
 = annulus.getHeightCoordinate( outerRadius, innerRadius, amp )
 
-tmp = np.pi/2.
+tmp = np.pi
 xc1 = (rSurf(tmp)+outerRadius)/2.*np.cos(tmp)      #x-coord of GA bell
 yc1 = (rSurf(tmp)+outerRadius)/2.*np.sin(tmp)      #y-coord of GA bell
 def initialCondition( x, y ) :
@@ -285,8 +285,8 @@ for i in np.arange( 0, nTimesteps+1 ) :
         else :
             np.save( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy', U )
         
-        plt.contourf( xx0, yy0, W.dot(U[0,:,:]), 20 )
-        # plt.contourf( xx0, yy0, W.dot(U[0,:,:]), np.arange(-.27,.27+.02,.02) )
+        # plt.contourf( xx0, yy0, W.dot(U[0,:,:]), 20 )
+        plt.contourf( xx0, yy0, W.dot(U[0,:,:]), np.arange(-.17,.17+.02,.02) )
         plt.axis('equal')
         plt.colorbar()
         fig.savefig( '{0:04d}'.format(np.int(np.round(t)+1e-12))+'.png', bbox_inches = 'tight' )
