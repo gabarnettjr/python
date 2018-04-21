@@ -16,19 +16,19 @@ from gab.pseudospectral import periodic
 c           = .1                                                #wave speed
 innerRadius = 1.
 outerRadius = 2.
-tf          = 1000.                                             #final time
-k           = 20.                  #controls steepness of initial condition
-amp         = .05                 #amplitude of trigonometric topo function
+tf          = 40.                                               #final time
+k           = 200.                 #controls steepness of initial condition
+amp         = .10                 #amplitude of trigonometric topo function
 
-saveDel       = 100                        #time interval to save snapshots
+saveDel       = 2                          #time interval to save snapshots
 plotFromSaved = 0                            #if 1, load instead of compute
 
-rkStages = np.int64(sys.argv[1])     #number of Runge-Kutta stages (3 or 4)
+phs = np.int64(sys.argv[1])                  #PHS RBF exponent (odd number)
+pol = np.int64(sys.argv[2])                              #polynomial degree
+stc = np.int64(sys.argv[3])                                   #stencil size
+ptb = np.float64(sys.argv[4])        #random radial perturbation percentage
 
-phs = np.int64(sys.argv[2])                  #PHS RBF exponent (odd number)
-pol = np.int64(sys.argv[3])                              #polynomial degree
-stc = np.int64(sys.argv[4])                                   #stencil size
-ptb = np.float64(sys.argv[5])        #random radial perturbation percentage
+rkStages = np.int64(sys.argv[5])     #number of Runge-Kutta stages (3 or 4)
 
 ns = np.int64(sys.argv[6])+2                      #total number of s levels
 dt = np.float64(sys.argv[7])                                       #delta t
@@ -103,6 +103,11 @@ thth = thth[1:-1,:]                                     #remove ghost nodes
 rr = rr[1:-1,:]                                         #remove ghost nodes
 dsdth = dsdth( thth, rr )                   #overwrite function with values
 dsdr  = dsdr( thth, rr )                    #overwrite function with values
+
+cosTh = np.cos(thth)
+sinTh = np.sin(thth)
+cosThOverR = cosTh/rr
+sinThOverR = sinTh/rr
 
 thth0, ss0 = np.meshgrid( th, s0[1:-1] )                 #mesh for plotting
 rr0 = annulus.getRadii( thth0, ss0 \
@@ -222,26 +227,37 @@ W = phs1.getDM( x=s, X=s0[1:-1], m=0 \
 
 #Functions to approximate differential operators and other things:
 
-def Ds( U ) :
+def Ds(U) :
     return Ws @ U
 
-def Dth( U ) :
-    return U @ Wth
+def Dlam(U) :
+    return U[1:-1,:] @ Wth
 
-def HVs( U ) :
-    return Whvs @ U
+def Dr(U) :
+    return dsdr * Ds(U)
 
-def HVth( U ) :
-    return U @ Whvth
+def Dth(U) :
+    return Dlam(U) + dsdth * Ds(U)
+
+def Dx(U) :
+    return cosTh * Dr(U) - sinThOverR * Dth(U)
+
+def Dy(U) :
+    return sinTh * Dr(U) + cosThOverR * Dth(U)
+
+def HV(U) :
+    return ( Whvs @ U ) + ( U[1:-1,:] @ Whvth )
 
 def setGhostNodes( U ) :
     return annulus.setGhostNodesNoLoop( U \
     , rhoB, rhoT, wIinner, wEinner, wIouter, wEouter, stc )
 
 def odefun( t, U ) :
-    return annulus.odefun( t, U         \
-    , setGhostNodes, Ds, Dth, HVs, HVth \
-    , thth, rr, c, dsdth, dsdr )
+    return annulus.odefunCartesian( t, U \
+    , setGhostNodes, Dx, Dy, HV, c )
+    # return annulus.odefun( t, U         \
+    # , setGhostNodes, Ds, Dth, HVs, HVth \
+    # , thth, rr, c, dsdth, dsdr )
 
 if rkStages == 3 :
     rk = rk.rk3
