@@ -16,11 +16,11 @@ from gab.pseudospectral import periodic
 c           = .1                                                #wave speed
 innerRadius = 1.
 outerRadius = 2.
-tf          = 10.                                               #final time
-k           = 200.                 #controls steepness of initial condition
+tf          = 1000.                                             #final time
+k           = 20.                  #controls steepness of initial condition
 amp         = .05                 #amplitude of trigonometric topo function
 
-saveDel       = 1                          #time interval to save snapshots
+saveDel       = 100                        #time interval to save snapshots
 plotFromSaved = 0                            #if 1, load instead of compute
 
 rkStages = np.int64(sys.argv[1])     #number of Runge-Kutta stages (3 or 4)
@@ -33,13 +33,14 @@ ptb = np.float64(sys.argv[5])        #random radial perturbation percentage
 ns = np.int64(sys.argv[6])+2                      #total number of s levels
 dt = np.float64(sys.argv[7])                                       #delta t
 
-xc1 = (innerRadius+outerRadius)/2.*np.cos(np.pi/4)      #x-coord of GA bell
-yc1 = (innerRadius+outerRadius)/2.*np.sin(np.pi/4)      #y-coord of GA bell
-def initialCondition( x, y ) :
-    return np.exp( -k*( (x-xc1)**2. + (y-yc1)**2. ) )
-
 rSurf, dsdth, dsdr \
 = annulus.getHeightCoordinate( outerRadius, innerRadius, amp )
+
+tmp = np.pi/2.
+xc1 = (rSurf(tmp)+outerRadius)/2.*np.cos(tmp)      #x-coord of GA bell
+yc1 = (rSurf(tmp)+outerRadius)/2.*np.sin(tmp)      #y-coord of GA bell
+def initialCondition( x, y ) :
+    return np.exp( -k*( (x-xc1)**2. + (y-yc1)**2. ) )
 
 ###########################################################################
 
@@ -268,14 +269,15 @@ for i in np.arange( 0, nTimesteps+1 ) :
         else :
             np.save( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy', U )
         
-        plt.contourf( xx0, yy0, W.dot(U[0,:,:]), np.arange(-.255,.255+.01,.01) )
+        plt.contourf( xx0, yy0, W.dot(U[0,:,:]), 20 )
+        # plt.contourf( xx0, yy0, W.dot(U[0,:,:]), np.arange(-.27,.27+.02,.02) )
         plt.axis('equal')
         plt.colorbar()
         fig.savefig( '{0:04d}'.format(np.int(np.round(t)+1e-12))+'.png', bbox_inches = 'tight' )
         plt.clf()
         
-        if np.max(np.abs(U)) > 10. :
-            sys.exit("\nUnstable in time.\n")
+        # if np.max(np.abs(U)) > 10. :
+            # sys.exit("\nUnstable in time.\n")
         
     if plotFromSaved == 1 :
         t = t + dt
