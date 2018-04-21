@@ -13,14 +13,14 @@ from gab.pseudospectral import periodic
 
 ###########################################################################
 
-c           = .1                                                #wave speed
+c           = .1                                               #wave speed
 innerRadius = 1.
 outerRadius = 2.
-tf          = 20.                                               #final time
+tf          = 10.                                               #final time
 k           = 200.                 #controls steepness of initial condition
 amp         = .10                 #amplitude of trigonometric topo function
 
-saveDel       = 2                          #time interval to save snapshots
+saveDel       = 1                          #time interval to save snapshots
 plotFromSaved = 0                            #if 1, load instead of compute
 
 phs = np.int64(sys.argv[1])                  #PHS RBF exponent (odd number)
@@ -173,7 +173,7 @@ if stc == pol+1 :
 
 ###########################################################################
 
-#Radial weights arranged in a differentiation matrix:
+#Radial FD weights arranged in a differentiation matrix:
 
 Ws   = phs1.getDM( x=s, X=s[1:-1], m=1     \
 , phsDegree=phs, polyDegree=pol, stencilSize=stc )
@@ -254,10 +254,8 @@ def setGhostNodes( U ) :
 
 def odefun( t, U ) :
     return annulus.odefunCartesian( t, U \
-    , setGhostNodes, Dx, Dy, HV, c )
-    # return annulus.odefun( t, U         \
-    # , setGhostNodes, Ds, Dth, HVs, HVth \
-    # , thth, rr, c, dsdth, dsdr )
+    , setGhostNodes, Dx, Dy, HV          \
+    , c )
 
 if rkStages == 3 :
     rk = rk.rk3
