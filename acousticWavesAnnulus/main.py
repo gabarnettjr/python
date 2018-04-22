@@ -121,11 +121,11 @@ yy0 = rr0 * np.sin(thth0)                             #mesh of reg x-coords
 
 # fig, ax = plt.subplots( 1, 2, figsize=(8,4) )
 # ax[0].plot( s0, s0, '-', s0, s, '.' )       #plot of initial vs perturbed s
-# plt.xlabel('s0')
-# plt.ylabel('s')
+# ax[0].set_xlabel('s0')
+# ax[0].set_ylabel('s')
 # ax[1].plot( s[1:-1], ds, '-' )                #plot of s vs non-constant ds
-# plt.xlabel('s')
-# plt.ylabel('ds')
+# ax[1].set_xlabel('s')
+# ax[1].set_ylabel('ds')
 # plt.show()
 # sys.exit("\nStop here for now.\n")
 
@@ -152,6 +152,8 @@ rhoT = initialCondition( xT, yT )
 # , xB, yB, "-" \
 # , xT, yT, "-" )
 # plt.axis('equal')
+# plt.xlabel( 'x' )
+# plt.ylabel( 'y' )
 # plt.show()
 # sys.exit("\nStop here for now.\n")
 
