@@ -7,31 +7,33 @@ from scipy.sparse import spdiags
 
 sys.path.append( '../site-packages' )
 
-from gab import rk, phs1
+from gab import rk, phs1, phs2
 from gab.acousticWaveEquation import annulus
 from gab.pseudospectral import periodic
 
 ###########################################################################
 
-c           = .1                                               #wave speed
-innerRadius = 1.
-outerRadius = 2.
+dimSplit = np.int64(sys.argv[1])    #if 1, then use fully 2D approximations
+
+c           = .1                                                #wave speed
+innerRadius = 3.
+outerRadius = 4.
 tf          = 10.                                               #final time
 k           = 200.                 #controls steepness of initial condition
-amp         = .10                 #amplitude of trigonometric topo function
+amp         = .05                 #amplitude of trigonometric topo function
 
 saveDel       = 1                          #time interval to save snapshots
 plotFromSaved = 0                            #if 1, load instead of compute
 
-phs = np.int64(sys.argv[1])                  #PHS RBF exponent (odd number)
-pol = np.int64(sys.argv[2])                              #polynomial degree
-stc = np.int64(sys.argv[3])                                   #stencil size
-ptb = np.float64(sys.argv[4])        #random radial perturbation percentage
+phs = np.int64(sys.argv[2])                  #PHS RBF exponent (odd number)
+pol = np.int64(sys.argv[3])                              #polynomial degree
+stc = np.int64(sys.argv[4])                                   #stencil size
+ptb = np.float64(sys.argv[5])        #random radial perturbation percentage
 
-rkStages = np.int64(sys.argv[5])     #number of Runge-Kutta stages (3 or 4)
+rkStages = np.int64(sys.argv[6])     #number of Runge-Kutta stages (3 or 4)
 
-ns = np.int64(sys.argv[6])+2                      #total number of s levels
-dt = np.float64(sys.argv[7])                                       #delta t
+ns = np.int64(sys.argv[7])+2                      #total number of s levels
+dt = np.float64(sys.argv[8])                                       #delta t
 
 rSurf, dsdth, dsdr \
 = annulus.getHeightCoordinate( outerRadius, innerRadius, amp )
@@ -98,6 +100,8 @@ rr = annulus.getRadii( thth, ss \
 , innerRadius, outerRadius, rSurf )                #mesh of perturbed radii
 xx = rr * np.cos(thth)                               #mesh of x-coordinates
 yy = rr * np.sin(thth)                               #mesh of y-coordinates
+xxi = xx[1:-1,:]                                       #exclude ghost nodes
+yyi = yy[1:-1,:]                                       #exclude ghost nodes
 
 thth = thth[1:-1,:]                                     #remove ghost nodes
 rr = rr[1:-1,:]                                         #remove ghost nodes
@@ -175,6 +179,30 @@ if stc == pol+1 :
 
 ###########################################################################
 
+#Get fully 2D Cartesian DMs:
+
+if dimSplit != 1 :
+    
+    stencils = phs2.getStencils( xx.flatten(), yy.flatten() \
+    , xxi.flatten(), yyi.flatten(), stc )
+    
+    A = phs2.getAmatrices( stencils, phs, pol )
+    
+    K = np.int( np.round( (phs-1)/2 ) )
+    
+    Wx  = phs2.getWeights( stencils, A, "1",  0 )
+    Wy  = phs2.getWeights( stencils, A, "2",  0 )
+    
+    Wth_2D = np.transpose(np.tile(-yyi.flatten(),(stc,1))) * Wx \
+           + np.transpose(np.tile( xxi.flatten(),(stc,1))) * Wy
+    
+    Whv = phs2.getWeights( stencils, A, "hv", K )
+    Whv = alp * stencils.h**pol * Whv
+    
+    stc = 7
+
+###########################################################################
+
 #Radial FD weights arranged in a differentiation matrix:
 
 Ws   = phs1.getDM( x=s, X=s[1:-1], m=1     \
@@ -184,21 +212,19 @@ Whvs = phs1.getDM( x=s, X=s[1:-1], m=phs-1 \
 , phsDegree=phs, polyDegree=pol, stencilSize=stc )
 
 dsPol = spdiags( ds**pol, np.array([0]), len(ds), len(ds) )
-Whvs = alp * dsPol.dot(Whvs)                       #scaled radial HV matrix
+Whvs = alp * dsPol.dot(Whvs)                   #scaled radial HV matrix
 
 ###########################################################################
 
 #Angular FD weights arranged in a differentiation matrix:
 
-# Wth = periodic.getDM( th=th, TH=th, m=1 )
+Wth   = phs1.getPeriodicDM( period=2*np.pi, X=th, m=1     \
+, phsDegree=phs, polyDegree=pol, stencilSize=stc )
 
-Wth   = phs1.getPeriodicDM( period=2*np.pi, X=th, m=1 \
-, phsDegree=9, polyDegree=7, stencilSize=17 )
+Whvth = phs1.getPeriodicDM( period=2*np.pi, X=th, m=phs-1 \
+, phsDegree=phs, polyDegree=pol, stencilSize=stc )
 
-Whvth = phs1.getPeriodicDM( period=2*np.pi, X=th, m=8 \
-, phsDegree=9, polyDegree=7, stencilSize=17 )
-
-Whvth = -2.**-15. * dth**7. * Whvth              #scaled angular HV matrix
+Whvth = alp * dth**pol * Whvth              #scaled angular HV matrix
 
 Wth = np.transpose( Wth )                 #work on rows instead of columns
 Whvth = np.transpose( Whvth )             #work on rows instead of columns
@@ -229,29 +255,69 @@ W = phs1.getDM( x=s, X=s0[1:-1], m=0 \
 
 #Functions to approximate differential operators and other things:
 
-def Ds(U) :
-    return Ws @ U
-
-def Dlam(U) :
-    return U[1:-1,:] @ Wth
-
-def Dr(U) :
-    return dsdr * Ds(U)
-
-def Dth(U) :
-    return Dlam(U) + dsdth * Ds(U)
-
-def Dx(U) :
-    return cosTh * Dr(U) - sinThOverR * Dth(U)
-
-def Dy(U) :
-    return sinTh * Dr(U) + cosThOverR * Dth(U)
-
-def HV(U) :
-    return ( Whvs @ U ) + ( U[1:-1,:] @ Whvth )
+if dimSplit == 1 :
+    
+    def Ds(U) :
+        return Ws @ U
+    
+    def Dlam(U) :
+        return U[1:-1,:] @ Wth
+    
+    def Dr(U) :
+        return dsdr * Ds(U)
+    
+    def Dth(U) :
+        return Dlam(U) + dsdth * Ds(U)
+    
+    def Dx(U) :
+        return cosTh * Dr(U) - sinThOverR * Dth(U)
+    
+    def Dy(U) :
+        return sinTh * Dr(U) + cosThOverR * Dth(U)
+    
+    def HV(U) :
+        return ( Whvs @ U ) + ( U[1:-1,:] @ Whvth )
+    
+else :
+    
+    # def DX(U) :
+        # U = U.flatten()
+        # U = np.sum( Wx*U[stencils.idx], axis=1 )
+        # return np.reshape( U, (ns-2,nth) )
+    
+    # def DY(U) :
+        # U = U.flatten()
+        # U = np.sum( Wy*U[stencils.idx], axis=1 )
+        # return np.reshape( U, (ns-2,nth) )
+    
+    def Ds(U) :
+        return Ws @ U
+    
+    def Dr(U) :
+        return dsdr * Ds(U)
+    
+    def Dth(U) :
+        U = U.flatten()
+        U = np.sum( Wth_2D*U[stencils.idx], axis=1 )
+        return np.reshape( U, (ns-2,nth) )
+        # return -yyi * DX(U) + xxi * DY(U)
+    
+    def Dx(U) :
+        return cosTh * Dr(U) - sinThOverR * Dth(U)
+    
+    def Dy(U) :
+        return sinTh * Dr(U) + cosThOverR * Dth(U)
+    
+    def HV(U) :
+        return ( Whvs @ U ) + ( U[1:-1,:] @ Whvth )
+    
+    # def HV(U) :
+        # U = U.flatten()
+        # U = np.sum( Whv*U[stencils.idx], axis=1 )
+        # return np.reshape( U, (ns-2,nth) )
 
 def setGhostNodes( U ) :
-    return annulus.setGhostNodesNoLoop( U \
+    return annulus.setGhostNodes1D( U \
     , rhoB, rhoT, wIinner, wEinner, wIouter, wEouter, stc )
 
 def odefun( t, U ) :
@@ -292,8 +358,8 @@ for i in np.arange( 0, nTimesteps+1 ) :
         fig.savefig( '{0:04d}'.format(np.int(np.round(t)+1e-12))+'.png', bbox_inches = 'tight' )
         plt.clf()
         
-        # if np.max(np.abs(U)) > 10. :
-            # sys.exit("\nUnstable in time.\n")
+        if np.max(np.abs(U)) > 10. :
+            sys.exit("\nUnstable in time.\n")
         
     if plotFromSaved == 1 :
         t = t + dt
