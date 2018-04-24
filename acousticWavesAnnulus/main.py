@@ -13,16 +13,16 @@ from gab.pseudospectral import periodic
 
 ###########################################################################
 
-dimSplit = np.int64(sys.argv[1])    #if 1, then use fully 2D approximations
+dimSplit = np.int64(sys.argv[1])               #0:none, 1:some, 2:fullSplit
 
 c           = .1                                                #wave speed
-innerRadius = 3.
-outerRadius = 4.
-tf          = 10.                                               #final time
-k           = 200.                 #controls steepness of initial condition
-amp         = .05                 #amplitude of trigonometric topo function
+innerRadius = 1.
+outerRadius = 2.
+tf          = 60.                                               #final time
+k           = 100.                 #controls steepness of initial condition
+amp         = .05        #relative amplitude of trigonometric topo function
 
-saveDel       = 1                          #time interval to save snapshots
+saveDel       = 2                          #time interval to save snapshots
 plotFromSaved = 0                            #if 1, load instead of compute
 
 phs = np.int64(sys.argv[2])                  #PHS RBF exponent (odd number)
@@ -39,8 +39,8 @@ rSurf, dsdth, dsdr \
 = annulus.getHeightCoordinate( outerRadius, innerRadius, amp )
 
 tmp = np.pi
-xc1 = (rSurf(tmp)+outerRadius)/2.*np.cos(tmp)      #x-coord of GA bell
-yc1 = (rSurf(tmp)+outerRadius)/2.*np.sin(tmp)      #y-coord of GA bell
+xc1 = (rSurf(tmp)+outerRadius)/2.*np.cos(tmp)           #x-coord of GA bell
+yc1 = (rSurf(tmp)+outerRadius)/2.*np.sin(tmp)           #y-coord of GA bell
 def initialCondition( x, y ) :
     return np.exp( -k*( (x-xc1)**2. + (y-yc1)**2. ) )
 
@@ -55,12 +55,13 @@ saveString = 'c' + '{0:1.2f}'.format(c)   \
 + '_k'   + '{0:03.0f}'.format(k)          \
 + '_amp' + '{0:1.2f}'.format(amp)
 
-saveString = saveString + '/'     \
-+ 'phs'  + '{0:1d}'.format(phs)   \
-+ '_pol' + '{0:1d}'.format(pol)   \
-+ '_stc' + '{0:1d}'.format(stc)   \
-+ '_ptb' + '{0:1.2f}'.format(ptb) \
-+ '_ns'  + '{0:1d}'.format(ns-2)  \
+saveString = saveString + '/'            \
++ 'dimSplit' + '{0:1d}'.format(dimSplit) \
++ '_phs'     + '{0:1d}'.format(phs)      \
++ '_pol'     + '{0:1d}'.format(pol)      \
++ '_stc'     + '{0:1d}'.format(stc)      \
++ '_ptb'     + '{0:1.2f}'.format(ptb)    \
++ '_ns'      + '{0:1d}'.format(ns-2)     \
 + '/'
 
 if os.path.exists( saveString+'*.npy' ) :
@@ -113,7 +114,7 @@ sinTh = np.sin(thth)
 cosThOverR = cosTh/rr
 sinThOverR = sinTh/rr
 
-thth0, ss0 = np.meshgrid( th, s0[1:-1] )                 #mesh for plotting
+thth0, ss0 = np.meshgrid( th, s0[1:-1] )         #regular mesh for plotting
 rr0 = annulus.getRadii( thth0, ss0 \
 , innerRadius, outerRadius, rSurf )                  #mesh of regular radii
 xx0 = rr0 * np.cos(thth0)                             #mesh of reg x-coords
@@ -179,27 +180,43 @@ if stc == pol+1 :
 
 ###########################################################################
 
-#Get fully 2D Cartesian DMs:
-
-if dimSplit != 1 :
+if ( dimSplit != 2 ) & ( plotFromSaved != 1 ) :
+    
+    #Get fully 2D Cartesian DMs:
     
     stencils = phs2.getStencils( xx.flatten(), yy.flatten() \
     , xxi.flatten(), yyi.flatten(), stc )
     
-    A = phs2.getAmatrices( stencils, phs, pol )
+    if dimSplit == 1 :
+        A = phs2.getAmatrices( stencils, phs, pol )
+        Wx  = phs2.getWeights( stencils, A, "1",  0 )
+        Wy  = phs2.getWeights( stencils, A, "2",  0 )
+        Wth = np.transpose(np.tile(-yyi.flatten(),(stc,1))) * Wx \
+            + np.transpose(np.tile( xxi.flatten(),(stc,1))) * Wy
+    elif dimSplit == 0 :
+        e1 = np.transpose( np.vstack(( -yyi.flatten(), xxi.flatten() )) )
+        nm = np.sqrt( e1[:,0]**2. + e1[:,1]**2. )
+        e1 = e1 / np.transpose(np.tile(nm,(2,1)))
+        e2 = np.transpose( np.vstack((  xxi.flatten(), yyi.flatten() )) )
+        nm = np.sqrt( e2[:,0]**2. + e2[:,1]**2. )
+        e2 = e2 / np.transpose(np.tile(nm,(2,1)))
+        stencils = phs2.rotateStencils( stencils, e1, e2 )
+        A = phs2.getAmatrices( stencils, phs, pol )
+        Wx1 = phs2.getWeights( stencils, A, "1", 0 )
+        Wx2 = phs2.getWeights( stencils, A, "2", 0 )
+        Wx = Wx1 * stencils.dx1dx + Wx2 * stencils.dx2dx
+        Wy = Wx1 * stencils.dx1dy + Wx2 * stencils.dx2dy
     
     K = np.int( np.round( (phs-1)/2 ) )
-    
-    Wx  = phs2.getWeights( stencils, A, "1",  0 )
-    Wy  = phs2.getWeights( stencils, A, "2",  0 )
-    
-    Wth_2D = np.transpose(np.tile(-yyi.flatten(),(stc,1))) * Wx \
-           + np.transpose(np.tile( xxi.flatten(),(stc,1))) * Wy
-    
     Whv = phs2.getWeights( stencils, A, "hv", K )
-    Whv = alp * stencils.h**pol * Whv
+    Whv = alp * stencils.h**(2*K-1) * Whv
     
-    stc = 7
+    if pol == 3 :
+        stc = 9
+    elif pol == 5 :
+        stc = 21
+    else :
+        sys.exit("\nOnly using pol=3 and pol=5 right now.\n")
 
 ###########################################################################
 
@@ -212,22 +229,22 @@ Whvs = phs1.getDM( x=s, X=s[1:-1], m=phs-1 \
 , phsDegree=phs, polyDegree=pol, stencilSize=stc )
 
 dsPol = spdiags( ds**pol, np.array([0]), len(ds), len(ds) )
-Whvs = alp * dsPol.dot(Whvs)                   #scaled radial HV matrix
+Whvs = alp * dsPol.dot(Whvs)                       #scaled radial HV matrix
 
 ###########################################################################
 
 #Angular FD weights arranged in a differentiation matrix:
 
-Wth   = phs1.getPeriodicDM( period=2*np.pi, X=th, m=1     \
+Wlam   = phs1.getPeriodicDM( period=2*np.pi, X=th, m=1     \
 , phsDegree=phs, polyDegree=pol, stencilSize=stc )
 
-Whvth = phs1.getPeriodicDM( period=2*np.pi, X=th, m=phs-1 \
+Whvlam = phs1.getPeriodicDM( period=2*np.pi, X=th, m=phs-1 \
 , phsDegree=phs, polyDegree=pol, stencilSize=stc )
 
-Whvth = alp * dth**pol * Whvth              #scaled angular HV matrix
+Whvlam = alp * dth**pol * Whvlam                  #scaled angular HV matrix
 
-Wth = np.transpose( Wth )                 #work on rows instead of columns
-Whvth = np.transpose( Whvth )             #work on rows instead of columns
+Wlam = np.transpose( Wlam )                #work on rows instead of columns
+Whvlam = np.transpose( Whvlam )            #work on rows instead of columns
 
 ###########################################################################
 
@@ -255,19 +272,19 @@ W = phs1.getDM( x=s, X=s0[1:-1], m=0 \
 
 #Functions to approximate differential operators and other things:
 
-if dimSplit == 1 :
+if dimSplit == 2 :
     
     def Ds(U) :
         return Ws @ U
     
     def Dlam(U) :
-        return U[1:-1,:] @ Wth
+        return U[1:-1,:] @ Wlam
     
     def Dr(U) :
-        return dsdr * Ds(U)
+        return Ds(U) * dsdr
     
     def Dth(U) :
-        return Dlam(U) + dsdth * Ds(U)
+        return Dlam(U) + Ds(U) * dsdth
     
     def Dx(U) :
         return cosTh * Dr(U) - sinThOverR * Dth(U)
@@ -276,31 +293,20 @@ if dimSplit == 1 :
         return sinTh * Dr(U) + cosThOverR * Dth(U)
     
     def HV(U) :
-        return ( Whvs @ U ) + ( U[1:-1,:] @ Whvth )
+        return ( Whvs @ U ) + ( U[1:-1,:] @ Whvlam )
     
-else :
-    
-    # def DX(U) :
-        # U = U.flatten()
-        # U = np.sum( Wx*U[stencils.idx], axis=1 )
-        # return np.reshape( U, (ns-2,nth) )
-    
-    # def DY(U) :
-        # U = U.flatten()
-        # U = np.sum( Wy*U[stencils.idx], axis=1 )
-        # return np.reshape( U, (ns-2,nth) )
+elif dimSplit == 1 :
     
     def Ds(U) :
         return Ws @ U
     
     def Dr(U) :
-        return dsdr * Ds(U)
+        return Ds(U) * dsdr
     
     def Dth(U) :
         U = U.flatten()
-        U = np.sum( Wth_2D*U[stencils.idx], axis=1 )
+        U = np.sum( Wth*U[stencils.idx], axis=1 )
         return np.reshape( U, (ns-2,nth) )
-        # return -yyi * DX(U) + xxi * DY(U)
     
     def Dx(U) :
         return cosTh * Dr(U) - sinThOverR * Dth(U)
@@ -309,12 +315,28 @@ else :
         return sinTh * Dr(U) + cosThOverR * Dth(U)
     
     def HV(U) :
-        return ( Whvs @ U ) + ( U[1:-1,:] @ Whvth )
+        return ( Whvs @ U ) + ( U[1:-1,:] @ Whvlam )
+
+elif dimSplit == 0 :
     
-    # def HV(U) :
-        # U = U.flatten()
-        # U = np.sum( Whv*U[stencils.idx], axis=1 )
-        # return np.reshape( U, (ns-2,nth) )
+    def Dx(U) :
+        U = U.flatten()
+        U = np.sum( Wx*U[stencils.idx], axis=1 )
+        return np.reshape( U, (ns-2,nth) )
+    
+    def Dy(U) :
+        U = U.flatten()
+        U = np.sum( Wy*U[stencils.idx], axis=1 )
+        return np.reshape( U, (ns-2,nth) )
+    
+    def HV(U) :
+        U = U.flatten()
+        U = np.sum( Whv*U[stencils.idx], axis=1 )
+        return np.reshape( U, (ns-2,nth) )
+
+else :
+    
+    sys.exit("\nError: dimSplit should be 0, 1, or 2.\n")
 
 def setGhostNodes( U ) :
     return annulus.setGhostNodes1D( U \
@@ -351,15 +373,15 @@ for i in np.arange( 0, nTimesteps+1 ) :
         else :
             np.save( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy', U )
         
-        # plt.contourf( xx0, yy0, W.dot(U[0,:,:]), 20 )
+        # plt.contourf( xx0, yy0, W.dot(U[2,:,:]), 20 )
         plt.contourf( xx0, yy0, W.dot(U[0,:,:]), np.arange(-.17,.17+.02,.02) )
         plt.axis('equal')
         plt.colorbar()
         fig.savefig( '{0:04d}'.format(np.int(np.round(t)+1e-12))+'.png', bbox_inches = 'tight' )
         plt.clf()
         
-        if np.max(np.abs(U)) > 10. :
-            sys.exit("\nUnstable in time.\n")
+        # if np.max(np.abs(U)) > 10. :
+            # sys.exit("\nUnstable in time.\n")
         
     if plotFromSaved == 1 :
         t = t + dt

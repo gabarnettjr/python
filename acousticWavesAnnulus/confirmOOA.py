@@ -54,12 +54,13 @@ def loadSingleResult( ns, phs, pol, stc, ptb ) :
     + '_k'   + '{0:03.0f}'.format(k)          \
     + '_amp' + '{0:1.2f}'.format(amp)
 
-    saveString = saveString + '/'     \
-    + 'phs'  + '{0:1d}'.format(phs)   \
-    + '_pol' + '{0:1d}'.format(pol)   \
-    + '_stc' + '{0:1d}'.format(stc)   \
-    + '_ptb' + '{0:1.2f}'.format(ptb) \
-    + '_ns'  + '{0:1d}'.format(ns-2)  \
+    saveString = saveString + '/'            \
+    + 'dimSplit' + '{0:1d}'.format(dimSplit) \
+    + '_phs'     + '{0:1d}'.format(phs)      \
+    + '_pol'     + '{0:1d}'.format(pol)      \
+    + '_stc'     + '{0:1d}'.format(stc)      \
+    + '_ptb'     + '{0:1.2f}'.format(ptb)    \
+    + '_ns'      + '{0:1d}'.format(ns-2)     \
     + '/'
     
     U = np.load( saveString+'{0:04d}'.format(np.int(np.round(tf)))+'.npy' )
@@ -223,7 +224,7 @@ plt.show()
 
 if contourErrors == 1 :
 
-    rSurf, rSurfPrime = annulus.getTopoFunc( innerRadius, amp )
+    rSurf, rSurfPrime = annulus.getTopoFunc( innerRadius, outerRadius, amp )
 
     thth0, ss0 = np.meshgrid( th0, s0[1:-1] )
     rr0 = annulus.getRadii( thth0, ss0, innerRadius, outerRadius, rSurf )
