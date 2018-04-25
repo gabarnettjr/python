@@ -13,62 +13,47 @@ from gab.pseudospectral import periodic
 
 ###########################################################################
 
-dimSplit = np.int64(sys.argv[1])               #0:none, 1:some, 2:fullSplit
-
 c           = .1                                                #wave speed
 innerRadius = 2.
 outerRadius = 3.
-tf          = 60.                                               #final time
-k           = 50.                  #controls steepness of initial condition
+tf          = 50.                                               #final time
+saveDel     = 5                            #time interval to save snapshots
+exp         = 100.                 #controls steepness of initial condition
 amp         = .05        #relative amplitude of trigonometric topo function
+frq         = 9                   #frequency of trigonometric topo function
 
-saveDel       = 2                          #time interval to save snapshots
-plotFromSaved = 0                            #if 1, load instead of compute
+plotFromSaved = 1                            #if 1, load instead of compute
 
-phs = np.int64(sys.argv[2])                  #PHS RBF exponent (odd number)
-pol = np.int64(sys.argv[3])                              #polynomial degree
-stc = np.int64(sys.argv[4])                                   #stencil size
-ptb = np.float64(sys.argv[5])        #random radial perturbation percentage
-
+dimSplit = np.int64(sys.argv[1])               #0:none, 1:some, 2:fullSplit
+phs      = np.int64(sys.argv[2])             #PHS RBF exponent (odd number)
+pol      = np.int64(sys.argv[3])                         #polynomial degree
+stc      = np.int64(sys.argv[4])                              #stencil size
+ptb      = np.float64(sys.argv[5])   #random radial perturbation percentage
 rkStages = np.int64(sys.argv[6])     #number of Runge-Kutta stages (3 or 4)
-
-ns = np.int64(sys.argv[7])+2                      #total number of s levels
-dt = np.float64(sys.argv[8])                                       #delta t
+ns       = np.int64(sys.argv[7])+2                #total number of s levels
+dt       = 1./np.float64(sys.argv[8])                              #delta t
 
 rSurf, dsdth, dsdr \
-= annulus.getHeightCoordinate( outerRadius, innerRadius, amp )
+= annulus.getHeightCoordinate( innerRadius, outerRadius, amp, frq )
 
 tmp = np.pi
 xc1 = (rSurf(tmp)+outerRadius)/2.*np.cos(tmp)           #x-coord of GA bell
 yc1 = (rSurf(tmp)+outerRadius)/2.*np.sin(tmp)           #y-coord of GA bell
 def initialCondition( x, y ) :
-    return np.exp( -k*( (x-xc1)**2. + (y-yc1)**2. ) )
+    return np.exp( -exp*( (x-xc1)**2. + (y-yc1)**2. ) )
 
 ###########################################################################
 
 #Set things up for saving:
 
-saveString = 'c' + '{0:1.2f}'.format(c)   \
-+ '_ri'  + '{0:1.0f}'.format(innerRadius) \
-+ '_ro'  + '{0:1.0f}'.format(outerRadius) \
-+ '_tf'  + '{0:04.0f}'.format(tf)         \
-+ '_k'   + '{0:03.0f}'.format(k)          \
-+ '_amp' + '{0:1.2f}'.format(amp)
-
-saveString = saveString + '/'            \
-+ 'dimSplit' + '{0:1d}'.format(dimSplit) \
-+ '_phs'     + '{0:1d}'.format(phs)      \
-+ '_pol'     + '{0:1d}'.format(pol)      \
-+ '_stc'     + '{0:1d}'.format(stc)      \
-+ '_ptb'     + '{0:1.2f}'.format(ptb)    \
-+ '_ns'      + '{0:1d}'.format(ns-2)     \
-+ '/'
+saveString = annulus.getSavestring( c, innerRadius, outerRadius, tf, saveDel, exp, amp, frq \
+, dimSplit, phs, pol, stc, ptb, rkStages, ns, dt )
 
 if os.path.exists( saveString+'*.npy' ) :
-    os.remove( saveString+'*.npy' )
+    os.remove( saveString+'*.npy' )                       #remove old files
 
 if not os.path.exists( saveString ) :
-    os.makedirs( saveString )
+    os.makedirs( saveString )                         #make new directories
 
 ###########################################################################
 
@@ -122,7 +107,7 @@ yy0 = rr0 * np.sin(thth0)                             #mesh of reg x-coords
 
 ###########################################################################
 
-#Plot showing how much the radii have been perturbed:
+#Plot showing how the radii have been perturbed:
 
 # fig, ax = plt.subplots( 1, 2, figsize=(8,4) )
 # ax[0].plot( s0, s0, '-', s0, s, '.' )       #plot of initial vs perturbed s
@@ -217,7 +202,7 @@ if ( dimSplit != 2 ) & ( plotFromSaved != 1 ) :
     elif pol == 5 :
         stc = 21
     else :
-        sys.exit("\nOnly using pol=3 and pol=5 right now.\n")
+        sys.exit("\nOnly using pol=3 and pol=5 in this case.\n")
 
 ###########################################################################
 

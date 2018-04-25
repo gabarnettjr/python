@@ -11,57 +11,59 @@ from gab.acousticWaveEquation import annulus
 ###########################################################################
 
 c           = .1                                                #wave speed
-innerRadius = 1.
-outerRadius = 2.
+innerRadius = 2.
+outerRadius = 3.
 tf          = 10.                                               #final time
-k           = 200.                 #controls steepness of initial condition
-amp         = .05                 #amplitude of trigonometric topo function
+saveDel     = 1                            #time interval to save snapshots
+exp         = 50.                  #controls steepness of initial condition
+amp         = .00        #relative amplitude of trigonometric topo function
+frq         = 9                   #frequency of trigonometric topo function
 
 ord = np.inf                                   #norm to use for error check
 
 contourErrors = 1
 
-phsA = 5
-polA = 3
-stcA = 7
-ptbA = .30
+dimSplitA = 2
+phsA      = 5
+polA      = 3
+stcA      = 9
+ptbA      = .00
+rkStagesA = 3
 
-phsB = 7
-polB = 5
-stcB = 13
-ptbB = .30
+dimSplitB = 1
+phsB      = 5
+polB      = 3
+stcB      = 25
+ptbB      = .00
+rkStagesB = 3
 
-phs0 = 7
-pol0 = 5
-stc0 = 13
-ptb0 = .00
+dimSplit0 = 2
+phs0      = 5
+pol0      = 3
+stc0      = 9
+ptb0      = .00
+rkStages0 = 3
 
 ns0 = 256+2                                           #reference resolution
-ns1 = 16+2
+ns1 = 8+2
 ns2 = 16+2
 ns3 = 32+2
 ns4 = 64+2
 ns5 = 128+2
 
+dt0 = 1./64.
+dt1 = 1./2.
+dt2 = 1./4.
+dt3 = 1./8.
+dt4 = 1./16.
+dt5 = 1./32.
+
 ###########################################################################
 
-def loadSingleResult( ns, phs, pol, stc, ptb ) :
+def loadSingleResult( dimSplit, phs, pol, stc, ptb, rkStages, ns, dt ) :
     
-    saveString = 'c' + '{0:1.2f}'.format(c)   \
-    + '_ri'  + '{0:1.0f}'.format(innerRadius) \
-    + '_ro'  + '{0:1.0f}'.format(outerRadius) \
-    + '_tf'  + '{0:04.0f}'.format(tf)         \
-    + '_k'   + '{0:03.0f}'.format(k)          \
-    + '_amp' + '{0:1.2f}'.format(amp)
-
-    saveString = saveString + '/'            \
-    + 'dimSplit' + '{0:1d}'.format(dimSplit) \
-    + '_phs'     + '{0:1d}'.format(phs)      \
-    + '_pol'     + '{0:1d}'.format(pol)      \
-    + '_stc'     + '{0:1d}'.format(stc)      \
-    + '_ptb'     + '{0:1.2f}'.format(ptb)    \
-    + '_ns'      + '{0:1d}'.format(ns-2)     \
-    + '/'
+    saveString = annulus.getSavestring( c, innerRadius, outerRadius, tf, saveDel, exp, amp, frq \
+    , dimSplit, phs, pol, stc, ptb, rkStages, ns, dt )
     
     U = np.load( saveString+'{0:04d}'.format(np.int(np.round(tf)))+'.npy' )
     s = np.load( saveString+'s'+'.npy' )
@@ -72,15 +74,14 @@ def loadSingleResult( ns, phs, pol, stc, ptb ) :
 
 #Load reference solution and things to compare it to:
 
-def loadManyResults( ns0, ns1, ns2, ns3, ns4, ns5 \
-, phs, pol, stc, ptb ) :
+def loadManyResults( dimSplit, phs, pol, stc, ptb, rkStages ) :
     
-    U0, s0 = loadSingleResult( ns0, phs0, pol0, stc0, ptb0 )
-    U1, s1 = loadSingleResult( ns1, phs,  pol,  stc,  ptb  )
-    U2, s2 = loadSingleResult( ns2, phs,  pol,  stc,  ptb  )
-    U3, s3 = loadSingleResult( ns3, phs,  pol,  stc,  ptb  )
-    U4, s4 = loadSingleResult( ns4, phs,  pol,  stc,  ptb  )
-    U5, s5 = loadSingleResult( ns5, phs,  pol,  stc,  ptb  )
+    U0, s0 = loadSingleResult( dimSplit0, phs0, pol0, stc0, ptb0, rkStages0, ns0, dt0 )
+    U1, s1 = loadSingleResult( dimSplit,  phs,  pol,  stc,  ptb,  rkStages,  ns1, dt1 )
+    U2, s2 = loadSingleResult( dimSplit,  phs,  pol,  stc,  ptb,  rkStages,  ns2, dt2 )
+    U3, s3 = loadSingleResult( dimSplit,  phs,  pol,  stc,  ptb,  rkStages,  ns3, dt3 )
+    U4, s4 = loadSingleResult( dimSplit,  phs,  pol,  stc,  ptb,  rkStages,  ns4, dt4 )
+    U5, s5 = loadSingleResult( dimSplit,  phs,  pol,  stc,  ptb,  rkStages,  ns5, dt5 )
     
     return U0, U1, U2, U3, U4, U5, s0, s1, s2, s3, s4, s5
 
@@ -88,7 +89,7 @@ def loadManyResults( ns0, ns1, ns2, ns3, ns4, ns5 \
 
 #Get regularly spaced theta levels:
 
-def getThetaLevels( ns0, ns1, ns2, ns3, ns4, ns5 ) :
+def getThetaLevels() :
 
     nth0 = annulus.getNth( innerRadius, outerRadius, ns0 )
     nth1 = annulus.getNth( innerRadius, outerRadius, ns1 )
@@ -176,19 +177,19 @@ def gatherErrors( U0, U1, U2, U3, U4, U5 ) :
 
 ###########################################################################
 
-def getErrorVector( ns0, ns1, ns2, ns3, ns4, ns5, phs, pol, stc, ptb ) :
-
+def getErrorVector( dimSplit, phs, pol, stc, ptb, rkStages ) :
+    
     U0, U1, U2, U3, U4, U5, s0, s1, s2, s3, s4, s5  \
-    = loadManyResults( ns0, ns1, ns2, ns3, ns4, ns5, phs, pol, stc, ptb )
-
-    th0, th1, th2, th3, th4, th5 = getThetaLevels( ns0, ns1, ns2, ns3, ns4, ns5 )
-
+    = loadManyResults( dimSplit, phs, pol, stc, ptb, rkStages )
+    
+    th0, th1, th2, th3, th4, th5 = getThetaLevels()
+    
     U0, U1, U2, U3, U4, U5 = interpRadial( U0, U1, U2, U3, U4, U5 \
-    , s0, s1, s2, s3, s4, s5, phs, pol, stc )
-
+    , s0, s1, s2, s3, s4, s5, 5, 3, 9 )
+    
     U0, U1, U2, U3, U4, U5 = interpAngular( U0, U1, U2, U3, U4, U5 \
     , th0, th1, th2, th3, th4, th5 )
-
+    
     err = gatherErrors( U0, U1, U2, U3, U4, U5 )
     
     return err, U0, U1, U2, U3, U4, U5, th0, s0
@@ -198,10 +199,10 @@ def getErrorVector( ns0, ns1, ns2, ns3, ns4, ns5, phs, pol, stc, ptb ) :
 #Plot the error to check convergence:
 
 errA, U0, U1, U2, U3, U4, U5, th0, s0 \
-= getErrorVector( ns0, ns1, ns2, ns3, ns4, ns5, phsA, polA, stcA, ptbA )
+= getErrorVector( dimSplitA, phsA, polA, stcA, ptbA, rkStagesA )
 
 errB, U0, U1, U2, U3, U4, U5, th0, s0 \
-= getErrorVector( ns0, ns1, ns2, ns3, ns4, ns5, phsB, polB, stcB, ptbB )
+= getErrorVector( dimSplitB, phsB, polB, stcB, ptbB, rkStagesB )
 
 ns= np.hstack(( ns1, ns2, ns3, ns4, ns5 ))
 ns = ns - 2
@@ -224,7 +225,7 @@ plt.show()
 
 if contourErrors == 1 :
 
-    rSurf, rSurfPrime = annulus.getTopoFunc( innerRadius, outerRadius, amp )
+    rSurf, rSurfPrime = annulus.getTopoFunc( innerRadius, outerRadius, amp, frq )
 
     thth0, ss0 = np.meshgrid( th0, s0[1:-1] )
     rr0 = annulus.getRadii( thth0, ss0, innerRadius, outerRadius, rSurf )
