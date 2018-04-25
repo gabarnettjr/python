@@ -189,10 +189,8 @@ if ( dimSplit != 2 ) & ( plotFromSaved != 1 ) :
     
     if dimSplit == 1 :
         A = phs2.getAmatrices( stencils, phs, pol )
-        Wx  = phs2.getWeights( stencils, A, "1",  0 )
-        Wy  = phs2.getWeights( stencils, A, "2",  0 )
-        Wth = np.transpose(np.tile(-yyi.flatten(),(stc,1))) * Wx \
-            + np.transpose(np.tile( xxi.flatten(),(stc,1))) * Wy
+        Wx = phs2.getWeights( stencils, A, "1",  0 )
+        Wy = phs2.getWeights( stencils, A, "2",  0 )
     elif dimSplit == 0 :
         e1 = np.transpose( np.vstack(( -yyi.flatten(), xxi.flatten() )) )
         nm = np.sqrt( e1[:,0]**2. + e1[:,1]**2. )
@@ -207,9 +205,12 @@ if ( dimSplit != 2 ) & ( plotFromSaved != 1 ) :
         Wx = Wx1 * stencils.dx1dx + Wx2 * stencils.dx2dx
         Wy = Wx1 * stencils.dx1dy + Wx2 * stencils.dx2dy
     
-    K = np.int( np.round( (phs-1)/2 ) )
-    Whv = phs2.getWeights( stencils, A, "hv", K )
-    Whv = alp * stencils.h**(2*K-1) * Whv
+    Wth = np.transpose(np.tile(-yyi.flatten(),(stc,1))) * Wx \
+        + np.transpose(np.tile( xxi.flatten(),(stc,1))) * Wy
+    
+    # K = np.int( np.round( (phs-1)/2 ) )
+    # Whv = phs2.getWeights( stencils, A, "hv", K )
+    # Whv = alp * stencils.h**(2*K-1) * Whv
     
     if pol == 3 :
         stc = 9
@@ -295,7 +296,7 @@ if dimSplit == 2 :
     def HV(U) :
         return ( Whvs @ U ) + ( U[1:-1,:] @ Whvlam )
     
-elif dimSplit == 1 :
+elif ( dimSplit == 1 ) | ( dimSplit == 0 ) :
     
     def Ds(U) :
         return Ws @ U
@@ -317,22 +318,22 @@ elif dimSplit == 1 :
     def HV(U) :
         return ( Whvs @ U ) + ( U[1:-1,:] @ Whvlam )
 
-elif dimSplit == 0 :
+# elif dimSplit == 0 :
     
-    def Dx(U) :
-        U = U.flatten()
-        U = np.sum( Wx*U[stencils.idx], axis=1 )
-        return np.reshape( U, (ns-2,nth) )
+    # def Dx(U) :
+        # U = U.flatten()
+        # U = np.sum( Wx*U[stencils.idx], axis=1 )
+        # return np.reshape( U, (ns-2,nth) )
     
-    def Dy(U) :
-        U = U.flatten()
-        U = np.sum( Wy*U[stencils.idx], axis=1 )
-        return np.reshape( U, (ns-2,nth) )
+    # def Dy(U) :
+        # U = U.flatten()
+        # U = np.sum( Wy*U[stencils.idx], axis=1 )
+        # return np.reshape( U, (ns-2,nth) )
     
-    def HV(U) :
-        U = U.flatten()
-        U = np.sum( Whv*U[stencils.idx], axis=1 )
-        return np.reshape( U, (ns-2,nth) )
+    # def HV(U) :
+        # U = U.flatten()
+        # U = np.sum( Whv*U[stencils.idx], axis=1 )
+        # return np.reshape( U, (ns-2,nth) )
 
 else :
     
