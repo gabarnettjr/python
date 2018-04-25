@@ -16,10 +16,10 @@ from gab.pseudospectral import periodic
 dimSplit = np.int64(sys.argv[1])               #0:none, 1:some, 2:fullSplit
 
 c           = .1                                                #wave speed
-innerRadius = 1.
-outerRadius = 2.
+innerRadius = 2.
+outerRadius = 3.
 tf          = 60.                                               #final time
-k           = 100.                 #controls steepness of initial condition
+k           = 50.                  #controls steepness of initial condition
 amp         = .05        #relative amplitude of trigonometric topo function
 
 saveDel       = 2                          #time interval to save snapshots
