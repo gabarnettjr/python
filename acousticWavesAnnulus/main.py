@@ -15,14 +15,15 @@ from gab.pseudospectral import periodic
 
 c           = .1                                                #wave speed
 innerRadius = 2.
-outerRadius = 3.
-tf          = 50.                                               #final time
-saveDel     = 5                            #time interval to save snapshots
-exp         = 100.                 #controls steepness of initial condition
+outerRadius = 4.
+tf          = 20.                                               #final time
+saveDel     = 2                            #time interval to save snapshots
+exp         = 25.                  #controls steepness of initial condition
 amp         = .05        #relative amplitude of trigonometric topo function
 frq         = 9                   #frequency of trigonometric topo function
 
-plotFromSaved = 1                            #if 1, load instead of compute
+plotFromSaved = 0                            #if 1, load instead of compute
+saveContours  = 0                       #switch for saving contours as pngs
 
 dimSplit = np.int64(sys.argv[1])               #0:none, 1:some, 2:fullSplit
 phs      = np.int64(sys.argv[2])             #PHS RBF exponent (odd number)
@@ -33,14 +34,17 @@ rkStages = np.int64(sys.argv[6])     #number of Runge-Kutta stages (3 or 4)
 ns       = np.int64(sys.argv[7])+2                #total number of s levels
 dt       = 1./np.float64(sys.argv[8])                              #delta t
 
-rSurf, dsdth, dsdr \
+rSurf, rSurfPrime, sFunc, dsdth, dsdr \
 = annulus.getHeightCoordinate( innerRadius, outerRadius, amp, frq )
 
 tmp = np.pi
 xc1 = (rSurf(tmp)+outerRadius)/2.*np.cos(tmp)           #x-coord of GA bell
 yc1 = (rSurf(tmp)+outerRadius)/2.*np.sin(tmp)           #y-coord of GA bell
 def initialCondition( x, y ) :
-    return np.exp( -exp*( (x-xc1)**2. + (y-yc1)**2. ) )
+    if ( exp == 0. ) & ( amp == 0. ) :
+        return np.sin( np.pi * np.sqrt(x**2.+y**2.) )
+    else :
+        return np.exp( -exp*( (x-xc1)**2. + (y-yc1)**2. ) )
 
 ###########################################################################
 
@@ -89,21 +93,40 @@ yy = rr * np.sin(thth)                               #mesh of y-coordinates
 xxi = xx[1:-1,:]                                       #exclude ghost nodes
 yyi = yy[1:-1,:]                                       #exclude ghost nodes
 
-thth = thth[1:-1,:]                                     #remove ghost nodes
-rr = rr[1:-1,:]                                         #remove ghost nodes
-dsdth = dsdth( thth, rr )                   #overwrite function with values
-dsdr  = dsdr( thth, rr )                    #overwrite function with values
+ththi = thth[1:-1,:]                                    #remove ghost nodes
+rri = rr[1:-1,:]                                        #remove ghost nodes
+dsdth = dsdth( rri, ththi )                 #overwrite function with values
+dsdr  = dsdr( rri, ththi )                  #overwrite function with values
 
-cosTh = np.cos(thth)
-sinTh = np.sin(thth)
-cosThOverR = cosTh/rr
-sinThOverR = sinTh/rr
+cosTh = np.cos(ththi)
+sinTh = np.sin(ththi)
+cosThOverR = cosTh/rri
+sinThOverR = sinTh/rri
 
 thth0, ss0 = np.meshgrid( th, s0[1:-1] )         #regular mesh for plotting
 rr0 = annulus.getRadii( thth0, ss0 \
 , innerRadius, outerRadius, rSurf )                  #mesh of regular radii
 xx0 = rr0 * np.cos(thth0)                             #mesh of reg x-coords
 yy0 = rr0 * np.sin(thth0)                             #mesh of reg x-coords
+
+###########################################################################
+
+#Plot the coordinate transformation functions:
+
+# plt.contourf( xxi, yyi, sFunc(rri,ththi), 20 )
+# plt.axis( 'equal' )
+# plt.colorbar()
+# plt.show()
+
+# plt.contourf( xxi, yyi, dsdth, 20 )
+# plt.axis( 'equal' )
+# plt.colorbar()
+# plt.show()
+
+# plt.contourf( xxi, yyi, dsdr, 20 )
+# plt.axis( 'equal' )
+# plt.colorbar()
+# plt.show()
 
 ###########################################################################
 
@@ -199,14 +222,12 @@ if dimSplit != 2 :
         # Whv = phs2.getWeights( stencils, A, "hv", K )
         # Whv = alp * stencils.h**(2*K-1) * Whv
     
+    if pol == 3 :
+        stc = 9
+    elif pol == 5 :
+        stc = 21
     else :
-        
-        if pol == 3 :
-            stc = 9
-        elif pol == 5 :
-            stc = 21
-        else :
-            sys.exit("\nOnly using pol=3 and pol=5 in this case.\n")
+        sys.exit("\nOnly using pol=3 and pol=5 in this case.\n")
 
 ###########################################################################
 
@@ -363,15 +384,17 @@ for i in np.arange( 0, nTimesteps+1 ) :
         else :
             np.save( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy', U )
         
-        # plt.contourf( xx0, yy0, W.dot(U[2,:,:]), 20 )
-        plt.contourf( xx0, yy0, W.dot(U[0,:,:]), np.arange(-.17,.17+.02,.02) )
-        plt.axis('equal')
-        plt.colorbar()
-        fig.savefig( '{0:04d}'.format(np.int(np.round(t)+1e-12))+'.png', bbox_inches = 'tight' )
-        plt.clf()
+        if saveContours == 1 :
+            # plt.contourf( xx0, yy0, W.dot(U[0,:,:]), 20 )
+            plt.contourf( xx0, yy0, W.dot(U[0,:,:]), np.arange(-.17,.17+.02,.02) )
+            # plt.contourf( xx0, yy0, W.dot(U[0,:,:]), np.arange(-1.1,1.3,.2) )
+            plt.axis('equal')
+            plt.colorbar()
+            fig.savefig( '{0:04d}'.format(np.int(np.round(t)+1e-12))+'.png', bbox_inches = 'tight' )
+            plt.clf()
         
-        # if np.max(np.abs(U)) > 10. :
-            # sys.exit("\nUnstable in time.\n")
+        if np.max(np.abs(U)) > 10. :
+            sys.exit("\nUnstable in time.\n")
         
     if plotFromSaved == 1 :
         t = t + dt
