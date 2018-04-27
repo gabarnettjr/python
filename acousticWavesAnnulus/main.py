@@ -18,12 +18,12 @@ innerRadius = 2.
 outerRadius = 3.
 tf          = 20.                                               #final time
 saveDel     = 2                            #time interval to save snapshots
-exp         = 50.                  #controls steepness of initial condition
+exp         = 100.                 #controls steepness of initial condition
 amp         = .10        #relative amplitude of trigonometric topo function
 frq         = 9                   #frequency of trigonometric topo function
 
 plotFromSaved = 0                            #if 1, load instead of compute
-saveContours  = 1                       #switch for saving contours as pngs
+saveContours  = 0                       #switch for saving contours as pngs
 
 dimSplit = np.int64(sys.argv[1])               #0:none, 1:some, 2:fullSplit
 phs      = np.int64(sys.argv[2])             #PHS RBF exponent (odd number)
@@ -37,7 +37,7 @@ dt       = 1./np.float64(sys.argv[8])                              #delta t
 rSurf, rSurfPrime, sFunc, dsdth, dsdr \
 = annulus.getHeightCoordinate( innerRadius, outerRadius, amp, frq )
 
-tmp = 17./18.*np.pi
+tmp = 1./18.*np.pi
 xc1 = (rSurf(tmp)+outerRadius)/2.*np.cos(tmp)           #x-coord of GA bell
 yc1 = (rSurf(tmp)+outerRadius)/2.*np.sin(tmp)           #y-coord of GA bell
 def initialCondition( x, y ) :
@@ -61,25 +61,33 @@ if not os.path.exists( saveString ) :
 
 ###########################################################################
 
-#Get th and s vectors and save s vector (randomly perturbed):
+#Get th and s vectors and save them (randomly perturbed):
 
 t = 0.                                                       #starting time
 nTimesteps = np.int(np.round( tf / dt ))         #total number of timesteps
 
 nth = annulus.getNth( innerRadius, outerRadius, ns )#nmbr of angular levels
 dth = 2.*np.pi / nth                                  #constant delta theta
-th  = np.linspace( 0., 2.*np.pi, nth+1 )              #vector of all angles
-th  = th[0:-1]                           #remove last angle (same as first)
+th0  = np.linspace( 0., 2.*np.pi, nth+1 )             #vector of all angles
+th0  = th0[0:-1]                         #remove last angle (same as first)
+ptb = ptb * dth                               #relative perturbation factor
+ran = -ptb + 2.*ptb*np.random.rand(nth)         #random perturbation vector
+th = th0.copy()
+th = th + ran                                 #th vector after perturbation
+tmp = np.hstack(( th[-1]-2.*np.pi, th, th[0]+2.*np.pi ))
+dth = ( tmp[2:nth+2] - tmp[0:nth] ) / 2.             #non-constant delta th
+
 
 ds  = ( outerRadius - innerRadius ) / (ns-2)              #constant delta s
 s0  = np.linspace( innerRadius-ds/2, outerRadius+ds/2, ns )       #s vector
 ptb = ptb * ds                                #relative perturbation factor
-ran = -ptb + 2*ptb*np.random.rand(len(s0))      #random perturbation vector
+ran = -ptb + 2.*ptb*np.random.rand(ns)          #random perturbation vector
 s   = s0.copy()
 s   = s + ran                                  #s vector after perturbation
-ds  = ( s[2:len(s)] - s[0:len(s)-2] ) / 2.            #non-constant delta s
+ds  = ( s[2:ns] - s[0:ns-2] ) / 2.                    #non-constant delta s
 
 np.save( saveString+'s'+'.npy', s )                #save vector of s values
+np.save( saveString+'th'+'.npy', th )             #save vector of th values
 
 ###########################################################################
 
@@ -103,7 +111,7 @@ sinTh = np.sin(ththi)
 cosThOverR = cosTh/rri
 sinThOverR = sinTh/rri
 
-thth0, ss0 = np.meshgrid( th, s0[1:-1] )         #regular mesh for plotting
+thth0, ss0 = np.meshgrid( th0, s0[1:-1] )        #regular mesh for plotting
 rr0 = annulus.getRadii( thth0, ss0 \
 , innerRadius, outerRadius, rSurf )                  #mesh of regular radii
 xx0 = rr0 * np.cos(thth0)                             #mesh of reg x-coords
@@ -111,7 +119,7 @@ yy0 = rr0 * np.sin(thth0)                             #mesh of reg x-coords
 
 ###########################################################################
 
-#Plot the coordinate transformation functions:
+#Plot the coordinate transformation functions and then exit:
 
 # plt.contourf( xxi, yyi, sFunc(rri,ththi), 20 )
 # plt.axis( 'equal' )
@@ -128,9 +136,11 @@ yy0 = rr0 * np.sin(thth0)                             #mesh of reg x-coords
 # plt.colorbar()
 # plt.show()
 
+# sys.exit("\nStop here for now.\n")
+
 ###########################################################################
 
-#Plot showing how the radii have been perturbed:
+#Plot the perturbed radii and then exit:
 
 # fig, ax = plt.subplots( 1, 2, figsize=(8,4) )
 # ax[0].plot( s0, s0, '-', s0, s, '.' )       #plot of initial vs perturbed s
@@ -140,6 +150,7 @@ yy0 = rr0 * np.sin(thth0)                             #mesh of reg x-coords
 # ax[1].set_xlabel('s')
 # ax[1].set_ylabel('ds')
 # plt.show()
+
 # sys.exit("\nStop here for now.\n")
 
 ###########################################################################
@@ -158,8 +169,8 @@ yT = outerRadius * np.sin(th)
 rhoT = initialCondition( xT, yT )
 
 ###########################################################################
-
-#Plot the nodes and exit:
+    
+#Plot the nodes and then exit:
 
 # plt.plot( xx.flatten(), yy.flatten(), "." \
 # , xB, yB, "-" \
@@ -168,6 +179,7 @@ rhoT = initialCondition( xT, yT )
 # plt.xlabel( 'x' )
 # plt.ylabel( 'y' )
 # plt.show()
+
 # sys.exit("\nStop here for now.\n")
 
 ###########################################################################
@@ -244,13 +256,14 @@ Whvs = alp * dsPol.dot(Whvs)                       #scaled radial HV matrix
 
 #Angular FD weights arranged in a differentiation matrix:
 
-Wlam   = phs1.getPeriodicDM( period=2*np.pi, X=th, m=1     \
+Wlam   = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th, m=1     \
 , phsDegree=phs, polyDegree=pol, stencilSize=stc )
 
-Whvlam = phs1.getPeriodicDM( period=2*np.pi, X=th, m=phs-1 \
+Whvlam = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th, m=phs-1 \
 , phsDegree=phs, polyDegree=pol, stencilSize=stc )
 
-Whvlam = alp * dth**pol * Whvlam                  #scaled angular HV matrix
+dthPol = spdiags( dth**pol, np.array([0]), len(dth), len(dth) )
+Whvlam = alp * dthPol.dot(Whvlam)                 #scaled angular HV matrix
 
 Wlam = np.transpose( Wlam )                #work on rows instead of columns
 Whvlam = np.transpose( Whvlam )            #work on rows instead of columns
@@ -272,10 +285,15 @@ wEouter = np.transpose( np.tile( wEouter, (nth,1) ) )
 
 ###########################################################################
 
-#Interpolation from perturbed s values to regular s values for plotting:
+#Interpolation from perturbed values to regular values for plotting:
 
-W = phs1.getDM( x=s, X=s0[1:-1], m=0 \
+Wradial = phs1.getDM( x=s, X=s0[1:-1], m=0 \
 , phsDegree=phs, polyDegree=pol, stencilSize=stc )
+
+Wangular = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th0, m=0 \
+, phsDegree=phs, polyDegree=pol, stencilSize=stc )
+
+Wangular = np.transpose( Wangular )               #act on rows, not columns
 
 ###########################################################################
 
@@ -289,17 +307,17 @@ if dimSplit == 2 :
     def Dlam(U) :
         return U[1:-1,:] @ Wlam
     
-    def Dr(U) :
-        return Ds(U) * dsdr
+    # def Dr(U) :
+        # return Ds(U) * dsdr
     
-    def Dth(U) :
-        return Dlam(U) + Ds(U) * dsdth
+    # def Dth(U) :
+        # return Dlam(U) + Ds(U) * dsdth
     
-    def Dx(U) :
-        return cosTh * Dr(U) - sinThOverR * Dth(U)
+    # def Dx(U) :
+        # return cosTh * Dr(U) - sinThOverR * Dth(U)
     
-    def Dy(U) :
-        return sinTh * Dr(U) + cosThOverR * Dth(U)
+    # def Dy(U) :
+        # return sinTh * Dr(U) + cosThOverR * Dth(U)
     
     def HV(U) :
         return ( Whvs @ U ) + ( U[1:-1,:] @ Whvlam )
@@ -352,9 +370,13 @@ def setGhostNodes( U ) :
     , rhoB, rhoT, wIinner, wEinner, wIouter, wEouter, stc )
 
 def odefun( t, U ) :
-    return annulus.odefunCartesian( t, U \
-    , setGhostNodes, Dx, Dy, HV          \
-    , c )
+    return annulus.odefun( t, U \
+    , setGhostNodes, Ds, Dlam, HV \
+    , c, dsdth, dsdr \
+    , cosTh, sinTh, cosThOverR, sinThOverR )
+    # return annulus.odefunCartesian( t, U \
+    # , setGhostNodes, Dx, Dy, HV          \
+    # , c )
 
 if rkStages == 3 :
     rk = rk.rk3
@@ -383,9 +405,10 @@ for i in np.arange( 0, nTimesteps+1 ) :
             np.save( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy', U )
         
         if saveContours == 1 :
-            # plt.contourf( xx0, yy0, W.dot(U[0,:,:]), 20 )
-            plt.contourf( xx0, yy0, W.dot(U[0,:,:]), np.arange(-.17,.17+.02,.02) )
-            # plt.contourf( xx0, yy0, W.dot(U[0,:,:]), np.arange(-1.1,1.3,.2) )
+            tmp = Wradial @ U[0,:,:] @ Wangular
+            # plt.contourf( xx0, yy0, tmp, 20 )
+            plt.contourf( xx0, yy0, tmp, np.arange(-.17,.17+.02,.02) )
+            # plt.contourf( xx0, yy0, tmp, np.arange(-1.1,1.3,.2) )
             plt.axis('equal')
             plt.colorbar()
             fig.savefig( '{0:04d}'.format(np.int(np.round(t)+1e-12))+'.png', bbox_inches = 'tight' )

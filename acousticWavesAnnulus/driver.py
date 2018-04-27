@@ -1,28 +1,46 @@
 import os
 
-#dimensions entirely split:
-for i in range( 6 ) :
-    ns = '{0:1d}'.format( 2**(i+3) )
-    dtinv = '{0:1d}'.format( 2**(i) )
-    str = "2 5 4 5 .00 3 " + ns + " " + dtinv
+#p5 regular nodes:
+for i in range( 5 ) :
+    ns = '{0:1d}'.format( 2**(i+4) )
+    dtinv = '{0:1d}'.format( 2**(i+2) )
+    str = "2 7 5 13 .00 4 " + ns + " " + dtinv
     print( str + " :" )
     os.system( "python main.py " + str )
     print()
 
-# #dimensions split except for theta derivative:
-# for i in range( 5 ) :
-    # ns = '{0:1d}'.format( 2**(i+3) )
-    # dtinv = '{0:1d}'.format( 2**(i) )
-    # str = "0 5 3 25 .00 3 " + ns + " " + dtinv
-    # print( str + " :" )
-    # os.system( "python main.py " + str )
-    # print()
+#p5 perturbed nodes:
+for i in range( 4 ) :
+    ns = '{0:1d}'.format( 2**(i+4) )
+    dtinv = '{0:1d}'.format( 2**(i+2) )
+    str = "2 7 5 13 .30 3 " + ns + " " + dtinv
+    print( str + " :" )
+    os.system( "python main.py " + str )
+    print()
 
-# #dimensions split except for theta derivative:
+#p3 regular nodes:
+for i in range( 4 ) :
+    ns = '{0:1d}'.format( 2**(i+4) )
+    dtinv = '{0:1d}'.format( 2**(i+2) )
+    str = "2 5 3 7 .00 3 " + ns + " " + dtinv
+    print( str + " :" )
+    os.system( "python main.py " + str )
+    print()
+
+#p3 perturbed nodes:
+for i in range( 4 ) :
+    ns = '{0:1d}'.format( 2**(i+4) )
+    dtinv = '{0:1d}'.format( 2**(i+2) )
+    str = "2 5 3 7 .30 3 " + ns + " " + dtinv
+    print( str + " :" )
+    os.system( "python main.py " + str )
+    print()
+
+# #p4 regular nodes (FD4) (diverges at high res):
 # for i in range( 5 ) :
-    # ns = '{0:1d}'.format( 2**(i+3) )
-    # dtinv = '{0:1d}'.format( 2**(i) )
-    # str = "0 5 3 25 .30 3 " + ns + " " + dtinv
+    # ns = '{0:1d}'.format( 2**(i+4) )
+    # dtinv = '{0:1d}'.format( 2**(i+2) )
+    # str = "2 5 4 5 .00 4 " + ns + " " + dtinv
     # print( str + " :" )
     # os.system( "python main.py " + str )
     # print()
