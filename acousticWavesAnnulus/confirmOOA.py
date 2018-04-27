@@ -252,7 +252,7 @@ def getErrorVector( dimSplit, phs, pol, stc, ptb, rkStages ) :
     th0, th1, th2, th3, th4, th5 = getThetaLevels()
     
     U0, U1, U2, U3, U4, U5 = interpRadial( U0, U1, U2, U3, U4, U5 \
-    , s0, s1, s2, s3, s4, s5, 5, 3, 9 )
+    , s0, s1, s2, s3, s4, s5, 7, 5, 13 )
     
     U0, U1, U2, U3, U4, U5 = interpAngular( U0, U1, U2, U3, U4, U5 \
     , th0, th1, th2, th3, th4, th5 )

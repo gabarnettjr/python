@@ -15,11 +15,11 @@ from gab.pseudospectral import periodic
 
 c           = .1                                                #wave speed
 innerRadius = 2.
-outerRadius = 4.
-tf          = 200.                                              #final time
-saveDel     = 20                           #time interval to save snapshots
-exp         = 25.                  #controls steepness of initial condition
-amp         = .05        #relative amplitude of trigonometric topo function
+outerRadius = 3.
+tf          = 20.                                               #final time
+saveDel     = 2                            #time interval to save snapshots
+exp         = 50.                  #controls steepness of initial condition
+amp         = .10        #relative amplitude of trigonometric topo function
 frq         = 9                   #frequency of trigonometric topo function
 
 plotFromSaved = 0                            #if 1, load instead of compute
@@ -37,7 +37,7 @@ dt       = 1./np.float64(sys.argv[8])                              #delta t
 rSurf, rSurfPrime, sFunc, dsdth, dsdr \
 = annulus.getHeightCoordinate( innerRadius, outerRadius, amp, frq )
 
-tmp = np.pi
+tmp = 17./18.*np.pi
 xc1 = (rSurf(tmp)+outerRadius)/2.*np.cos(tmp)           #x-coord of GA bell
 yc1 = (rSurf(tmp)+outerRadius)/2.*np.sin(tmp)           #y-coord of GA bell
 def initialCondition( x, y ) :
@@ -177,7 +177,7 @@ rhoT = initialCondition( xT, yT )
 if ( pol == 3 ) | ( pol == 4 ) :
     alp = -2.**-10.
 elif ( pol == 5 ) | ( pol == 6 ) :
-    alp = 2.**-15.
+    alp = 2.**-13.
 else :
     sys.exit("\nError: pol should be 3, 4, 5, or 6.\n")
 
@@ -221,9 +221,9 @@ if dimSplit != 2 :
         # Whv = alp * stencils.h**(2*K-1) * Whv
     
     if pol == 3 :
-        stc = 9
+        stc = 7
     elif pol == 5 :
-        stc = 21
+        stc = 13
     else :
         sys.exit("\nOnly using pol=3 and pol=5 in this case.\n")
 
