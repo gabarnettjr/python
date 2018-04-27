@@ -16,14 +16,14 @@ from gab.pseudospectral import periodic
 c           = .1                                                #wave speed
 innerRadius = 2.
 outerRadius = 3.
-tf          = 20.                                               #final time
+tf          = 40.                                               #final time
 saveDel     = 2                            #time interval to save snapshots
 exp         = 100.                 #controls steepness of initial condition
-amp         = .10        #relative amplitude of trigonometric topo function
+amp         = .00        #relative amplitude of trigonometric topo function
 frq         = 9                   #frequency of trigonometric topo function
 
 plotFromSaved = 0                            #if 1, load instead of compute
-saveContours  = 0                       #switch for saving contours as pngs
+saveContours  = 1                       #switch for saving contours as pngs
 
 dimSplit = np.int64(sys.argv[1])               #0:none, 1:some, 2:fullSplit
 phs      = np.int64(sys.argv[2])             #PHS RBF exponent (odd number)
@@ -37,7 +37,7 @@ dt       = 1./np.float64(sys.argv[8])                              #delta t
 rSurf, rSurfPrime, sFunc, dsdth, dsdr \
 = annulus.getHeightCoordinate( innerRadius, outerRadius, amp, frq )
 
-tmp = 1./18.*np.pi
+tmp = 17./18.*np.pi
 xc1 = (rSurf(tmp)+outerRadius)/2.*np.cos(tmp)           #x-coord of GA bell
 yc1 = (rSurf(tmp)+outerRadius)/2.*np.sin(tmp)           #y-coord of GA bell
 def initialCondition( x, y ) :
@@ -70,18 +70,17 @@ nth = annulus.getNth( innerRadius, outerRadius, ns )#nmbr of angular levels
 dth = 2.*np.pi / nth                                  #constant delta theta
 th0  = np.linspace( 0., 2.*np.pi, nth+1 )             #vector of all angles
 th0  = th0[0:-1]                         #remove last angle (same as first)
-ptb = ptb * dth                               #relative perturbation factor
-ran = -ptb + 2.*ptb*np.random.rand(nth)         #random perturbation vector
+tmp = ptb * dth                               #relative perturbation factor
+ran = -tmp + 2.*tmp*np.random.rand(nth)         #random perturbation vector
 th = th0.copy()
 th = th + ran                                 #th vector after perturbation
 tmp = np.hstack(( th[-1]-2.*np.pi, th, th[0]+2.*np.pi ))
 dth = ( tmp[2:nth+2] - tmp[0:nth] ) / 2.             #non-constant delta th
 
-
 ds  = ( outerRadius - innerRadius ) / (ns-2)              #constant delta s
 s0  = np.linspace( innerRadius-ds/2, outerRadius+ds/2, ns )       #s vector
-ptb = ptb * ds                                #relative perturbation factor
-ran = -ptb + 2.*ptb*np.random.rand(ns)          #random perturbation vector
+tmp = ptb * ds                                #relative perturbation factor
+ran = -tmp + 2.*tmp*np.random.rand(ns)          #random perturbation vector
 s   = s0.copy()
 s   = s + ran                                  #s vector after perturbation
 ds  = ( s[2:ns] - s[0:ns-2] ) / 2.                    #non-constant delta s
