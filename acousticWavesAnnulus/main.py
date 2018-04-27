@@ -16,14 +16,14 @@ from gab.pseudospectral import periodic
 c           = .1                                                #wave speed
 innerRadius = 2.
 outerRadius = 4.
-tf          = 20.                                               #final time
-saveDel     = 2                            #time interval to save snapshots
+tf          = 200.                                              #final time
+saveDel     = 20                           #time interval to save snapshots
 exp         = 25.                  #controls steepness of initial condition
 amp         = .05        #relative amplitude of trigonometric topo function
 frq         = 9                   #frequency of trigonometric topo function
 
 plotFromSaved = 0                            #if 1, load instead of compute
-saveContours  = 0                       #switch for saving contours as pngs
+saveContours  = 1                       #switch for saving contours as pngs
 
 dimSplit = np.int64(sys.argv[1])               #0:none, 1:some, 2:fullSplit
 phs      = np.int64(sys.argv[2])             #PHS RBF exponent (odd number)
@@ -174,17 +174,15 @@ rhoT = initialCondition( xT, yT )
 
 #Radial hyperviscosity coefficient (alp):
 
-if ( pol == 1 ) | ( pol == 2 ) :
-    alp = 2^-9000
-elif ( pol == 3 ) | ( pol == 4 ) :
+if ( pol == 3 ) | ( pol == 4 ) :
     alp = -2.**-10.
 elif ( pol == 5 ) | ( pol == 6 ) :
-    alp = 2.**-12.
-elif ( pol == 7 ) | ( pol == 8 ) :
-    alp = -2**-14
+    alp = 2.**-15.
+else :
+    sys.exit("\nError: pol should be 3, 4, 5, or 6.\n")
 
-if stc == pol+1 :
-    alp = 0.                           #remove HV if using only polynomials
+# if stc == pol+1 :
+    # alp = 0.                           #remove HV if using only polynomials
 
 ###########################################################################
 
