@@ -8,7 +8,7 @@ from scipy.sparse import spdiags
 sys.path.append( '../site-packages' )
 
 from gab import rk, phs1, phs2
-from gab.acousticWaveEquation import annulus
+from gab.annulus import common, waveEquation
 from gab.pseudospectral import periodic
 
 ###########################################################################
@@ -16,14 +16,14 @@ from gab.pseudospectral import periodic
 c           = .1                                                #wave speed
 innerRadius = 2.
 outerRadius = 3.
-tf          = 40.                                               #final time
+tf          = 20.                                               #final time
 saveDel     = 2                            #time interval to save snapshots
 exp         = 100.                 #controls steepness of initial condition
-amp         = .00        #relative amplitude of trigonometric topo function
+amp         = .10        #relative amplitude of trigonometric topo function
 frq         = 9                   #frequency of trigonometric topo function
 
 plotFromSaved = 0                            #if 1, load instead of compute
-saveContours  = 1                       #switch for saving contours as pngs
+saveContours  = 0                       #switch for saving contours as pngs
 
 dimSplit = np.int64(sys.argv[1])               #0:none, 1:some, 2:fullSplit
 phs      = np.int64(sys.argv[2])             #PHS RBF exponent (odd number)
@@ -35,9 +35,9 @@ ns       = np.int64(sys.argv[7])+2                #total number of s levels
 dt       = 1./np.float64(sys.argv[8])                              #delta t
 
 rSurf, rSurfPrime, sFunc, dsdth, dsdr \
-= annulus.getHeightCoordinate( innerRadius, outerRadius, amp, frq )
+= common.getHeightCoordinate( innerRadius, outerRadius, amp, frq )
 
-tmp = 17./18.*np.pi
+tmp = 1./18.*np.pi
 xc1 = (rSurf(tmp)+outerRadius)/2.*np.cos(tmp)           #x-coord of GA bell
 yc1 = (rSurf(tmp)+outerRadius)/2.*np.sin(tmp)           #y-coord of GA bell
 def initialCondition( x, y ) :
@@ -50,7 +50,7 @@ def initialCondition( x, y ) :
 
 #Set things up for saving:
 
-saveString = annulus.getSavestring( c, innerRadius, outerRadius, tf, saveDel, exp, amp, frq \
+saveString = waveEquation.getSavestring( c, innerRadius, outerRadius, tf, saveDel, exp, amp, frq \
 , dimSplit, phs, pol, stc, ptb, rkStages, ns, dt )
 
 if os.path.exists( saveString+'*.npy' ) :
@@ -66,7 +66,7 @@ if not os.path.exists( saveString ) :
 t = 0.                                                       #starting time
 nTimesteps = np.int(np.round( tf / dt ))         #total number of timesteps
 
-nth = annulus.getNth( innerRadius, outerRadius, ns )#nmbr of angular levels
+nth = common.getNth( innerRadius, outerRadius, ns )#nmbr of angular levels
 dth = 2.*np.pi / nth                                  #constant delta theta
 th0  = np.linspace( 0., 2.*np.pi, nth+1 )             #vector of all angles
 th0  = th0[0:-1]                         #remove last angle (same as first)
@@ -93,7 +93,7 @@ np.save( saveString+'th'+'.npy', th )             #save vector of th values
 #Get computational mesh and mesh for contour plotting:
 
 thth, ss = np.meshgrid( th, s )      #mesh of perturbed s values and angles
-rr = annulus.getRadii( thth, ss \
+rr = common.getRadii( thth, ss \
 , innerRadius, outerRadius, rSurf )                #mesh of perturbed radii
 xx = rr * np.cos(thth)                               #mesh of x-coordinates
 yy = rr * np.sin(thth)                               #mesh of y-coordinates
@@ -111,7 +111,7 @@ cosThOverR = cosTh/rri
 sinThOverR = sinTh/rri
 
 thth0, ss0 = np.meshgrid( th0, s0[1:-1] )        #regular mesh for plotting
-rr0 = annulus.getRadii( thth0, ss0 \
+rr0 = common.getRadii( thth0, ss0 \
 , innerRadius, outerRadius, rSurf )                  #mesh of regular radii
 xx0 = rr0 * np.cos(thth0)                             #mesh of reg x-coords
 yy0 = rr0 * np.sin(thth0)                             #mesh of reg x-coords
@@ -365,15 +365,15 @@ else :
     sys.exit("\nError: dimSplit should be 0, 1, or 2.\n")
 
 def setGhostNodes( U ) :
-    return annulus.setGhostNodes1D( U \
+    return waveEquation.setGhostNodes1D( U \
     , rhoB, rhoT, wIinner, wEinner, wIouter, wEouter, stc )
 
 def odefun( t, U ) :
-    return annulus.odefun( t, U \
+    return waveEquation.odefun( t, U \
     , setGhostNodes, Ds, Dlam, HV \
     , c, dsdth, dsdr \
     , cosTh, sinTh, cosThOverR, sinThOverR )
-    # return annulus.odefunCartesian( t, U \
+    # return waveEquation.odefunCartesian( t, U \
     # , setGhostNodes, Dx, Dy, HV          \
     # , c )
 

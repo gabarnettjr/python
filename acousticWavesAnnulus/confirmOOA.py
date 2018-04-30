@@ -6,7 +6,7 @@ sys.path.append( '../site-packages' )
 
 from gab import phs1, phs2
 from gab.pseudospectral import periodic
-from gab.acousticWaveEquation import annulus
+from gab.annulus import common, waveEquation
 
 ###########################################################################
 
@@ -27,15 +27,15 @@ dimSplitA = 2
 phsA      = 5
 polA      = 3
 stcA      = 7
-ptbA      = .40
+ptbA      = .00
 rkStagesA = 3
 
 dimSplitB = 2
 phsB      = 7
 polB      = 5
 stcB      = 13
-ptbB      = .40
-rkStagesB = 3
+ptbB      = .00
+rkStagesB = 4
 
 dimSplit0 = 2
 phs0      = 7
@@ -61,18 +61,18 @@ dt4 = 1./16.
 dt5 = 1./32.
 
 rSurf, rSurfPrime, sFunc, dsdth, dsdr \
-= annulus.getHeightCoordinate( innerRadius, outerRadius, amp, frq )
+= common.getHeightCoordinate( innerRadius, outerRadius, amp, frq )
 
 ###########################################################################
 
 def loadSingleResult( dimSplit, phs, pol, stc, ptb, rkStages, ns, dt, t0 ) :
     
-    saveString = annulus.getSavestring( c, innerRadius, outerRadius, tf, saveDel, exp, amp, frq \
+    saveString = waveEquation.getSavestring( c, innerRadius, outerRadius, tf, saveDel, exp, amp, frq \
     , dimSplit, phs, pol, stc, ptb, rkStages, ns, dt )
     
     U  = np.load( saveString+'{0:04d}'.format(np.int(np.round(t0)))+'.npy' )
     s  = np.load( saveString+'s'+'.npy' )
-    th = np.load( saveString+'th'+.npy' )
+    th = np.load( saveString+'th'+'.npy' )
     
     return U[0,:,:], s, th
 
@@ -92,46 +92,6 @@ def loadManyResults( dimSplit, phs, pol, stc, ptb, rkStages ) :
     return U0, U1, U2, U3, U4, U5 \
     , s0, s1, s2, s3, s4, s5 \
     , th0, th1, th2, th3, th4, th5
-
-###########################################################################
-
-#Get regularly spaced theta levels:
-
-# def getThetaLevels() :
-
-    # nth0 = annulus.getNth( innerRadius, outerRadius, ns0 )
-    # nth1 = annulus.getNth( innerRadius, outerRadius, ns1 )
-    # nth2 = annulus.getNth( innerRadius, outerRadius, ns2 )
-    # nth3 = annulus.getNth( innerRadius, outerRadius, ns3 )
-    # nth4 = annulus.getNth( innerRadius, outerRadius, ns4 )
-    # nth5 = annulus.getNth( innerRadius, outerRadius, ns5 )
-
-    # th0 = np.linspace( 0, 2.*np.pi, nth0+1 )
-    # th1 = np.linspace( 0, 2.*np.pi, nth1+1 )
-    # th2 = np.linspace( 0, 2.*np.pi, nth2+1 )
-    # th3 = np.linspace( 0, 2.*np.pi, nth3+1 )
-    # th4 = np.linspace( 0, 2.*np.pi, nth4+1 )
-    # th5 = np.linspace( 0, 2.*np.pi, nth5+1 )
-
-    # th0 = th0[0:-1]
-    # th1 = th1[0:-1]
-    # th2 = th2[0:-1]
-    # th3 = th3[0:-1]
-    # th4 = th4[0:-1]
-    # th5 = th5[0:-1]
-    
-    # return th0, th1, th2, th3, th4, th5
-
-###########################################################################
-
-# def getXYpoints( th, s ) :
-    
-    # thth, ss = np.meshgrid( th, s )
-    # rr = annulus.getRadii( thth, ss, innerRadius, outerRadius, rSurf )
-    # x = ( rr * np.cos(thth) ) . flatten()
-    # y = ( rr * np.sin(thth) ) . flatten()
-    
-    # return x, y
 
 ###########################################################################
 
@@ -249,10 +209,10 @@ plt.show()
 
 if contourErrors == 1 :
 
-    rSurf, rSurfPrime = annulus.getTopoFunc( innerRadius, outerRadius, amp, frq )
+    rSurf, rSurfPrime = common.getTopoFunc( innerRadius, outerRadius, amp, frq )
 
     thth0, ss0 = np.meshgrid( th0, s0[1:-1] )
-    rr0 = annulus.getRadii( thth0, ss0, innerRadius, outerRadius, rSurf )
+    rr0 = common.getRadii( thth0, ss0, innerRadius, outerRadius, rSurf )
     xx0 = rr0 * np.cos(thth0)
     yy0 = rr0 * np.sin(thth0)
 
