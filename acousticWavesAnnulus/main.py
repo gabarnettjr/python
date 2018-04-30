@@ -13,7 +13,7 @@ from gab.pseudospectral import periodic
 
 ###########################################################################
 
-c           = .1                                                #wave speed
+c           = .01                                               #wave speed
 innerRadius = 2.
 outerRadius = 3.
 tf          = 20.                                               #final time

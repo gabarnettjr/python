@@ -10,7 +10,7 @@ from gab.annulus import common, waveEquation
 
 ###########################################################################
 
-c           = .1                                                #wave speed
+c           = .01                                               #wave speed
 innerRadius = 2.
 outerRadius = 3.
 tf          = 20.                                               #final time
@@ -24,9 +24,9 @@ ord = 2                                        #norm to use for error check
 contourErrors = 1
 
 dimSplitA = 2
-phsA      = 5
-polA      = 3
-stcA      = 7
+phsA      = 7
+polA      = 5
+stcA      = 13
 ptbA      = .00
 rkStagesA = 3
 
