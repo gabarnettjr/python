@@ -13,12 +13,12 @@ from gab.pseudospectral import periodic
 
 ###########################################################################
 
-c           = .01                                               #wave speed
+c           = .02                                               #wave speed
 innerRadius = 2.
 outerRadius = 3.
 tf          = 20.                                               #final time
 saveDel     = 2                            #time interval to save snapshots
-exp         = 100.                 #controls steepness of initial condition
+exp         = 50.                  #controls steepness of initial condition
 amp         = .10        #relative amplitude of trigonometric topo function
 frq         = 9                   #frequency of trigonometric topo function
 
@@ -183,12 +183,13 @@ rhoT = initialCondition( xT, yT )
 
 ###########################################################################
 
-#Radial hyperviscosity coefficient (alp):
+#Hyperviscosity coefficient (alp) for radial and angular directions:
 
 if ( pol == 3 ) | ( pol == 4 ) :
     alp = -2.**-10.
 elif ( pol == 5 ) | ( pol == 6 ) :
-    alp = 2.**-13.
+    alp = 2.**-15
+    # alp = 2.**-13.
 else :
     sys.exit("\nError: pol should be 3, 4, 5, or 6.\n")
 

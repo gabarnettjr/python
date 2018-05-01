@@ -10,12 +10,12 @@ from gab.annulus import common, waveEquation
 
 ###########################################################################
 
-c           = .01                                               #wave speed
+c           = .02                                               #wave speed
 innerRadius = 2.
 outerRadius = 3.
 tf          = 20.                                               #final time
 saveDel     = 2                            #time interval to save snapshots
-exp         = 100.                 #controls steepness of initial condition
+exp         = 50.                  #controls steepness of initial condition
 amp         = .10        #relative amplitude of trigonometric topo function
 frq         = 9                   #frequency of trigonometric topo function
 
@@ -24,23 +24,23 @@ ord = 2                                        #norm to use for error check
 contourErrors = 1
 
 dimSplitA = 2
-phsA      = 7
-polA      = 5
-stcA      = 13
-ptbA      = .00
+phsA      = 5
+polA      = 3
+stcA      = 7
+ptbA      = .30
 rkStagesA = 3
 
 dimSplitB = 2
 phsB      = 7
 polB      = 5
-stcB      = 13
-ptbB      = .00
-rkStagesB = 4
+stcB      = 15
+ptbB      = .30
+rkStagesB = 3
 
 dimSplit0 = 2
 phs0      = 7
 pol0      = 5
-stc0      = 13
+stc0      = 15
 ptb0      = .00
 rkStages0 = 4
 
@@ -195,8 +195,9 @@ plt.plot( np.log(ns), np.log(errB), '-' )
 plt.plot( np.array([3.,5.]), np.array([-1.,-5.]), '--' )
 plt.plot( np.array([3.,5.]), np.array([-1.,-7.]), '--' )
 plt.plot( np.array([3.,5.]), np.array([-1.,-9.]),  '--' )
-# plt.plot( np.array([3.,5.]), np.array([-1.,-11.]), '--' )
-plt.legend(( 'A', 'B', '2nd order', '3rd order', '4th order' ))
+plt.plot( np.array([3.,5.]), np.array([-1.,-11.]), '--' )
+plt.legend(( 'A', 'B', '2nd order' \
+, '3rd order', '4th order', '5th order' ))
 plt.plot( np.log(ns), np.log(errA), 'k.' )
 plt.plot( np.log(ns), np.log(errB), 'k.' )
 plt.xlabel( 'log(ns)' )
