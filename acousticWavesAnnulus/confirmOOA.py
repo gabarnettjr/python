@@ -4,22 +4,21 @@ import matplotlib.pyplot as plt
 
 sys.path.append( '../site-packages' )
 
-from gab import phs1, phs2
-from gab.pseudospectral import periodic
+from gab import phs1
 from gab.annulus import common, waveEquation
 
 ###########################################################################
 
-c           = .02                                               #wave speed
+c           = .10                                               #wave speed
 innerRadius = 2.
 outerRadius = 3.
-tf          = 20.                                               #final time
-saveDel     = 2                            #time interval to save snapshots
-exp         = 50.                  #controls steepness of initial condition
-amp         = .10        #relative amplitude of trigonometric topo function
+tf          = 10.                                               #final time
+saveDel     = 1                            #time interval to save snapshots
+exp         = 00.                  #controls steepness of initial condition
+amp         = .00        #relative amplitude of trigonometric topo function
 frq         = 9                   #frequency of trigonometric topo function
 
-ord = 2                                        #norm to use for error check
+ord = np.inf                                   #norm to use for error check
 
 contourErrors = 1
 
@@ -27,20 +26,20 @@ dimSplitA = 2
 phsA      = 5
 polA      = 3
 stcA      = 7
-ptbA      = .30
+ptbA      = .00
 rkStagesA = 3
 
 dimSplitB = 2
 phsB      = 7
 polB      = 5
-stcB      = 15
-ptbB      = .30
-rkStagesB = 3
+stcB      = 13
+ptbB      = .00
+rkStagesB = 4
 
 dimSplit0 = 2
 phs0      = 7
 pol0      = 5
-stc0      = 15
+stc0      = 13
 ptb0      = .00
 rkStages0 = 4
 
@@ -201,7 +200,7 @@ plt.legend(( 'A', 'B', '2nd order' \
 plt.plot( np.log(ns), np.log(errA), 'k.' )
 plt.plot( np.log(ns), np.log(errB), 'k.' )
 plt.xlabel( 'log(ns)' )
-plt.ylabel( 'log(relMaxNormErr)' )
+plt.ylabel( 'log(relErr)' )
 plt.show()
 
 ###########################################################################

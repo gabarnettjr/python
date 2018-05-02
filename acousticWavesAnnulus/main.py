@@ -9,17 +9,16 @@ sys.path.append( '../site-packages' )
 
 from gab import rk, phs1, phs2
 from gab.annulus import common, waveEquation
-from gab.pseudospectral import periodic
 
 ###########################################################################
 
-c           = .02                                               #wave speed
+c           = .10                                               #wave speed
 innerRadius = 2.
 outerRadius = 3.
-tf          = 20.                                               #final time
-saveDel     = 2                            #time interval to save snapshots
-exp         = 50.                  #controls steepness of initial condition
-amp         = .10        #relative amplitude of trigonometric topo function
+tf          = 10.                                               #final time
+saveDel     = 1                            #time interval to save snapshots
+exp         = 00.                  #controls steepness of initial condition
+amp         = .00        #relative amplitude of trigonometric topo function
 frq         = 9                   #frequency of trigonometric topo function
 
 plotFromSaved = 0                            #if 1, load instead of compute
@@ -188,8 +187,7 @@ rhoT = initialCondition( xT, yT )
 if ( pol == 3 ) | ( pol == 4 ) :
     alp = -2.**-10.
 elif ( pol == 5 ) | ( pol == 6 ) :
-    alp = 2.**-15
-    # alp = 2.**-13.
+    alp = 2.**-13.
 else :
     sys.exit("\nError: pol should be 3, 4, 5, or 6.\n")
 
@@ -366,7 +364,7 @@ else :
     sys.exit("\nError: dimSplit should be 0, 1, or 2.\n")
 
 def setGhostNodes( U ) :
-    return waveEquation.setGhostNodes1D( U \
+    return waveEquation.setGhostNodes( U \
     , rhoB, rhoT, wIinner, wEinner, wIouter, wEouter, stc )
 
 def odefun( t, U ) :
