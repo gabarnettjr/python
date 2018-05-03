@@ -12,10 +12,10 @@ from gab.annulus import common, waveEquation
 c           = .10                                               #wave speed
 innerRadius = 2.
 outerRadius = 3.
-tf          = 10.                                               #final time
-saveDel     = 1                            #time interval to save snapshots
-exp         = 00.                  #controls steepness of initial condition
-amp         = .00        #relative amplitude of trigonometric topo function
+tf          = 20.                                               #final time
+saveDel     = 2                            #time interval to save snapshots
+exp         = 100.                 #controls steepness of initial condition
+amp         = .10        #relative amplitude of trigonometric topo function
 frq         = 9                   #frequency of trigonometric topo function
 
 ord = np.inf                                   #norm to use for error check
@@ -23,17 +23,17 @@ ord = np.inf                                   #norm to use for error check
 contourErrors = 1
 
 dimSplitA = 2
-phsA      = 5
-polA      = 3
-stcA      = 7
+phsA      = 7
+polA      = 5
+stcA      = 13
 ptbA      = .00
-rkStagesA = 3
+rkStagesA = 4
 
 dimSplitB = 2
 phsB      = 7
 polB      = 5
 stcB      = 13
-ptbB      = .00
+ptbB      = .30
 rkStagesB = 4
 
 dimSplit0 = 2
@@ -43,7 +43,7 @@ stc0      = 13
 ptb0      = .00
 rkStages0 = 4
 
-t0 = tf
+t0 = tf                                                    #time to look at
 
 ns0 = 256+2                                           #reference resolution
 ns1 = 16+2
