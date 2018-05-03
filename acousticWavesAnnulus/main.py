@@ -15,10 +15,10 @@ from gab.annulus import common, waveEquation
 c           = .10                                               #wave speed
 innerRadius = 2.
 outerRadius = 3.
-tf          = 10.                                               #final time
-saveDel     = 1                            #time interval to save snapshots
-exp         = 00.                  #controls steepness of initial condition
-amp         = .00        #relative amplitude of trigonometric topo function
+tf          = 20.                                               #final time
+saveDel     = 2                            #time interval to save snapshots
+exp         = 100.                 #controls steepness of initial condition
+amp         = .10        #relative amplitude of trigonometric topo function
 frq         = 9                   #frequency of trigonometric topo function
 
 plotFromSaved = 0                            #if 1, load instead of compute
@@ -40,10 +40,7 @@ tmp = 1./18.*np.pi
 xc1 = (rSurf(tmp)+outerRadius)/2.*np.cos(tmp)           #x-coord of GA bell
 yc1 = (rSurf(tmp)+outerRadius)/2.*np.sin(tmp)           #y-coord of GA bell
 def initialCondition( x, y ) :
-    if ( exp == 0. ) & ( amp == 0. ) :
-        return np.sin( np.pi * np.sqrt(x**2.+y**2.) )
-    else :
-        return np.exp( -exp*( (x-xc1)**2. + (y-yc1)**2. ) )
+    return 1. + np.exp( -exp*( (x-xc1)**2. + (y-yc1)**2. ) )
 
 ###########################################################################
 
@@ -101,8 +98,8 @@ yyi = yy[1:-1,:]                                       #exclude ghost nodes
 
 ththi = thth[1:-1,:]                                    #remove ghost nodes
 rri = rr[1:-1,:]                                        #remove ghost nodes
-dsdth = dsdth( rri, ththi )                 #overwrite function with values
-dsdr  = dsdr( rri, ththi )                  #overwrite function with values
+dsdthi = dsdth( rri, ththi )                #overwrite function with values
+dsdri  = dsdr( rri, ththi )                 #overwrite function with values
 
 cosTh = np.cos(ththi)
 sinTh = np.sin(ththi)
@@ -124,12 +121,12 @@ yy0 = rr0 * np.sin(thth0)                             #mesh of reg x-coords
 # plt.colorbar()
 # plt.show()
 
-# plt.contourf( xxi, yyi, dsdth, 20 )
+# plt.contourf( xxi, yyi, dsdthi, 20 )
 # plt.axis( 'equal' )
 # plt.colorbar()
 # plt.show()
 
-# plt.contourf( xxi, yyi, dsdr, 20 )
+# plt.contourf( xxi, yyi, dsdri, 20 )
 # plt.axis( 'equal' )
 # plt.colorbar()
 # plt.show()
@@ -153,18 +150,45 @@ yy0 = rr0 * np.sin(thth0)                             #mesh of reg x-coords
 
 ###########################################################################
 
-#Set initial condition and fixed Dirichlet BC for U[0,:,:] (rho):
+#Set initial condition for U[0,:,:] (P):
 
 U = np.zeros(( 3, ns, nth ))
-U[0,:,:] = initialCondition( xx, yy )
+rhoInv = 1. / initialCondition(xx,yy)
+U[0,:,:] = c^2. / rhoInv
 
 xB = rSurf(th) * np.cos(th)
 yB = rSurf(th) * np.sin(th)
-rhoB = initialCondition( xB, yB )
-
 xT = outerRadius * np.cos(th)
 yT = outerRadius * np.sin(th)
-rhoT = initialCondition( xT, yT )
+
+###########################################################################
+
+#Extra things needed for enforcing the Neumann boundary condition:
+
+NxBot = np.tile( np.cos(th) + np.sin(th) * rSurfPrime(th), (stc,1) )
+NyBot = np.tile( np.sin(th) + np.cos(th) * rSurfPrime(th), (stc,1) )
+tmp = np.sqrt( NxBot**2. + NyBot**2. )
+NxBot = NxBot / tmp
+NyBot = NyBot / tmp
+
+NxTop = np.tile( np.cos(th), (stc,1) )
+NyTop = np.tile( np.sin(th), (stc,1) )
+
+TxBot = np.tile( -np.sin(th) + np.cos(th) * rSurfPrime(th), (stc+1,1) )
+TyBot = np.tile(  np.cos(th) + np.sin(th) * rSurfPrime(th), (stc+1,1) )
+tmp = np.sqrt( TxBot**2. + TyBot**2. )
+TxBot = TxBot / tmp
+TyBot = TyBot / tmp
+
+TxTop = np.tile( -np.sin(th), (stc+1,1) )
+TyTop = np.tile(  np.cos(th), (stc+1,1) )
+
+alpha = NxBot[0,:] * np.sin(th) - NyBot[0,:] * np.cos(th)
+beta  = NxBot[0,:] * np.cos(th) + NyBot[0,:] * np.sin(th)
+
+rBot     = rSurf(th)
+dsdrBot  = dsdr( rBot, th )
+dsdthBot = dsdth( rBot, th )
 
 ###########################################################################
     
@@ -268,18 +292,23 @@ Whvlam = np.transpose( Whvlam )            #work on rows instead of columns
 
 ###########################################################################
 
-#Weights for interpolation to boundary and extrapolation to ghost-nodes:
+#Weights for interpolation to boundary and extrapolation to ghost-nodes
+#and d/ds:
 
 wIinner = phs1.getWeights( innerRadius, s[0:stc],   0, phs, pol )
 wEinner = phs1.getWeights( s[0],        s[1:stc+1], 0, phs, pol )
+wDinner = phs1.getWeights( innerRadius, s[0:stc],   1, phs, pol )
 
 wIouter = phs1.getWeights( outerRadius, s[-1:-stc-1:-1], 0, phs, pol )
 wEouter = phs1.getWeights( s[-1],       s[-2:-stc-2:-1], 0, phs, pol )
+wDouter = phs1.getWeights( outerRadius, s[-1:-stc-1:-1], 1, phs, pol )
 
 wIinner = np.transpose( np.tile( wIinner, (nth,1) ) )
 wEinner = np.transpose( np.tile( wEinner, (nth,1) ) )
+wDinner = np.transpose( np.tile( wDinner, (nth,1) ) )
 wIouter = np.transpose( np.tile( wIouter, (nth,1) ) )
 wEouter = np.transpose( np.tile( wEouter, (nth,1) ) )
+wDouter = np.transpose( np.tile( wDouter, (nth,1) ) )
 
 ###########################################################################
 
@@ -305,17 +334,17 @@ if dimSplit == 2 :
     def Dlam(U) :
         return U[1:-1,:] @ Wlam
     
-    # def Dr(U) :
-        # return Ds(U) * dsdr
+    def Dr(U) :
+        return Ds(U) * dsdri
     
-    # def Dth(U) :
-        # return Dlam(U) + Ds(U) * dsdth
+    def Dth(U) :
+        return Dlam(U) + Ds(U) * dsdthi
     
-    # def Dx(U) :
-        # return cosTh * Dr(U) - sinThOverR * Dth(U)
+    def Dx(U) :
+        return cosTh * Dr(U) - sinThOverR * Dth(U)
     
-    # def Dy(U) :
-        # return sinTh * Dr(U) + cosThOverR * Dth(U)
+    def Dy(U) :
+        return sinTh * Dr(U) + cosThOverR * Dth(U)
     
     def HV(U) :
         return ( Whvs @ U ) + ( U[1:-1,:] @ Whvlam )
@@ -326,7 +355,7 @@ elif ( dimSplit == 1 ) | ( dimSplit == 0 ) :
         return Ws @ U
     
     def Dr(U) :
-        return Ds(U) * dsdr
+        return Ds(U) * dsdri
     
     def Dth(U) :
         U = U.flatten()
@@ -364,17 +393,22 @@ else :
     sys.exit("\nError: dimSplit should be 0, 1, or 2.\n")
 
 def setGhostNodes( U ) :
-    return waveEquation.setGhostNodes( U \
-    , rhoB, rhoT, wIinner, wEinner, wIouter, wEouter, stc )
+    return waveEquation.setGhostNodesNeumann( U \
+    , NxBot, NyBot, NxTop, NyTop \
+    , TxBot, TyBot, TxTop, TyTop \
+    , alpha, beta, dsdrBot, dsdthBot, rBot, stc \
+    , Wlam, wIinner, wEinner, wDinner, wIouter, wEouter, wDouter )
+    # return waveEquation.setGhostNodes( U \
+    # , rhoB, rhoT, wIinner, wEinner, wIouter, wEouter, stc )
 
 def odefun( t, U ) :
-    return waveEquation.odefun( t, U \
-    , setGhostNodes, Ds, Dlam, HV \
-    , c, dsdth, dsdr \
-    , cosTh, sinTh, cosThOverR, sinThOverR )
-    # return waveEquation.odefunCartesian( t, U \
-    # , setGhostNodes, Dx, Dy, HV          \
-    # , c )
+    # return waveEquation.odefun( t, U \
+    # , setGhostNodes, Ds, Dlam, HV \
+    # , c, dsdthi, dsdri \
+    # , cosTh, sinTh, cosThOverR, sinThOverR )
+    return waveEquation.odefunCartesian( t, U \
+    , setGhostNodes, Dx, Dy, HV          \
+    , Po, rhoInv )
 
 if rkStages == 3 :
     rk = rk.rk3
