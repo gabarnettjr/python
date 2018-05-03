@@ -15,14 +15,14 @@ from gab.annulus import common, waveEquation
 c           = .10                                               #wave speed
 innerRadius = 2.
 outerRadius = 3.
-tf          = 20.                                               #final time
+tf          = 40.                                               #final time
 saveDel     = 2                            #time interval to save snapshots
 exp         = 100.                 #controls steepness of initial condition
 amp         = .10        #relative amplitude of trigonometric topo function
 frq         = 9                   #frequency of trigonometric topo function
 
 plotFromSaved = 0                            #if 1, load instead of compute
-saveContours  = 0                       #switch for saving contours as pngs
+saveContours  = 1                       #switch for saving contours as pngs
 
 dimSplit = np.int64(sys.argv[1])               #0:none, 1:some, 2:fullSplit
 phs      = np.int64(sys.argv[2])             #PHS RBF exponent (odd number)
@@ -153,8 +153,9 @@ yy0 = rr0 * np.sin(thth0)                             #mesh of reg x-coords
 #Set initial condition for U[0,:,:] (P):
 
 U = np.zeros(( 3, ns, nth ))
-rhoInv = 1. / initialCondition(xx,yy)
-U[0,:,:] = c^2. / rhoInv
+U[0,:,:] = initialCondition(xx,yy)
+rhoInv = c**2. / U[0,1:-1,:]
+Po = U[0,1:-1,:]
 
 xB = rSurf(th) * np.cos(th)
 yB = rSurf(th) * np.sin(th)
@@ -165,30 +166,30 @@ yT = outerRadius * np.sin(th)
 
 #Extra things needed for enforcing the Neumann boundary condition:
 
-NxBot = np.tile( np.cos(th) + np.sin(th) * rSurfPrime(th), (stc,1) )
-NyBot = np.tile( np.sin(th) + np.cos(th) * rSurfPrime(th), (stc,1) )
-tmp = np.sqrt( NxBot**2. + NyBot**2. )
-NxBot = NxBot / tmp
-NyBot = NyBot / tmp
+NxTop = np.tile( np.cos(th), (stc-1,1) )
+NyTop = np.tile( np.sin(th), (stc-1,1) )
 
-NxTop = np.tile( np.cos(th), (stc,1) )
-NyTop = np.tile( np.sin(th), (stc,1) )
-
-TxBot = np.tile( -np.sin(th) + np.cos(th) * rSurfPrime(th), (stc+1,1) )
-TyBot = np.tile(  np.cos(th) + np.sin(th) * rSurfPrime(th), (stc+1,1) )
-tmp = np.sqrt( TxBot**2. + TyBot**2. )
-TxBot = TxBot / tmp
-TyBot = TyBot / tmp
-
-TxTop = np.tile( -np.sin(th), (stc+1,1) )
-TyTop = np.tile(  np.cos(th), (stc+1,1) )
-
-alpha = NxBot[0,:] * np.sin(th) - NyBot[0,:] * np.cos(th)
-beta  = NxBot[0,:] * np.cos(th) + NyBot[0,:] * np.sin(th)
+TxTop = np.tile( -np.sin(th), (stc,1) )
+TyTop = np.tile(  np.cos(th), (stc,1) )
 
 rBot     = rSurf(th)
 dsdrBot  = dsdr( rBot, th )
 dsdthBot = dsdth( rBot, th )
+
+NxBot = np.cos(th) * dsdrBot - np.sin(th)/rBot * dsdthBot
+NyBot = np.sin(th) * dsdrBot + np.cos(th)/rBot * dsdthBot
+tmp = np.sqrt( NxBot**2. + NyBot**2. )
+NxBot = NxBot / tmp
+NyBot = NyBot / tmp
+
+alpha = NxBot * np.sin(th) - NyBot * np.cos(th)
+beta  = NxBot * np.cos(th) + NyBot * np.sin(th)
+
+TxBot = np.tile( -NyBot, (stc,1) )
+TyBot = np.tile(  NxBot, (stc,1) )
+
+NxBot = np.tile( NxBot, (stc-1,1) )
+NyBot = np.tile( NyBot, (stc-1,1) )
 
 ###########################################################################
     
@@ -439,7 +440,7 @@ for i in np.arange( 0, nTimesteps+1 ) :
         if saveContours == 1 :
             tmp = Wradial @ U[0,:,:] @ Wangular
             # plt.contourf( xx0, yy0, tmp, 20 )
-            plt.contourf( xx0, yy0, tmp, np.arange(-.17,.17+.02,.02) )
+            plt.contourf( xx0, yy0, tmp, np.arange(1.-.19,1.+.21,.02) )
             # plt.contourf( xx0, yy0, tmp, np.arange(-1.1,1.3,.2) )
             plt.axis('equal')
             plt.colorbar()
