@@ -14,26 +14,26 @@ innerRadius = 1.
 outerRadius = 3.
 tf          = 10.                                               #final time
 saveDel     = 1                            #time interval to save snapshots
-exp         = 50.                  #controls steepness of initial condition
-amp         = .10        #relative amplitude of trigonometric topo function
+exp         = 00.                  #controls steepness of initial condition
+amp         = .00        #relative amplitude of trigonometric topo function
 frq         = 9                   #frequency of trigonometric topo function
 
 ord = np.inf                                   #norm to use for error check
 
-contourErrors = 1
+contourErrors = 0
 
 dimSplitA = 2
 phsA      = 5
 polA      = 3
 stcA      = 7
-ptbA      = .30
+ptbA      = .00
 rkStagesA = 3
 
 dimSplitB = 2
 phsB      = 7
 polB      = 5
 stcB      = 13
-ptbB      = .30
+ptbB      = .00
 rkStagesB = 3
 
 dimSplit0 = 2
@@ -186,7 +186,7 @@ errB, U0, U1, U2, U3, U4, U5, th0, s0 \
 ns= np.hstack(( ns1, ns2, ns3, ns4, ns5 ))
 ns = ns - 2
 
-dom = np.array( [ 1.2, 2.2 ] )
+dom = np.array( [ 1.5, 2.3 ] )
 shift = -2.
 
 plt.plot( np.log10(ns), np.log10(errA), '-' )
