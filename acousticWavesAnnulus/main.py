@@ -12,13 +12,13 @@ from gab.annulus import common, waveEquation
 
 ###########################################################################
 
-c           = .10                                               #wave speed
-innerRadius = 2.
-outerRadius = 4.
-tf          = 20.                                               #final time
-saveDel     = 2                            #time interval to save snapshots
-exp         = 100.                 #controls steepness of initial condition
-amp         = .00        #relative amplitude of trigonometric topo function
+c           = .01                                     #wave speed (c**2=RT)
+innerRadius = 1.
+outerRadius = 3.
+tf          = 10.                                               #final time
+saveDel     = 1                            #time interval to save snapshots
+exp         = 50.                  #controls steepness of initial condition
+amp         = .10        #relative amplitude of trigonometric topo function
 frq         = 9                   #frequency of trigonometric topo function
 
 plotFromSaved = 0                            #if 1, load instead of compute
@@ -33,14 +33,19 @@ rkStages = np.int64(sys.argv[6])     #number of Runge-Kutta stages (3 or 4)
 ns       = np.int64(sys.argv[7])+2                #total number of s levels
 dt       = 1./np.float64(sys.argv[8])                              #delta t
 
-rSurf, rSurfPrime, sFunc, dsdth, dsdr \
-= common.getHeightCoordinate( innerRadius, outerRadius, amp, frq )
+rSurf, rSurfPrime \
+= common.getTopoFunc( innerRadius, outerRadius, amp, frq, phs, pol, stc )
+sFunc, dsdth, dsdr \
+= common.getHeightCoordinate( innerRadius, outerRadius, rSurf, rSurfPrime )
 
 tmp = 17./18.*np.pi
 xc1 = (rSurf(tmp)+outerRadius)/2.*np.cos(tmp)           #x-coord of GA bell
 yc1 = (rSurf(tmp)+outerRadius)/2.*np.sin(tmp)           #y-coord of GA bell
 def initialCondition( x, y ) :
-    return 1. + np.exp( -exp*( (x-xc1)**2. + (y-yc1)**2. ) )
+    if ( exp == 0. ) & ( amp == 0. ) :
+        return 1. + .5 * np.cos( 2*np.pi * np.sqrt(x**2.+y**2.) )
+    else :
+        return 1. + np.exp( -exp*( (x-xc1)**2. + (y-yc1)**2. ) )
 
 ###########################################################################
 
@@ -198,8 +203,8 @@ elif ( pol == 5 ) | ( pol == 6 ) :
 else :
     sys.exit("\nError: pol should be 3, 4, 5, or 6.\n")
 
-# if stc == pol+1 :
-    # alp = 0.                           #remove HV if using only polynomials
+if stc == pol+1 :
+    alp = 0.                           #remove HV if using only polynomials
 
 ###########################################################################
 
@@ -282,9 +287,9 @@ wIinner = phs1.getWeights( innerRadius, s[0:stc],   0, phs, pol )
 wEinner = phs1.getWeights( s[0],        s[1:stc+1], 0, phs, pol )
 wDinner = phs1.getWeights( innerRadius, s[0:stc],   1, phs, pol )
 
-wIouter = phs1.getWeights( outerRadius, s[-1:-stc-1:-1], 0, phs, pol )
-wEouter = phs1.getWeights( s[-1],       s[-2:-stc-2:-1], 0, phs, pol )
-wDouter = phs1.getWeights( outerRadius, s[-1:-stc-1:-1], 1, phs, pol )
+wIouter = phs1.getWeights( outerRadius, s[-1:-(stc+1):-1], 0, phs, pol )
+wEouter = phs1.getWeights( s[-1],       s[-2:-(stc+2):-1], 0, phs, pol )
+wDouter = phs1.getWeights( outerRadius, s[-1:-(stc+1):-1], 1, phs, pol )
 
 wIinner = np.transpose( np.tile( wIinner, (nth,1) ) )
 wEinner = np.transpose( np.tile( wEinner, (nth,1) ) )
@@ -417,13 +422,14 @@ for i in np.arange( 0, nTimesteps+1 ) :
         if plotFromSaved == 1 :
             U = np.load( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy' )
         else :
+            U = setGhostNodes( U )
             np.save( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy', U )
         
         if saveContours == 1 :
             tmp = Wradial @ U[0,:,:] @ Wangular
             # plt.contourf( xx0, yy0, tmp, 20 )
-            plt.contourf( xx0, yy0, tmp, np.arange(1.-.19,1.+.21,.02) )
-            # plt.contourf( xx0, yy0, tmp, np.arange(-1.1,1.3,.2) )
+            # plt.contourf( xx0, yy0, tmp, np.arange(1.-.19,1.+.21,.02) )
+            plt.contourf( xx0, yy0, tmp, np.arange(1.-.51,1.+.53,.02) )
             plt.axis('equal')
             plt.colorbar()
             fig.savefig( '{0:04d}'.format(np.int(np.round(t)+1e-12))+'.png', bbox_inches = 'tight' )

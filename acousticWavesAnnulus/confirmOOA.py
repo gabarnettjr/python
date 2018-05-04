@@ -9,12 +9,12 @@ from gab.annulus import common, waveEquation
 
 ###########################################################################
 
-c           = .10                                               #wave speed
-innerRadius = 2.
+c           = .01                                     #wave speed (c**2=RT)
+innerRadius = 1.
 outerRadius = 3.
-tf          = 20.                                               #final time
-saveDel     = 2                            #time interval to save snapshots
-exp         = 100.                 #controls steepness of initial condition
+tf          = 10.                                               #final time
+saveDel     = 1                            #time interval to save snapshots
+exp         = 50.                  #controls steepness of initial condition
 amp         = .10        #relative amplitude of trigonometric topo function
 frq         = 9                   #frequency of trigonometric topo function
 
@@ -23,18 +23,18 @@ ord = np.inf                                   #norm to use for error check
 contourErrors = 1
 
 dimSplitA = 2
-phsA      = 7
-polA      = 5
-stcA      = 13
-ptbA      = .00
-rkStagesA = 4
+phsA      = 5
+polA      = 3
+stcA      = 7
+ptbA      = .30
+rkStagesA = 3
 
 dimSplitB = 2
 phsB      = 7
 polB      = 5
 stcB      = 13
 ptbB      = .30
-rkStagesB = 4
+rkStagesB = 3
 
 dimSplit0 = 2
 phs0      = 7
@@ -45,22 +45,19 @@ rkStages0 = 4
 
 t0 = tf                                                    #time to look at
 
-ns0 = 256+2                                           #reference resolution
-ns1 = 16+2
-ns2 = 16+2
-ns3 = 32+2
-ns4 = 64+2
-ns5 = 128+2
+ns0 = 384+2                                           #reference resolution
+ns1 = 12+2
+ns2 = 24+2
+ns3 = 48+2
+ns4 = 96+2
+ns5 = 192+2
 
-dt0 = 1./64.
-dt1 = 1./4.
-dt2 = 1./4.
-dt3 = 1./8.
-dt4 = 1./16.
-dt5 = 1./32.
-
-rSurf, rSurfPrime, sFunc, dsdth, dsdr \
-= common.getHeightCoordinate( innerRadius, outerRadius, amp, frq )
+dt0 = 1./32.
+dt1 = 1./1.
+dt2 = 1./2.
+dt3 = 1./4.
+dt4 = 1./8.
+dt5 = 1./16.
 
 ###########################################################################
 
@@ -69,9 +66,9 @@ def loadSingleResult( dimSplit, phs, pol, stc, ptb, rkStages, ns, dt, t0 ) :
     saveString = waveEquation.getSavestring( c, innerRadius, outerRadius, tf, saveDel, exp, amp, frq \
     , dimSplit, phs, pol, stc, ptb, rkStages, ns, dt )
     
-    U  = np.load( saveString+'{0:04d}'.format(np.int(np.round(t0)))+'.npy' )
-    s  = np.load( saveString+'s'+'.npy' )
-    th = np.load( saveString+'th'+'.npy' )
+    U  = np.load( saveString + '{0:04d}'.format(np.int(np.round(t0))) + '.npy' )
+    s  = np.load( saveString + 's' + '.npy' )
+    th = np.load( saveString + 'th' + '.npy' )
     
     return U[0,:,:], s, th
 
@@ -189,18 +186,22 @@ errB, U0, U1, U2, U3, U4, U5, th0, s0 \
 ns= np.hstack(( ns1, ns2, ns3, ns4, ns5 ))
 ns = ns - 2
 
-plt.plot( np.log(ns), np.log(errA), '-' )
-plt.plot( np.log(ns), np.log(errB), '-' )
-plt.plot( np.array([3.,5.]), np.array([-1.,-5.]), '--' )
-plt.plot( np.array([3.,5.]), np.array([-1.,-7.]), '--' )
-plt.plot( np.array([3.,5.]), np.array([-1.,-9.]),  '--' )
-plt.plot( np.array([3.,5.]), np.array([-1.,-11.]), '--' )
-plt.legend(( 'A', 'B', '2nd order' \
+dom = np.array( [ 1.2, 2.2 ] )
+shift = -2.
+
+plt.plot( np.log10(ns), np.log10(errA), '-' )
+plt.plot( np.log10(ns), np.log10(errB), '-' )
+plt.plot( dom, np.array([shift,shift-1.*(dom[1]-dom[0])]), '--' )
+plt.plot( dom, np.array([shift,shift-2.*(dom[1]-dom[0])]), '--' )
+plt.plot( dom, np.array([shift,shift-3.*(dom[1]-dom[0])]), '--' )
+plt.plot( dom, np.array([shift,shift-4.*(dom[1]-dom[0])]), '--' )
+plt.plot( dom, np.array([shift,shift-5.*(dom[1]-dom[0])]), '--' )
+plt.legend(( 'A', 'B', '1st order', '2nd order' \
 , '3rd order', '4th order', '5th order' ))
-plt.plot( np.log(ns), np.log(errA), 'k.' )
-plt.plot( np.log(ns), np.log(errB), 'k.' )
-plt.xlabel( 'log(ns)' )
-plt.ylabel( 'log(relErr)' )
+plt.plot( np.log10(ns), np.log10(errA), 'k.' )
+plt.plot( np.log10(ns), np.log10(errB), 'k.' )
+plt.xlabel( 'log10(ns)' )
+plt.ylabel( 'log10(relErr)' )
 plt.show()
 
 ###########################################################################
@@ -208,41 +209,72 @@ plt.show()
 #Contour plot of differences at final time:
 
 if contourErrors == 1 :
-
-    rSurf, rSurfPrime = common.getTopoFunc( innerRadius, outerRadius, amp, frq )
-
+    
+    rSurf, rSurfPrime = common.getTopoFunc( innerRadius, outerRadius, amp, frq, phs0, pol0, stc0 )
+    
     thth0, ss0 = np.meshgrid( th0, s0[1:-1] )
     rr0 = common.getRadii( thth0, ss0, innerRadius, outerRadius, rSurf )
     xx0 = rr0 * np.cos(thth0)
     yy0 = rr0 * np.sin(thth0)
-
-    nContours = 20
-
+    
+    e1 = np.abs( U1 - U0 )
+    e2 = np.abs( U2 - U0 )
+    e3 = np.abs( U3 - U0 )
+    e4 = np.abs( U4 - U0 )
+    e5 = np.abs( U5 - U0 )
+    
+    ep = 10.**-20.
+    
+    e1 = e1.flatten()
+    e2 = e2.flatten()
+    e3 = e3.flatten()
+    e4 = e4.flatten()
+    e5 = e5.flatten()
+    
+    e1[e1<=ep] = ep
+    e2[e2<=ep] = ep
+    e3[e3<=ep] = ep
+    e4[e4<=ep] = ep
+    e5[e5<=ep] = ep
+    
+    e1 = np.reshape( np.log10(e1), np.shape(xx0) )
+    e2 = np.reshape( np.log10(e2), np.shape(xx0) )
+    e3 = np.reshape( np.log10(e3), np.shape(xx0) )
+    e4 = np.reshape( np.log10(e4), np.shape(xx0) )
+    e5 = np.reshape( np.log10(e5), np.shape(xx0) )
+    
+    cvec = np.arange(-20,1,1)
+    
     plt.figure(1)
-    plt.contourf( xx0, yy0, U1-U0, nContours )
+    plt.contourf( xx0, yy0, e1, cvec )
     plt.axis('equal')
     plt.colorbar()
-
+    plt.title( 'max={0:1.2e}'.format(np.max(np.abs(U1-U0))) )
+    
     plt.figure(2)
-    plt.contourf( xx0, yy0, U2-U0, nContours )
+    plt.contourf( xx0, yy0, e2, cvec )
     plt.axis('equal')
     plt.colorbar()
-
+    plt.title( 'max={0:1.2e}'.format(np.max(np.abs(U2-U0))) )
+    
     plt.figure(3)
-    plt.contourf( xx0, yy0, U3-U0, nContours )
+    plt.contourf( xx0, yy0, e3, cvec )
     plt.axis('equal')
     plt.colorbar()
-
+    plt.title( 'max={0:1.2e}'.format(np.max(np.abs(U3-U0))) )
+    
     plt.figure(4)
-    plt.contourf( xx0, yy0, U4-U0, nContours )
+    plt.contourf( xx0, yy0, e4, cvec )
     plt.axis('equal')
     plt.colorbar()
-
+    plt.title( 'max={0:1.2e}'.format(np.max(np.abs(U4-U0))) )
+    
     plt.figure(5)
-    plt.contourf( xx0, yy0, U5-U0, nContours )
+    plt.contourf( xx0, yy0, e5, cvec )
     plt.axis('equal')
     plt.colorbar()
-
+    plt.title( 'max={0:1.2e}'.format(np.max(np.abs(U5-U0))) )
+    
     plt.show()
 
 ###########################################################################
