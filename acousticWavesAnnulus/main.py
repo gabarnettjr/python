@@ -68,27 +68,32 @@ if not os.path.exists( saveString ) :
 t = 0.                                                       #starting time
 nTimesteps = np.int(np.round( tf / dt ))         #total number of timesteps
 
-nth = common.getNth( innerRadius, outerRadius, ns )#nmbr of angular levels
+nth = common.getNth( innerRadius, outerRadius, ns ) #nmbr of angular levels
 dth = 2.*np.pi / nth                                  #constant delta theta
 th0  = np.linspace( 0., 2.*np.pi, nth+1 )             #vector of all angles
 th0  = th0[0:-1]                         #remove last angle (same as first)
 tmp = ptb * dth                               #relative perturbation factor
 ran = -tmp + 2.*tmp*np.random.rand(nth)         #random perturbation vector
-th = th0.copy()
+th = th0.copy()                                     #copy regular th vector
 th = th + ran                                 #th vector after perturbation
-tmp = np.hstack(( th[-1]-2.*np.pi, th, th[0]+2.*np.pi ))
-dth = ( tmp[2:nth+2] - tmp[0:nth] ) / 2.             #non-constant delta th
 
 ds  = ( outerRadius - innerRadius ) / (ns-2)              #constant delta s
 s0  = np.linspace( innerRadius-ds/2, outerRadius+ds/2, ns )       #s vector
 tmp = ptb * ds                                #relative perturbation factor
 ran = -tmp + 2.*tmp*np.random.rand(ns)          #random perturbation vector
-s   = s0.copy()
+s   = s0.copy()                                      #copy regular s vector
 s   = s + ran                                  #s vector after perturbation
-ds  = ( s[2:ns] - s[0:ns-2] ) / 2.                    #non-constant delta s
 
-np.save( saveString+'s'+'.npy', s )                #save vector of s values
-np.save( saveString+'th'+'.npy', th )             #save vector of th values
+if plotFromSaved == 1 :
+    th = np.load( saveString+'th'+'.npy' )        #load vector of th values
+    s = np.load( saveString+'s'+'.npy' )           #load vector of s values
+else :
+    np.save( saveString+'th'+'.npy', th )         #save vector of th values
+    np.save( saveString+'s'+'.npy', s )            #save vector of s values
+
+tmp = np.hstack(( th[-1]-2.*np.pi, th, th[0]+2.*np.pi ))
+dth = ( tmp[2:nth+2] - tmp[0:nth] ) / 2.             #non-constant delta th
+ds  = ( s[2:ns] - s[0:ns-2] ) / 2.                    #non-constant delta s
 
 ###########################################################################
 
@@ -99,13 +104,13 @@ rr = common.getRadii( thth, ss \
 , innerRadius, outerRadius, rSurf )                #mesh of perturbed radii
 xx = rr * np.cos(thth)                               #mesh of x-coordinates
 yy = rr * np.sin(thth)                               #mesh of y-coordinates
-xxi = xx[1:-1,:]                                       #exclude ghost nodes
-yyi = yy[1:-1,:]                                       #exclude ghost nodes
+xxi = xx[1:-1,:]                                      #without ghost layers
+yyi = yy[1:-1,:]                                      #without ghost layers
 
-ththi = thth[1:-1,:]                                    #remove ghost nodes
-rri = rr[1:-1,:]                                        #remove ghost nodes
-dsdthi = dsdth( rri, ththi )                #overwrite function with values
-dsdri  = dsdr( rri, ththi )                 #overwrite function with values
+ththi = thth[1:-1,:]                                  #without ghost layers
+rri = rr[1:-1,:]                                      #without ghost layers
+dsdthi = dsdth( rri, ththi )             #interior values of dsdth function
+dsdri  = dsdr( rri, ththi )               #interior values of dsdr function
 
 cosTh = np.cos(ththi)
 sinTh = np.sin(ththi)
@@ -115,8 +120,8 @@ sinThOverR = sinTh/rri
 thth0, ss0 = np.meshgrid( th0, s0[1:-1] )        #regular mesh for plotting
 rr0 = common.getRadii( thth0, ss0 \
 , innerRadius, outerRadius, rSurf )                  #mesh of regular radii
-xx0 = rr0 * np.cos(thth0)                             #mesh of reg x-coords
-yy0 = rr0 * np.sin(thth0)                             #mesh of reg x-coords
+xx0 = rr0 * np.cos(thth0)                         #mesh of regular x-coords
+yy0 = rr0 * np.sin(thth0)                         #mesh of regular x-coords
 
 ###########################################################################
 
@@ -183,7 +188,7 @@ yB = rSurf(th) * np.sin(th)
 xT = outerRadius * np.cos(th)
 yT = outerRadius * np.sin(th)
 print()
-print( 'max value on inner boundary =', np.max(np.abs(initialCondition(xB,yB))) )
+print( 'max value on inner boundary =', np.max(initialCondition(xB,yB)) )
 print()
 
 ###########################################################################
@@ -434,10 +439,9 @@ for i in np.arange( 0, nTimesteps+1 ) :
             np.save( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy', U )
         
         if saveContours == 1 :
-            tmp = Wradial @ U[0,:,:] @ Wangular
+            tmp = Wradial @ ( U[0,:,:] ) @ Wangular
             # plt.contourf( xx0, yy0, tmp, 20 )
             plt.contourf( xx0, yy0, tmp, np.arange(1.-.19,1.+.21,.02) )
-            # plt.contourf( xx0, yy0, tmp, np.arange(1.-.51,1.+.53,.02) )
             plt.axis('equal')
             plt.colorbar()
             fig.savefig( '{0:04d}'.format(np.int(np.round(t)+1e-12))+'.png', bbox_inches = 'tight' )
