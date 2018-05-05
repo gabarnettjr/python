@@ -14,15 +14,15 @@ from gab.annulus import common, waveEquation
 
 c           = .01                                     #wave speed (c**2=RT)
 innerRadius = 1.
-outerRadius = 3.
-tf          = 10.                                               #final time
-saveDel     = 1                            #time interval to save snapshots
-exp         = 00.                  #controls steepness of initial condition
-amp         = .00        #relative amplitude of trigonometric topo function
+outerRadius = 2.
+tf          = 500.                                              #final time
+saveDel     = 50                           #time interval to save snapshots
+exp         = 100.                 #controls steepness of initial condition
+amp         = .10        #relative amplitude of trigonometric topo function
 frq         = 9                   #frequency of trigonometric topo function
 
-plotFromSaved = 0                            #if 1, load instead of compute
-saveContours  = 0                       #switch for saving contours as pngs
+plotFromSaved = 1                            #if 1, load instead of compute
+saveContours  = 1                       #switch for saving contours as pngs
 
 dimSplit = np.int64(sys.argv[1])               #0:none, 1:some, 2:fullSplit
 phs      = np.int64(sys.argv[2])             #PHS RBF exponent (odd number)
@@ -175,13 +175,20 @@ NxBot, NyBot, NxTop, NyTop \
 = common.getTangentsAndNormals( th, stc, rSurf, dsdr, dsdth )
 
 ###########################################################################
-    
-#Plot the nodes and then exit:
 
-# xB = rSurf(th) * np.cos(th)
-# yB = rSurf(th) * np.sin(th)
-# xT = outerRadius * np.cos(th)
-# yT = outerRadius * np.sin(th)
+#Check the value of the initial condition on inner boundary:
+
+xB = rSurf(th) * np.cos(th)
+yB = rSurf(th) * np.sin(th)
+xT = outerRadius * np.cos(th)
+yT = outerRadius * np.sin(th)
+print()
+print( 'max value on inner boundary =', np.max(np.abs(initialCondition(xB,yB))) )
+print()
+
+###########################################################################
+
+#Plot the nodes and then exit:
 
 # plt.plot( xx.flatten(), yy.flatten(), "." \
 # , xB, yB, "-" \
@@ -429,8 +436,8 @@ for i in np.arange( 0, nTimesteps+1 ) :
         if saveContours == 1 :
             tmp = Wradial @ U[0,:,:] @ Wangular
             # plt.contourf( xx0, yy0, tmp, 20 )
-            # plt.contourf( xx0, yy0, tmp, np.arange(1.-.19,1.+.21,.02) )
-            plt.contourf( xx0, yy0, tmp, np.arange(1.-.51,1.+.53,.02) )
+            plt.contourf( xx0, yy0, tmp, np.arange(1.-.19,1.+.21,.02) )
+            # plt.contourf( xx0, yy0, tmp, np.arange(1.-.51,1.+.53,.02) )
             plt.axis('equal')
             plt.colorbar()
             fig.savefig( '{0:04d}'.format(np.int(np.round(t)+1e-12))+'.png', bbox_inches = 'tight' )
