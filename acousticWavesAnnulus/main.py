@@ -12,7 +12,7 @@ from gab.annulus import common, waveEquation
 
 ###########################################################################
 
-c           = .01                                     #wave speed (c**2=RT)
+c           = .03                                     #wave speed (c**2=RT)
 innerRadius = 1.
 outerRadius = 2.
 tf          = 100.                                              #final time
@@ -102,16 +102,16 @@ xx = rr * np.cos(thth)                               #mesh of x-coordinates
 yy = rr * np.sin(thth)                               #mesh of y-coordinates
 xxi = xx[1:-1,:]                                      #without ghost layers
 yyi = yy[1:-1,:]                                      #without ghost layers
-
 ththi = thth[1:-1,:]                                  #without ghost layers
 rri = rr[1:-1,:]                                      #without ghost layers
+
 dsdthi = dsdth( rri, ththi )             #interior values of dsdth function
 dsdri  = dsdr( rri, ththi )               #interior values of dsdr function
 
-cosTh = np.cos(ththi)
-sinTh = np.sin(ththi)
-cosThOverR = cosTh/rri
-sinThOverR = sinTh/rri
+cosTh = np.cos(ththi)                                                #dr/dx
+sinTh = np.sin(ththi)                                                #dr/dy
+cosThOverR = cosTh/rri                                              #dth/dy
+sinThOverR = sinTh/rri                                             #-dth/dx
 
 thth0, ss0 = np.meshgrid( th0, s0[1:-1] )        #regular mesh for plotting
 rr0 = common.getRadii( thth0, ss0 \
@@ -184,7 +184,9 @@ yB = rSurf(th) * np.sin(th)
 xT = outerRadius * np.cos(th)
 yT = outerRadius * np.sin(th)
 print()
-print( 'max value on inner boundary =', np.max(initialCondition(xB,yB)) )
+print( 'max value on boundary =', np.max(np.hstack(( \
+initialCondition(xB,yB),                             \
+initialCondition(xT,yT) ))) )
 print()
 
 ###########################################################################
@@ -206,11 +208,13 @@ print()
 #Hyperviscosity coefficient (alp) for radial and angular directions:
 
 if ( pol == 3 ) | ( pol == 4 ) :
-    alp = -2.**-10.
+    alp = -2.**-12.
 elif ( pol == 5 ) | ( pol == 6 ) :
-    alp = 2.**-13.
+    alp = 2.**-15.
+elif ( pol == 7 ) | ( pol == 8 ) :
+    alp = -2.**-20.
 else :
-    sys.exit("\nError: pol should be 3, 4, 5, or 6.\n")
+    sys.exit("\nError: pol should be 3, 4, 5, 6, 7, or 8.\n")
 
 if stc == pol+1 :
     alp = 0.                           #remove HV if using only polynomials
@@ -260,7 +264,7 @@ if dimSplit != 2 :
 
 ###########################################################################
 
-#Radial FD weights arranged in a differentiation matrix:
+#Radial PHS-FD weights arranged in a differentiation matrix:
 
 Ws   = phs1.getDM( x=s, X=s[1:-1], m=1     \
 , phsDegree=phs, polyDegree=pol, stencilSize=stc )
@@ -273,16 +277,21 @@ Whvs = alp * dsPol.dot(Whvs)                       #scaled radial HV matrix
 
 ###########################################################################
 
-#Angular FD weights arranged in a differentiation matrix:
+#Angular PHS-FD weights arranged in a differentiation matrix:
 
-Wlam   = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th, m=1     \
-, phsDegree=phs, polyDegree=pol, stencilSize=stc )
+phsA = 9
+polA = 7
+stcA = 21
+alpA = -2.**-20.
 
-Whvlam = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th, m=phs-1 \
-, phsDegree=phs, polyDegree=pol, stencilSize=stc )
+Wlam   = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th, m=1      \
+, phsDegree=phsA, polyDegree=polA, stencilSize=stcA )
 
-dthPol = spdiags( dth**pol, np.array([0]), len(dth), len(dth) )
-Whvlam = alp * dthPol.dot(Whvlam)                 #scaled angular HV matrix
+Whvlam = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th, m=phsA-1 \
+, phsDegree=phsA, polyDegree=polA, stencilSize=stcA )
+
+dthPol = spdiags( dth**7, np.array([0]), len(dth), len(dth) )
+Whvlam = alpA * dthPol.dot(Whvlam)                #scaled angular HV matrix
 
 Wlam = np.transpose( Wlam )                #work on rows instead of columns
 Whvlam = np.transpose( Whvlam )            #work on rows instead of columns
@@ -315,7 +324,7 @@ Wradial = phs1.getDM( x=s, X=s0[1:-1], m=0 \
 , phsDegree=phs, polyDegree=pol, stencilSize=stc )
 
 Wangular = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th0, m=0 \
-, phsDegree=phs, polyDegree=pol, stencilSize=stc )
+, phsDegree=phsA, polyDegree=polA, stencilSize=stcA )
 
 Wangular = np.transpose( Wangular )               #act on rows, not columns
 

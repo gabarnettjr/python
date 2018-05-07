@@ -9,7 +9,7 @@ from gab.annulus import common, waveEquation
 
 ###########################################################################
 
-c           = .01                                     #wave speed (c**2=RT)
+c           = .03                                     #wave speed (c**2=RT)
 innerRadius = 1.
 outerRadius = 2.
 tf          = 100.                                              #final time
@@ -26,7 +26,7 @@ dimSplitA = 2
 phsA      = 5
 polA      = 3
 stcA      = 7
-ptbA      = .00
+ptbA      = .30
 rkStagesA = 3
 
 dimSplitB = 2
@@ -34,7 +34,7 @@ phsB      = 7
 polB      = 5
 stcB      = 13
 ptbB      = .00
-rkStagesB = 4
+rkStagesB = 3
 
 dimSplit0 = 2
 phs0      = 7
@@ -52,12 +52,12 @@ ns3 = 48+2
 ns4 = 96+2
 ns5 = 96+2
 
-dt0 = 1./32.
-dt1 = 1./2.
-dt2 = 1./4.
-dt3 = 1./8.
-dt4 = 1./16.
-dt5 = 1./16.
+dt0 = 1./16.
+dt1 = 1./1.
+dt2 = 1./2.
+dt3 = 1./4.
+dt4 = 1./8.
+dt5 = 1./8.
 
 ###########################################################################
 
@@ -94,15 +94,17 @@ def loadManyResults( dimSplit, phs, pol, stc, ptb, rkStages ) :
 #Interpolate radially to reference grid using PHS-FD:
 
 def interpRadial( U0, U1, U2, U3, U4, U5, s0, s1, s2, s3, s4, s5 ) :
-
-    # W0 = phs1.getDM( x=s0, X=s0[1:-1], m=0, phsDegree=phs0, polyDegree=pol0, stencilSize=stc0 )
-    W1 = phs1.getDM( x=s1, X=s0[1:-1], m=0, phsDegree=phs0, polyDegree=pol0, stencilSize=stc0 )
-    W2 = phs1.getDM( x=s2, X=s0[1:-1], m=0, phsDegree=phs0, polyDegree=pol0, stencilSize=stc0 )
-    W3 = phs1.getDM( x=s3, X=s0[1:-1], m=0, phsDegree=phs0, polyDegree=pol0, stencilSize=stc0 )
-    W4 = phs1.getDM( x=s4, X=s0[1:-1], m=0, phsDegree=phs0, polyDegree=pol0, stencilSize=stc0 )
-    W5 = phs1.getDM( x=s5, X=s0[1:-1], m=0, phsDegree=phs0, polyDegree=pol0, stencilSize=stc0 )
-
-    # U0 = W0.dot( U0 )
+    
+    phsR = 7
+    polR = 5
+    stcR = 13
+    
+    W1 = phs1.getDM( x=s1, X=s0[1:-1], m=0, phsDegree=phsR, polyDegree=polR, stencilSize=stcR )
+    W2 = phs1.getDM( x=s2, X=s0[1:-1], m=0, phsDegree=phsR, polyDegree=polR, stencilSize=stcR )
+    W3 = phs1.getDM( x=s3, X=s0[1:-1], m=0, phsDegree=phsR, polyDegree=polR, stencilSize=stcR )
+    W4 = phs1.getDM( x=s4, X=s0[1:-1], m=0, phsDegree=phsR, polyDegree=polR, stencilSize=stcR )
+    W5 = phs1.getDM( x=s5, X=s0[1:-1], m=0, phsDegree=phsR, polyDegree=polR, stencilSize=stcR )
+    
     U0 = U0[1:-1,:]
     U1 = W1.dot( U1 )
     U2 = W2.dot( U2 )
@@ -117,21 +119,22 @@ def interpRadial( U0, U1, U2, U3, U4, U5, s0, s1, s2, s3, s4, s5 ) :
 #Interpolate angularly to reference grid using PHS-FD:
 
 def interpAngular( U0, U1, U2, U3, U4, U5, th0, th1, th2, th3, th4, th5 ) :
-
-    # W0 = phs1.getPeriodicDM( period=2*np.pi, x=th0, X=th0, m=0 \
-    # , phsDegree=phs0, polyDegree=pol0, stencilSize=stc0 )
+    
+    phsA = 9
+    polA = 7
+    stcA = 21
+    
     W1 = phs1.getPeriodicDM( period=2*np.pi, x=th1, X=th0, m=0 \
-    , phsDegree=phs0, polyDegree=pol0, stencilSize=stc0 )
+    , phsDegree=phsA, polyDegree=polA, stencilSize=stcA )
     W2 = phs1.getPeriodicDM( period=2*np.pi, x=th2, X=th0, m=0 \
-    , phsDegree=phs0, polyDegree=pol0, stencilSize=stc0 )
+    , phsDegree=phsA, polyDegree=polA, stencilSize=stcA )
     W3 = phs1.getPeriodicDM( period=2*np.pi, x=th3, X=th0, m=0 \
-    , phsDegree=phs0, polyDegree=pol0, stencilSize=stc0 )
+    , phsDegree=phsA, polyDegree=polA, stencilSize=stcA )
     W4 = phs1.getPeriodicDM( period=2*np.pi, x=th4, X=th0, m=0 \
-    , phsDegree=phs0, polyDegree=pol0, stencilSize=stc0 )
+    , phsDegree=phsA, polyDegree=polA, stencilSize=stcA )
     W5 = phs1.getPeriodicDM( period=2*np.pi, x=th5, X=th0, m=0 \
-    , phsDegree=phs0, polyDegree=pol0, stencilSize=stc0 )
-
-    # U0 = np.transpose( W0.dot(np.transpose(U0)) )
+    , phsDegree=phsA, polyDegree=polA, stencilSize=stcA )
+    
     U1 = np.transpose( W1.dot(np.transpose(U1)) )
     U2 = np.transpose( W2.dot(np.transpose(U2)) )
     U3 = np.transpose( W3.dot(np.transpose(U3)) )
@@ -186,8 +189,8 @@ errB, U0, U1, U2, U3, U4, U5, th0, s0 \
 ns= np.hstack(( ns1, ns2, ns3, ns4, ns5 ))
 ns = ns - 2
 
-dom = np.array( [ 1.5, 2.3 ] )
-shift = -2.
+dom = np.array( [ 1.4, 2.4 ] )
+shift = -3.
 
 plt.plot( np.log10(ns), np.log10(errA), '-' )
 plt.plot( np.log10(ns), np.log10(errB), '-' )

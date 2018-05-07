@@ -9,12 +9,7 @@ for i in range( 5 ) :
     
     #p5:
     
-    str = "2 7 5 13 .00 4 " + ns + " " + dtinv
-    print( str + " :" )
-    os.system( "python main.py " + str )
-    print()
-    
-    str = "2 7 5 13 .00 3 " + ns + " " + dtinv
+    str = "2 7 5 13 .30 3 " + ns + " " + dtinv
     print( str + " :" )
     os.system( "python main.py " + str )
     print()
@@ -24,7 +19,12 @@ for i in range( 5 ) :
     os.system( "python main.py " + str )
     print()
     
-    str = "2 7 5 13 .30 3 " + ns + " " + dtinv
+    str = "2 7 5 13 .00 3 " + ns + " " + dtinv
+    print( str + " :" )
+    os.system( "python main.py " + str )
+    print()
+    
+    str = "2 7 5 13 .00 4 " + ns + " " + dtinv
     print( str + " :" )
     os.system( "python main.py " + str )
     print()
@@ -33,12 +33,7 @@ for i in range( 5 ) :
     
     #p3:
     
-    str = "2 5 3 7 .00 4 " + ns + " " + dtinv
-    print( str + " :" )
-    os.system( "python main.py " + str )
-    print()
-    
-    str = "2 5 3 7 .00 3 " + ns + " " + dtinv
+    str = "2 5 3 7 .30 3 " + ns + " " + dtinv
     print( str + " :" )
     os.system( "python main.py " + str )
     print()
@@ -48,7 +43,12 @@ for i in range( 5 ) :
     os.system( "python main.py " + str )
     print()
     
-    str = "2 5 3 7 .30 3 " + ns + " " + dtinv
+    str = "2 5 3 7 .00 3 " + ns + " " + dtinv
+    print( str + " :" )
+    os.system( "python main.py " + str )
+    print()
+    
+    str = "2 5 3 7 .00 4 " + ns + " " + dtinv
     print( str + " :" )
     os.system( "python main.py " + str )
     print()
@@ -57,10 +57,10 @@ for i in range( 5 ) :
     
     #FD4:
     
-    # str = "2 5 4 5 .00 4 " + ns + " " + dtinv
-    # print( str + " :" )
-    # os.system( "python main.py " + str )
-    # print()
+    str = "2 5 4 5 .00 4 " + ns + " " + dtinv
+    print( str + " :" )
+    os.system( "python main.py " + str )
+    print()
 
 #####################################
 
@@ -75,9 +75,9 @@ print( str + " :" )
 os.system( "python main.py " + str )
 print()
 
-# str = "2 5 4 5 .00 4 " + ns + " " + dtinv
-# print( str + " :" )
-# os.system( "python main.py " + str )
-# print()
+str = "2 7 6 7 .00 4 " + ns + " " + dtinv
+print( str + " :" )
+os.system( "python main.py " + str )
+print()
 
 ###########################################################################
