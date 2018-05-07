@@ -15,14 +15,14 @@ from gab.annulus import common, waveEquation
 c           = .01                                     #wave speed (c**2=RT)
 innerRadius = 1.
 outerRadius = 2.
-tf          = 500.                                              #final time
-saveDel     = 50                           #time interval to save snapshots
+tf          = 100.                                              #final time
+saveDel     = 10                           #time interval to save snapshots
 exp         = 100.                 #controls steepness of initial condition
-amp         = .10        #relative amplitude of trigonometric topo function
+amp         = .10                 #amplitude of trigonometric topo function
 frq         = 9                   #frequency of trigonometric topo function
 
-plotFromSaved = 1                            #if 1, load instead of compute
-saveContours  = 1                       #switch for saving contours as pngs
+plotFromSaved = 0                            #if 1, load instead of compute
+saveContours  = 0                       #switch for saving contours as pngs
 
 dimSplit = np.int64(sys.argv[1])               #0:none, 1:some, 2:fullSplit
 phs      = np.int64(sys.argv[2])             #PHS RBF exponent (odd number)
@@ -42,11 +42,7 @@ tmp = 17./18.*np.pi
 xc1 = (rSurf(tmp)+outerRadius)/2.*np.cos(tmp)           #x-coord of GA bell
 yc1 = (rSurf(tmp)+outerRadius)/2.*np.sin(tmp)           #y-coord of GA bell
 def initialCondition( x, y ) :
-    if ( exp == 0. ) & ( amp == 0. ) :
-        return 1.
-        # return 1. + .5 * np.cos( 2*np.pi * np.sqrt(x**2.+y**2.) )
-    else :
-        return 1. + np.exp( -exp*( (x-xc1)**2. + (y-yc1)**2. ) )
+    return 1. + np.exp( -exp*( (x-xc1)**2. + (y-yc1)**2. ) )
 
 ###########################################################################
 

@@ -11,14 +11,14 @@ from gab.annulus import common, waveEquation
 
 c           = .01                                     #wave speed (c**2=RT)
 innerRadius = 1.
-outerRadius = 3.
-tf          = 10.                                               #final time
-saveDel     = 1                            #time interval to save snapshots
-exp         = 00.                  #controls steepness of initial condition
-amp         = .00        #relative amplitude of trigonometric topo function
+outerRadius = 2.
+tf          = 100.                                              #final time
+saveDel     = 10                           #time interval to save snapshots
+exp         = 100.                 #controls steepness of initial condition
+amp         = .10                 #amplitude of trigonometric topo function
 frq         = 9                   #frequency of trigonometric topo function
 
-ord = np.inf                                   #norm to use for error check
+ord = 2                                        #norm to use for error check
 
 contourErrors = 0
 
@@ -34,7 +34,7 @@ phsB      = 7
 polB      = 5
 stcB      = 13
 ptbB      = .00
-rkStagesB = 3
+rkStagesB = 4
 
 dimSplit0 = 2
 phs0      = 7
@@ -45,18 +45,18 @@ rkStages0 = 4
 
 t0 = tf                                                    #time to look at
 
-ns0 = 384+2                                           #reference resolution
+ns0 = 192+2                                           #reference resolution
 ns1 = 12+2
 ns2 = 24+2
 ns3 = 48+2
 ns4 = 96+2
-ns5 = 192+2
+ns5 = 96+2
 
 dt0 = 1./32.
-dt1 = 1./1.
-dt2 = 1./2.
-dt3 = 1./4.
-dt4 = 1./8.
+dt1 = 1./2.
+dt2 = 1./4.
+dt3 = 1./8.
+dt4 = 1./16.
 dt5 = 1./16.
 
 ###########################################################################
