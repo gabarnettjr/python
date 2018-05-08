@@ -12,52 +12,52 @@ from gab.annulus import common, waveEquation
 c           = .03                                     #wave speed (c**2=RT)
 innerRadius = 1.
 outerRadius = 2.
-tf          = 100.                                              #final time
-saveDel     = 10                           #time interval to save snapshots
-exp         = 100.                 #controls steepness of initial condition
+tf          = 10.                                               #final time
+saveDel     = 1                            #time interval to save snapshots
+exp         = 200.                 #controls steepness of initial condition
 amp         = .10                 #amplitude of trigonometric topo function
 frq         = 9                   #frequency of trigonometric topo function
 
-ord = 2                                        #norm to use for error check
+ord = np.inf                                   #norm to use for error check
 
-contourErrors = 0
+contourErrors = 1
 
 dimSplitA = 2
 phsA      = 5
 polA      = 3
 stcA      = 7
-ptbA      = .30
+ptbA      = .00
 rkStagesA = 3
 
 dimSplitB = 2
-phsB      = 7
-polB      = 5
-stcB      = 13
+phsB      = 5
+polB      = 3
+stcB      = 7
 ptbB      = .00
 rkStagesB = 3
 
 dimSplit0 = 2
-phs0      = 7
-pol0      = 5
-stc0      = 13
+phs0      = 5
+pol0      = 3
+stc0      = 7
 ptb0      = .00
 rkStages0 = 4
 
 t0 = tf                                                    #time to look at
 
-ns0 = 192+2                                           #reference resolution
+ns0 = 384+2                                           #reference resolution
 ns1 = 12+2
 ns2 = 24+2
 ns3 = 48+2
 ns4 = 96+2
-ns5 = 96+2
+ns5 = 192+2
 
-dt0 = 1./16.
+dt0 = 1./32.
 dt1 = 1./1.
 dt2 = 1./2.
 dt3 = 1./4.
 dt4 = 1./8.
-dt5 = 1./8.
+dt5 = 1./16.
 
 ###########################################################################
 
@@ -95,9 +95,9 @@ def loadManyResults( dimSplit, phs, pol, stc, ptb, rkStages ) :
 
 def interpRadial( U0, U1, U2, U3, U4, U5, s0, s1, s2, s3, s4, s5 ) :
     
-    phsR = 7
-    polR = 5
-    stcR = 13
+    phsR = 5
+    polR = 3
+    stcR = 7
     
     W1 = phs1.getDM( x=s1, X=s0[1:-1], m=0, phsDegree=phsR, polyDegree=polR, stencilSize=stcR )
     W2 = phs1.getDM( x=s2, X=s0[1:-1], m=0, phsDegree=phsR, polyDegree=polR, stencilSize=stcR )
@@ -120,9 +120,9 @@ def interpRadial( U0, U1, U2, U3, U4, U5, s0, s1, s2, s3, s4, s5 ) :
 
 def interpAngular( U0, U1, U2, U3, U4, U5, th0, th1, th2, th3, th4, th5 ) :
     
-    phsA = 9
-    polA = 7
-    stcA = 21
+    phsA = 7
+    polA = 5
+    stcA = 13
     
     W1 = phs1.getPeriodicDM( period=2*np.pi, x=th1, X=th0, m=0 \
     , phsDegree=phsA, polyDegree=polA, stencilSize=stcA )
@@ -213,7 +213,7 @@ plt.show()
 
 if contourErrors == 1 :
     
-    rSurf, rSurfPrime = common.getTopoFunc( innerRadius, outerRadius, amp, frq, phs0, pol0, stc0 )
+    rSurf, rSurfPrime = common.getTopoFunc( innerRadius, outerRadius, amp, frq )
     
     thth0, ss0 = np.meshgrid( th0, s0[1:-1] )
     rr0 = common.getRadii( thth0, ss0, innerRadius, outerRadius, rSurf )
@@ -240,13 +240,20 @@ if contourErrors == 1 :
     e4[e4<=ep] = ep
     e5[e5<=ep] = ep
     
-    e1 = np.reshape( np.log10(e1), np.shape(xx0) )
-    e2 = np.reshape( np.log10(e2), np.shape(xx0) )
-    e3 = np.reshape( np.log10(e3), np.shape(xx0) )
-    e4 = np.reshape( np.log10(e4), np.shape(xx0) )
-    e5 = np.reshape( np.log10(e5), np.shape(xx0) )
+    # e1 = np.log10(e1)
+    # e2 = np.log10(e2)
+    # e3 = np.log10(e3)
+    # e4 = np.log10(e4)
+    # e5 = np.log10(e5)
     
-    cvec = np.arange(-20,1,1)
+    e1 = np.reshape( e1, np.shape(xx0) )
+    e2 = np.reshape( e2, np.shape(xx0) )
+    e3 = np.reshape( e3, np.shape(xx0) )
+    e4 = np.reshape( e4, np.shape(xx0) )
+    e5 = np.reshape( e5, np.shape(xx0) )
+    
+    # cvec = np.arange(-20,1,1)
+    cvec = 20
     
     plt.figure(1)
     plt.contourf( xx0, yy0, e1, cvec )

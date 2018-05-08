@@ -15,14 +15,14 @@ from gab.annulus import common, waveEquation
 c           = .03                                     #wave speed (c**2=RT)
 innerRadius = 1.
 outerRadius = 2.
-tf          = 100.                                              #final time
-saveDel     = 10                           #time interval to save snapshots
-exp         = 100.                 #controls steepness of initial condition
+tf          = 500.                                              #final time
+saveDel     = 50                           #time interval to save snapshots
+exp         = 200.                 #controls steepness of initial condition
 amp         = .10                 #amplitude of trigonometric topo function
 frq         = 9                   #frequency of trigonometric topo function
 
 plotFromSaved = 0                            #if 1, load instead of compute
-saveContours  = 0                       #switch for saving contours as pngs
+saveContours  = 1                       #switch for saving contours as pngs
 
 dimSplit = np.int64(sys.argv[1])               #0:none, 1:some, 2:fullSplit
 phs      = np.int64(sys.argv[2])             #PHS RBF exponent (odd number)
@@ -34,7 +34,7 @@ ns       = np.int64(sys.argv[7])+2                #total number of s levels
 dt       = 1./np.float64(sys.argv[8])                              #delta t
 
 rSurf, rSurfPrime \
-= common.getTopoFunc( innerRadius, outerRadius, amp, frq, phs, pol, stc )
+= common.getTopoFunc( innerRadius, outerRadius, amp, frq )
 sFunc, dsdth, dsdr \
 = common.getHeightCoordinate( innerRadius, outerRadius, rSurf, rSurfPrime )
 
@@ -42,7 +42,17 @@ tmp = 17./18.*np.pi
 xc1 = (rSurf(tmp)+outerRadius)/2.*np.cos(tmp)           #x-coord of GA bell
 yc1 = (rSurf(tmp)+outerRadius)/2.*np.sin(tmp)           #y-coord of GA bell
 def initialCondition( x, y ) :
-    return 1. + np.exp( -exp*( (x-xc1)**2. + (y-yc1)**2. ) )
+    r = np.sqrt( 6 * ( (x-xc1)**2. + (y-yc1)**2. ) )
+    ind = r<1.
+    f = np.zeros( np.shape(x) )
+    # #simple thing:
+    # f[ind] = (1.-r[ind])**7.
+    #Wendland function:
+    f[ind] = ( 1. - r[ind] ) ** 10. * ( 429.*r[ind]**4. + 450.*r[ind]**3. \
+    + 210.*r[ind]**2. + 50.*r[ind] + 5.  )
+    f = 1. + f/5.
+    return f
+    # return 1. + np.exp( -exp*( (x-xc1)**2. + (y-yc1)**2. ) )
 
 ###########################################################################
 
@@ -107,6 +117,10 @@ rri = rr[1:-1,:]                                      #without ghost layers
 
 dsdthi = dsdth( rri, ththi )             #interior values of dsdth function
 dsdri  = dsdr( rri, ththi )               #interior values of dsdr function
+
+dsdthAll = dsdth( rr, thth )
+dsdrAll  = dsdr( rr, thth )
+rrInv = 1./rr
 
 cosTh = np.cos(ththi)                                                #dr/dx
 sinTh = np.sin(ththi)                                                #dr/dy
@@ -212,7 +226,7 @@ if ( pol == 3 ) | ( pol == 4 ) :
 elif ( pol == 5 ) | ( pol == 6 ) :
     alp = 2.**-15.
 elif ( pol == 7 ) | ( pol == 8 ) :
-    alp = -2.**-20.
+    alp = -2.**-18.
 else :
     sys.exit("\nError: pol should be 3, 4, 5, 6, 7, or 8.\n")
 
@@ -266,35 +280,40 @@ if dimSplit != 2 :
 
 #Radial PHS-FD weights arranged in a differentiation matrix:
 
-Ws   = phs1.getDM( x=s, X=s[1:-1], m=1     \
+Ws = phs1.getDM( x=s, X=s, m=1     \
 , phsDegree=phs, polyDegree=pol, stencilSize=stc )
 
-Whvs = phs1.getDM( x=s, X=s[1:-1], m=phs-1 \
-, phsDegree=phs, polyDegree=pol, stencilSize=stc )
+# #Simple (and incorrect) radial HV:
+# Whvs = phs1.getDM( x=s, X=s[1:-1], m=phs-1 \
+# , phsDegree=phs, polyDegree=pol, stencilSize=stc )
+# dsPol = spdiags( ds**pol, np.array([0]), len(ds), len(ds) )
+# Whvs = alp * dsPol.dot(Whvs)                       #scaled radial HV matrix
 
-dsPol = spdiags( ds**pol, np.array([0]), len(ds), len(ds) )
-Whvs = alp * dsPol.dot(Whvs)                       #scaled radial HV matrix
+#Complex radial HV:
+alpDrPol = alp * ( ( rr[2:ns,:] - rr[0:ns-2,:] ) / 2. ) ** pol
 
 ###########################################################################
 
 #Angular PHS-FD weights arranged in a differentiation matrix:
 
-phsA = 9
-polA = 7
-stcA = 21
-alpA = -2.**-20.
+phsA = 5
+polA = 3
+stcA = 7
+alpA = -2.**-15.
 
-Wlam   = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th, m=1      \
+Wlam = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th, m=1      \
 , phsDegree=phsA, polyDegree=polA, stencilSize=stcA )
-
-Whvlam = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th, m=phsA-1 \
-, phsDegree=phsA, polyDegree=polA, stencilSize=stcA )
-
-dthPol = spdiags( dth**7, np.array([0]), len(dth), len(dth) )
-Whvlam = alpA * dthPol.dot(Whvlam)                #scaled angular HV matrix
-
 Wlam = np.transpose( Wlam )                #work on rows instead of columns
-Whvlam = np.transpose( Whvlam )            #work on rows instead of columns
+
+# #Simple (and incorrect) angular HV:
+# Whvlam = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th, m=phsA-1 \
+# , phsDegree=phsA, polyDegree=polA, stencilSize=stcA )
+# dthPol = spdiags( dth**polA, np.array([0]), len(dth), len(dth) )
+# Whvlam = alpA * dthPol.dot(Whvlam)                #scaled angular HV matrix
+# Whvlam = np.transpose( Whvlam )             #work on rows instead of column
+
+#Complex angular HV:
+alpDthPol = alpA * np.tile( dth**polA, (ns-2,1) )
 
 ###########################################################################
 
@@ -335,7 +354,7 @@ Wangular = np.transpose( Wangular )               #act on rows, not columns
 if dimSplit == 2 :
     
     def Ds(U) :
-        return Ws @ U
+        return Ws[1:-1,:] @ U
     
     def Dlam(U) :
         return U[1:-1,:] @ Wlam
@@ -352,8 +371,32 @@ if dimSplit == 2 :
     # def Dy(U) :
         # return sinTh * Dr(U) + cosThOverR * Dth(U)
     
+    def L(U) :
+        Us = Ws@U
+        Uth = (U@Wlam) + Us*dsdthAll
+        return Ws@(Us*dsdrAll)*dsdrAll + rrInv*Us*dsdrAll \
+        +Uth@Wlam + (Ws@Uth)*dsdthAll
+    
     def HV(U) :
-        return ( Whvs @ U ) + ( U[1:-1,:] @ Whvlam )
+        U = L(U)
+        U = L(U)
+        return alpDrPol * U[1:-1,:]
+    
+    # def HV(U) :
+        # #Radial HV:
+        # HVr = dsdrAll * ( Ws @ U )
+        # for i in range( pol ) :
+            # HVr = dsdrAll * ( Ws @ HVr )
+        # HVr = alpDrPol * HVr[1:-1,:]
+        # #Angular HV:
+        # HVth = ( U @ Wlam ) + dsdthAll * ( Ws @ U )
+        # for i in range( polA ) :
+            # HVth = ( HVth @ Wlam ) + dsdthAll * ( Ws @ HVth )
+        # HVth = alpDthPol * HVth[1:-1,:]
+        # #Total HV:
+        # return HVr + HVth
+        # # #Simple (incorrect) method:
+        # # return ( Whvs @ U ) + ( U[1:-1,:] @ Whvlam )
     
 elif ( dimSplit == 1 ) | ( dimSplit == 0 ) :
     
@@ -452,7 +495,7 @@ for i in np.arange( 0, nTimesteps+1 ) :
             fig.savefig( '{0:04d}'.format(np.int(np.round(t)+1e-12))+'.png', bbox_inches = 'tight' )
             plt.clf()
         
-        if np.max(np.abs(U)) > 10. :
+        if np.max(np.abs(U)) > 5. :
             sys.exit("\nUnstable in time.\n")
         
     if plotFromSaved == 1 :
