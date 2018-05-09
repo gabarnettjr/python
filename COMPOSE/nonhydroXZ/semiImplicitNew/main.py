@@ -5,7 +5,7 @@ import time
 from scipy.sparse.linalg import LinearOperator
 
 sys.path.append( '../../../site-packages' )
-from gab import rk
+from gab import rk, phs1
 from gab.nonhydro import common
 
 ###########################################################################
@@ -36,7 +36,7 @@ saveDel   = 100                           #print/save every saveDel seconds
 var           = 2                        #determines what to plot (0,1,2,3)
 saveArrays    = 0
 saveContours  = 1
-plotFromSaved = 1                   #if 1, results are loaded, not computed
+plotFromSaved = 0                   #if 1, results are loaded, not computed
 
 ###########################################################################
 
@@ -118,6 +118,12 @@ dTbarDzInt     = dTbarDz    [i0:i1,j0:j1]
 ###########################################################################
 
 #Define finite difference (FD) weights for derivative approximation:
+
+# Wx = phs1.getPeriodicDM( period=xRight-xLeft, x=x[0,:], X=x[0,:], m=1 \
+# , phsDegree=phs, polyDegree=pol, stencilSize=stc )
+
+# Ws = phs1.getDM( x=s(x[:,0],z[:,0]), X=s(x[:,0],z[:,0]), m=1 \
+# , phsDegree=phs, polyDegree=pol, stencilSize=stc )
 
 if FD == 2 :
     wx = np.array( [ -1./2., 0., 1./2. ] )

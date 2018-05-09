@@ -18,28 +18,28 @@ exp         = 200.                 #controls steepness of initial condition
 amp         = .10                 #amplitude of trigonometric topo function
 frq         = 9                   #frequency of trigonometric topo function
 
-ord = np.inf                                   #norm to use for error check
+ord = 2                                        #norm to use for error check
 
 contourErrors = 1
 
 dimSplitA = 2
 phsA      = 5
 polA      = 3
-stcA      = 7
-ptbA      = .00
+stcA      = 9
+ptbA      = .30
 rkStagesA = 3
 
 dimSplitB = 2
-phsB      = 5
-polB      = 3
-stcB      = 7
+phsB      = 7
+polB      = 5
+stcB      = 13
 ptbB      = .00
-rkStagesB = 3
+rkStagesB = 4
 
 dimSplit0 = 2
-phs0      = 5
-pol0      = 3
-stc0      = 7
+phs0      = 9
+pol0      = 7
+stc0      = 17
 ptb0      = .00
 rkStages0 = 4
 
@@ -95,9 +95,9 @@ def loadManyResults( dimSplit, phs, pol, stc, ptb, rkStages ) :
 
 def interpRadial( U0, U1, U2, U3, U4, U5, s0, s1, s2, s3, s4, s5 ) :
     
-    phsR = 5
-    polR = 3
-    stcR = 7
+    phsR = 7
+    polR = 5
+    stcR = 13
     
     W1 = phs1.getDM( x=s1, X=s0[1:-1], m=0, phsDegree=phsR, polyDegree=polR, stencilSize=stcR )
     W2 = phs1.getDM( x=s2, X=s0[1:-1], m=0, phsDegree=phsR, polyDegree=polR, stencilSize=stcR )
@@ -120,9 +120,9 @@ def interpRadial( U0, U1, U2, U3, U4, U5, s0, s1, s2, s3, s4, s5 ) :
 
 def interpAngular( U0, U1, U2, U3, U4, U5, th0, th1, th2, th3, th4, th5 ) :
     
-    phsA = 7
-    polA = 5
-    stcA = 13
+    phsA = 9
+    polA = 7
+    stcA = 17
     
     W1 = phs1.getPeriodicDM( period=2*np.pi, x=th1, X=th0, m=0 \
     , phsDegree=phsA, polyDegree=polA, stencilSize=stcA )
@@ -146,7 +146,13 @@ def interpAngular( U0, U1, U2, U3, U4, U5, th0, th1, th2, th3, th4, th5 ) :
 ###########################################################################
 
 def gatherErrors( U0, U1, U2, U3, U4, U5 ) :
-
+    
+    # err1 = np.linalg.norm( U1-U2, ord )
+    # err2 = np.linalg.norm( U2-U3, ord )
+    # err3 = np.linalg.norm( U3-U4, ord )
+    # err4 = np.linalg.norm( U4-U5, ord )
+    # err5 = np.linalg.norm( U5-U0, ord )
+    
     err1 = np.linalg.norm( U1-U0, ord )
     err2 = np.linalg.norm( U2-U0, ord )
     err3 = np.linalg.norm( U3-U0, ord )
@@ -155,7 +161,7 @@ def gatherErrors( U0, U1, U2, U3, U4, U5 ) :
     
     err = np.hstack(( err1, err2, err3, err4, err5 ))
     
-    err = err / np.linalg.norm(U0,ord)
+    # err = err / np.linalg.norm(U0,ord)
     
     return err
 
@@ -190,15 +196,16 @@ ns= np.hstack(( ns1, ns2, ns3, ns4, ns5 ))
 ns = ns - 2
 
 dom = np.array( [ 1.4, 2.4 ] )
-shift = -3.
+width = dom[1] - dom[0]
+shift = -0.
 
 plt.plot( np.log10(ns), np.log10(errA), '-' )
 plt.plot( np.log10(ns), np.log10(errB), '-' )
-plt.plot( dom, np.array([shift,shift-1.*(dom[1]-dom[0])]), '--' )
-plt.plot( dom, np.array([shift,shift-2.*(dom[1]-dom[0])]), '--' )
-plt.plot( dom, np.array([shift,shift-3.*(dom[1]-dom[0])]), '--' )
-plt.plot( dom, np.array([shift,shift-4.*(dom[1]-dom[0])]), '--' )
-plt.plot( dom, np.array([shift,shift-5.*(dom[1]-dom[0])]), '--' )
+plt.plot( dom, np.array([shift,shift-1.*width]), '--' )
+plt.plot( dom, np.array([shift,shift-2.*width]), '--' )
+plt.plot( dom, np.array([shift,shift-3.*width]), '--' )
+plt.plot( dom, np.array([shift,shift-4.*width]), '--' )
+plt.plot( dom, np.array([shift,shift-5.*width]), '--' )
 plt.legend(( 'A', 'B', '1st order', '2nd order' \
 , '3rd order', '4th order', '5th order' ))
 plt.plot( np.log10(ns), np.log10(errA), 'k.' )
@@ -220,13 +227,17 @@ if contourErrors == 1 :
     xx0 = rr0 * np.cos(thth0)
     yy0 = rr0 * np.sin(thth0)
     
+    # e1 = np.abs( U1 - U2 )
+    # e2 = np.abs( U2 - U3 )
+    # e3 = np.abs( U3 - U4 )
+    # e4 = np.abs( U4 - U5 )
+    # e5 = np.abs( U5 - U0 )
+    
     e1 = np.abs( U1 - U0 )
     e2 = np.abs( U2 - U0 )
     e3 = np.abs( U3 - U0 )
     e4 = np.abs( U4 - U0 )
     e5 = np.abs( U5 - U0 )
-    
-    ep = 10.**-20.
     
     e1 = e1.flatten()
     e2 = e2.flatten()
@@ -234,11 +245,13 @@ if contourErrors == 1 :
     e4 = e4.flatten()
     e5 = e5.flatten()
     
-    e1[e1<=ep] = ep
-    e2[e2<=ep] = ep
-    e3[e3<=ep] = ep
-    e4[e4<=ep] = ep
-    e5[e5<=ep] = ep
+    # ep = 10.**-20.
+    
+    # e1[e1<=ep] = ep
+    # e2[e2<=ep] = ep
+    # e3[e3<=ep] = ep
+    # e4[e4<=ep] = ep
+    # e5[e5<=ep] = ep
     
     # e1 = np.log10(e1)
     # e2 = np.log10(e2)
@@ -259,31 +272,31 @@ if contourErrors == 1 :
     plt.contourf( xx0, yy0, e1, cvec )
     plt.axis('equal')
     plt.colorbar()
-    plt.title( 'max={0:1.2e}'.format(np.max(np.abs(U1-U0))) )
+    plt.title( 'max={0:1.2e}'.format(np.max(np.abs(e1))) )
     
     plt.figure(2)
     plt.contourf( xx0, yy0, e2, cvec )
     plt.axis('equal')
     plt.colorbar()
-    plt.title( 'max={0:1.2e}'.format(np.max(np.abs(U2-U0))) )
+    plt.title( 'max={0:1.2e}'.format(np.max(np.abs(e2))) )
     
     plt.figure(3)
     plt.contourf( xx0, yy0, e3, cvec )
     plt.axis('equal')
     plt.colorbar()
-    plt.title( 'max={0:1.2e}'.format(np.max(np.abs(U3-U0))) )
+    plt.title( 'max={0:1.2e}'.format(np.max(np.abs(e3))) )
     
     plt.figure(4)
     plt.contourf( xx0, yy0, e4, cvec )
     plt.axis('equal')
     plt.colorbar()
-    plt.title( 'max={0:1.2e}'.format(np.max(np.abs(U4-U0))) )
+    plt.title( 'max={0:1.2e}'.format(np.max(np.abs(e4))) )
     
     plt.figure(5)
     plt.contourf( xx0, yy0, e5, cvec )
     plt.axis('equal')
     plt.colorbar()
-    plt.title( 'max={0:1.2e}'.format(np.max(np.abs(U5-U0))) )
+    plt.title( 'max={0:1.2e}'.format(np.max(np.abs(e5))) )
     
     plt.show()
 
