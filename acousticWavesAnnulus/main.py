@@ -34,7 +34,7 @@ ns       = np.int64(sys.argv[7])+2                #total number of s levels
 dt       = 1./np.float64(sys.argv[8])                              #delta t
 
 rSurf, rSurfPrime \
-= common.getTopoFunc( innerRadius, outerRadius, amp, frq )
+= common.getTopoFunc( innerRadius, outerRadius, amp, frq, phs, pol, stc )
 sFunc, dsdth, dsdr \
 = common.getHeightCoordinate( innerRadius, outerRadius, rSurf, rSurfPrime )
 
@@ -121,6 +121,9 @@ dsdri  = dsdr( rri, ththi )               #interior values of dsdr function
 dsdthAll = dsdth( rr, thth )
 dsdrAll  = dsdr( rr, thth )
 rrInv = 1./rr
+rrInv2 = rrInv**2.
+ssInv = 1./ss
+ssInv2 = ssInv**2.
 
 cosTh = np.cos(ththi)                                                #dr/dx
 sinTh = np.sin(ththi)                                                #dr/dy
@@ -224,7 +227,7 @@ print()
 if ( pol == 3 ) | ( pol == 4 ) :
     alp = -2.**-12.
 elif ( pol == 5 ) | ( pol == 6 ) :
-    alp = 2.**-15.
+    alp = 2.**-16.
 elif ( pol == 7 ) | ( pol == 8 ) :
     alp = -2.**-18.
 else :
@@ -235,46 +238,46 @@ if stc == pol+1 :
 
 ###########################################################################
 
-if dimSplit != 2 :
+# if dimSplit != 2 :
     
-    if plotFromSaved != 1 :
+    # if plotFromSaved != 1 :
     
-        #Get fully 2D Cartesian DMs:
+        # #Get fully 2D Cartesian DMs:
         
-        stencils = phs2.getStencils( xx.flatten(), yy.flatten() \
-        , xxi.flatten(), yyi.flatten(), stc )
+        # stencils = phs2.getStencils( xx.flatten(), yy.flatten() \
+        # , xxi.flatten(), yyi.flatten(), stc )
         
-        if dimSplit == 1 :
-            A = phs2.getAmatrices( stencils, phs, pol )
-            Wx = phs2.getWeights( stencils, A, "1",  0 )
-            Wy = phs2.getWeights( stencils, A, "2",  0 )
-        elif dimSplit == 0 :
-            e1 = np.transpose( np.vstack(( -yyi.flatten(), xxi.flatten() )) )
-            nm = np.sqrt( e1[:,0]**2. + e1[:,1]**2. )
-            e1 = e1 / np.transpose(np.tile(nm,(2,1)))
-            e2 = np.transpose( np.vstack((  xxi.flatten(), yyi.flatten() )) )
-            nm = np.sqrt( e2[:,0]**2. + e2[:,1]**2. )
-            e2 = e2 / np.transpose(np.tile(nm,(2,1)))
-            stencils = phs2.rotateStencils( stencils, e1, e2 )
-            A = phs2.getAmatrices( stencils, phs, pol )
-            Wx1 = phs2.getWeights( stencils, A, "1", 0 )
-            Wx2 = phs2.getWeights( stencils, A, "2", 0 )
-            Wx = Wx1 * stencils.dx1dx + Wx2 * stencils.dx2dx
-            Wy = Wx1 * stencils.dx1dy + Wx2 * stencils.dx2dy
+        # if dimSplit == 1 :
+            # A = phs2.getAmatrices( stencils, phs, pol )
+            # Wx = phs2.getWeights( stencils, A, "1",  0 )
+            # Wy = phs2.getWeights( stencils, A, "2",  0 )
+        # elif dimSplit == 0 :
+            # e1 = np.transpose( np.vstack(( -yyi.flatten(), xxi.flatten() )) )
+            # nm = np.sqrt( e1[:,0]**2. + e1[:,1]**2. )
+            # e1 = e1 / np.transpose(np.tile(nm,(2,1)))
+            # e2 = np.transpose( np.vstack((  xxi.flatten(), yyi.flatten() )) )
+            # nm = np.sqrt( e2[:,0]**2. + e2[:,1]**2. )
+            # e2 = e2 / np.transpose(np.tile(nm,(2,1)))
+            # stencils = phs2.rotateStencils( stencils, e1, e2 )
+            # A = phs2.getAmatrices( stencils, phs, pol )
+            # Wx1 = phs2.getWeights( stencils, A, "1", 0 )
+            # Wx2 = phs2.getWeights( stencils, A, "2", 0 )
+            # Wx = Wx1 * stencils.dx1dx + Wx2 * stencils.dx2dx
+            # Wy = Wx1 * stencils.dx1dy + Wx2 * stencils.dx2dy
         
-        Wth = np.transpose(np.tile(-yyi.flatten(),(stc,1))) * Wx \
-            + np.transpose(np.tile( xxi.flatten(),(stc,1))) * Wy
+        # Wth = np.transpose(np.tile(-yyi.flatten(),(stc,1))) * Wx \
+            # + np.transpose(np.tile( xxi.flatten(),(stc,1))) * Wy
         
-        # K = np.int( np.round( (phs-1)/2 ) )
-        # Whv = phs2.getWeights( stencils, A, "hv", K )
-        # Whv = alp * stencils.h**(2*K-1) * Whv
+        # # K = np.int( np.round( (phs-1)/2 ) )
+        # # Whv = phs2.getWeights( stencils, A, "hv", K )
+        # # Whv = alp * stencils.h**(2*K-1) * Whv
     
-    if pol == 3 :
-        stc = 7
-    elif pol == 5 :
-        stc = 13
-    else :
-        sys.exit("\nOnly using pol=3 and pol=5 in this case.\n")
+    # if pol == 3 :
+        # stc = 7
+    # elif pol == 5 :
+        # stc = 13
+    # else :
+        # sys.exit("\nOnly using pol=3 and pol=5 in this case.\n")
 
 ###########################################################################
 
@@ -290,16 +293,21 @@ Ws = phs1.getDM( x=s, X=s, m=1     \
 # Whvs = alp * dsPol.dot(Whvs)                       #scaled radial HV matrix
 
 #Complex radial HV:
-alpDrPol = alp * ( ( rr[2:ns,:] - rr[0:ns-2,:] ) / 2. ) ** pol
+# dr = ( rr[2:ns,:] - rr[0:ns-2,:] ) / 2.
+# alpDrPol = alp * dr**pol
+alpDrPol = alp * ((outerRadius-innerRadius)/(ns-2)) ** pol
+# alpDxPol = alp * ( ( dr + ss[1:-1,:]*np.tile(dth,(ns-2,1)) ) / 2. ) ** pol
+# alpDxPol = alp * ( ( (outerRadius-innerRadius)/(ns-2) + ss[1:-1,:]*2.*np.pi/nth ) / 2. ) ** pol
+# alpDsPol = alp * ( ( ss[1:-1,:]*np.tile(dth,(ns-2,1)) + np.transpose(np.tile(ds,(nth,1))) ) / 2. ) ** pol
 
 ###########################################################################
 
 #Angular PHS-FD weights arranged in a differentiation matrix:
 
-phsA = 5
-polA = 3
-stcA = 7
-alpA = -2.**-15.
+phsA = phs
+polA = pol
+stcA = stc
+alpA = alp
 
 Wlam = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th, m=1      \
 , phsDegree=phsA, polyDegree=polA, stencilSize=stcA )
@@ -312,8 +320,8 @@ Wlam = np.transpose( Wlam )                #work on rows instead of columns
 # Whvlam = alpA * dthPol.dot(Whvlam)                #scaled angular HV matrix
 # Whvlam = np.transpose( Whvlam )             #work on rows instead of column
 
-#Complex angular HV:
-alpDthPol = alpA * np.tile( dth**polA, (ns-2,1) )
+# # #Complex angular HV:
+# alpDellPol = alpA * ( ss[1:-1,:] * 2.*np.pi/nth ) ** polA
 
 ###########################################################################
 
@@ -372,14 +380,16 @@ if dimSplit == 2 :
         # return sinTh * Dr(U) + cosThOverR * Dth(U)
     
     def L(U) :
+        # Us = Ws@U
+        # return Ws@Us + ssInv*Us + ssInv2*((U@Wlam)@Wlam)
         Us = Ws@U
         Uth = (U@Wlam) + Us*dsdthAll
         return Ws@(Us*dsdrAll)*dsdrAll + rrInv*Us*dsdrAll \
-        +Uth@Wlam + (Ws@Uth)*dsdthAll
+        +rrInv2 * ( Uth@Wlam + (Ws@Uth)*dsdthAll )
     
     def HV(U) :
-        U = L(U)
-        U = L(U)
+        for i in range(np.int(np.round((phs-1)/2))) :
+            U = L(U)
         return alpDrPol * U[1:-1,:]
     
     # def HV(U) :
@@ -392,7 +402,7 @@ if dimSplit == 2 :
         # HVth = ( U @ Wlam ) + dsdthAll * ( Ws @ U )
         # for i in range( polA ) :
             # HVth = ( HVth @ Wlam ) + dsdthAll * ( Ws @ HVth )
-        # HVth = alpDthPol * HVth[1:-1,:]
+        # HVth = alpDellPol * HVth[1:-1,:]
         # #Total HV:
         # return HVr + HVth
         # # #Simple (incorrect) method:

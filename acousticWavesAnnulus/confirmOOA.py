@@ -213,7 +213,7 @@ plt.show()
 
 if contourErrors == 1 :
     
-    rSurf, rSurfPrime = common.getTopoFunc( innerRadius, outerRadius, amp, frq )
+    rSurf, rSurfPrime = common.getTopoFunc( innerRadius, outerRadius, amp, frq, phs0, pol0, stc0 )
     
     thth0, ss0 = np.meshgrid( th0, s0[1:-1] )
     rr0 = common.getRadii( thth0, ss0, innerRadius, outerRadius, rSurf )
