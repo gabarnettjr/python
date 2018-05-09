@@ -34,7 +34,7 @@ ns       = np.int64(sys.argv[7])+2                #total number of s levels
 dt       = 1./np.float64(sys.argv[8])                              #delta t
 
 rSurf, rSurfPrime \
-= common.getTopoFunc( innerRadius, outerRadius, amp, frq, phs, pol, stc )
+= common.getTopoFunc( innerRadius, outerRadius, amp, frq )
 sFunc, dsdth, dsdr \
 = common.getHeightCoordinate( innerRadius, outerRadius, rSurf, rSurfPrime )
 
@@ -186,14 +186,6 @@ rhoInv = c**2. / Po
 
 ###########################################################################
 
-#Extra things needed to enforce the Neumann boundary condition for P:
-
-NxBot, NyBot, NxTop, NyTop \
-, TxBot, TyBot, TxTop, TyTop, someFactor \
-= common.getTangentsAndNormals( th, stc, rSurf, dsdr, dsdth )
-
-###########################################################################
-
 #Check the value of the initial condition on inner boundary:
 
 xB = rSurf(th) * np.cos(th)
@@ -225,7 +217,7 @@ print()
 #Hyperviscosity coefficient (alp) for radial and angular directions:
 
 if ( pol == 3 ) | ( pol == 4 ) :
-    alp = -2.**-12.
+    alp = -2.**-13.
 elif ( pol == 5 ) | ( pol == 6 ) :
     alp = 2.**-16.
 elif ( pol == 7 ) | ( pol == 8 ) :
@@ -238,46 +230,54 @@ if stc == pol+1 :
 
 ###########################################################################
 
-# if dimSplit != 2 :
+if dimSplit != 2 :
     
-    # if plotFromSaved != 1 :
+    if plotFromSaved != 1 :
     
-        # #Get fully 2D Cartesian DMs:
+        #Get fully 2D Cartesian DMs:
         
-        # stencils = phs2.getStencils( xx.flatten(), yy.flatten() \
-        # , xxi.flatten(), yyi.flatten(), stc )
+        stencils = phs2.getStencils( xx.flatten(), yy.flatten() \
+        , xxi.flatten(), yyi.flatten(), stc )
         
-        # if dimSplit == 1 :
-            # A = phs2.getAmatrices( stencils, phs, pol )
+        if dimSplit == 1 :
+            A = phs2.getAmatrices( stencils, phs, pol )
             # Wx = phs2.getWeights( stencils, A, "1",  0 )
             # Wy = phs2.getWeights( stencils, A, "2",  0 )
-        # elif dimSplit == 0 :
-            # e1 = np.transpose( np.vstack(( -yyi.flatten(), xxi.flatten() )) )
-            # nm = np.sqrt( e1[:,0]**2. + e1[:,1]**2. )
-            # e1 = e1 / np.transpose(np.tile(nm,(2,1)))
-            # e2 = np.transpose( np.vstack((  xxi.flatten(), yyi.flatten() )) )
-            # nm = np.sqrt( e2[:,0]**2. + e2[:,1]**2. )
-            # e2 = e2 / np.transpose(np.tile(nm,(2,1)))
-            # stencils = phs2.rotateStencils( stencils, e1, e2 )
-            # A = phs2.getAmatrices( stencils, phs, pol )
-            # Wx1 = phs2.getWeights( stencils, A, "1", 0 )
-            # Wx2 = phs2.getWeights( stencils, A, "2", 0 )
-            # Wx = Wx1 * stencils.dx1dx + Wx2 * stencils.dx2dx
-            # Wy = Wx1 * stencils.dx1dy + Wx2 * stencils.dx2dy
+        elif dimSplit == 0 :
+            e1 = np.transpose( np.vstack(( -yyi.flatten(), xxi.flatten() )) )
+            nm = np.sqrt( e1[:,0]**2. + e1[:,1]**2. )
+            e1 = e1 / np.transpose(np.tile(nm,(2,1)))
+            e2 = np.transpose( np.vstack((  xxi.flatten(), yyi.flatten() )) )
+            nm = np.sqrt( e2[:,0]**2. + e2[:,1]**2. )
+            e2 = e2 / np.transpose(np.tile(nm,(2,1)))
+            stencils = phs2.rotateStencils( stencils, e1, e2 )
+            A = phs2.getAmatrices( stencils, phs, pol )
+            Wx1 = phs2.getWeights( stencils, A, "1", 0 )
+            Wx2 = phs2.getWeights( stencils, A, "2", 0 )
+            Wx = Wx1 * stencils.dx1dx + Wx2 * stencils.dx2dx
+            Wy = Wx1 * stencils.dx1dy + Wx2 * stencils.dx2dy
         
         # Wth = np.transpose(np.tile(-yyi.flatten(),(stc,1))) * Wx \
             # + np.transpose(np.tile( xxi.flatten(),(stc,1))) * Wy
         
-        # # K = np.int( np.round( (phs-1)/2 ) )
-        # # Whv = phs2.getWeights( stencils, A, "hv", K )
-        # # Whv = alp * stencils.h**(2*K-1) * Whv
+        K = np.int( np.round( (phs-1)/2 ) )
+        Whv = phs2.getWeights( stencils, A, "hv", K )
+        Whv = alp * stencils.h**(2*K-1) * Whv
     
-    # if pol == 3 :
-        # stc = 7
-    # elif pol == 5 :
-        # stc = 13
-    # else :
-        # sys.exit("\nOnly using pol=3 and pol=5 in this case.\n")
+    if pol == 3 :
+        stc = 7
+    elif pol == 5 :
+        stc = 13
+    else :
+        sys.exit("\nOnly using pol=3 and pol=5 in this case.\n")
+
+###########################################################################
+
+#Extra things needed to enforce the Neumann boundary condition for P:
+
+NxBot, NyBot, NxTop, NyTop \
+, TxBot, TyBot, TxTop, TyTop, someFactor \
+= common.getTangentsAndNormals( th, stc, rSurf, dsdr, dsdth )
 
 ###########################################################################
 
@@ -295,7 +295,7 @@ Ws = phs1.getDM( x=s, X=s, m=1     \
 #Complex radial HV:
 # dr = ( rr[2:ns,:] - rr[0:ns-2,:] ) / 2.
 # alpDrPol = alp * dr**pol
-alpDrPol = alp * ((outerRadius-innerRadius)/(ns-2)) ** pol
+# alpDrPol = alp * ((outerRadius-innerRadius)/(ns-2)) ** pol
 # alpDxPol = alp * ( ( dr + ss[1:-1,:]*np.tile(dth,(ns-2,1)) ) / 2. ) ** pol
 # alpDxPol = alp * ( ( (outerRadius-innerRadius)/(ns-2) + ss[1:-1,:]*2.*np.pi/nth ) / 2. ) ** pol
 # alpDsPol = alp * ( ( ss[1:-1,:]*np.tile(dth,(ns-2,1)) + np.transpose(np.tile(ds,(nth,1))) ) / 2. ) ** pol
@@ -411,24 +411,26 @@ if dimSplit == 2 :
 elif ( dimSplit == 1 ) | ( dimSplit == 0 ) :
     
     def Ds(U) :
-        return Ws @ U
+        return Ws[1:-1,:] @ U
     
-    def Dr(U) :
-        return Ds(U) * dsdri
+    def Dlam(U) :
+        return U[1:-1,:] @ Wlam
     
-    def Dth(U) :
-        U = U.flatten()
-        U = np.sum( Wth*U[stencils.idx], axis=1 )
-        return np.reshape( U, (ns-2,nth) )
+    # def Dth(U) :
+        # U = U.flatten()
+        # U = np.sum( Wth*U[stencils.idx], axis=1 )
+        # return np.reshape( U, (ns-2,nth) )
     
-    def Dx(U) :
-        return cosTh * Dr(U) - sinThOverR * Dth(U)
+    # def Dx(U) :
+        # return cosTh * Dr(U) - sinThOverR * Dth(U)
     
-    def Dy(U) :
-        return sinTh * Dr(U) + cosThOverR * Dth(U)
+    # def Dy(U) :
+        # return sinTh * Dr(U) + cosThOverR * Dth(U)
     
     def HV(U) :
-        return ( Whvs @ U ) + ( U[1:-1,:] @ Whvlam )
+        U = U.flatten()
+        U = np.sum( Whv*U[stencils.idx], axis=1 )
+        return np.reshape( U, (ns-2,nth) )
 
 # elif dimSplit == 0 :
     
