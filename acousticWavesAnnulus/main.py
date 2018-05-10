@@ -13,28 +13,29 @@ from gab.annulus import common, waveEquation
 ###########################################################################
 
 c           = .03                                     #wave speed (c**2=RT)
-innerRadius = 1.
-outerRadius = 2.
-tf          = 500.                                              #final time
-saveDel     = 50                           #time interval to save snapshots
+innerRadius = 2.
+outerRadius = 3.
+tf          = 10.                                               #final time
+saveDel     = 1                            #time interval to save snapshots
 exp         = 200.                 #controls steepness of initial condition
 amp         = .10                 #amplitude of trigonometric topo function
 frq         = 9                   #frequency of trigonometric topo function
 
 plotFromSaved = 0                            #if 1, load instead of compute
-saveContours  = 1                       #switch for saving contours as pngs
+saveContours  = 0                       #switch for saving contours as pngs
 
-dimSplit = np.int64(sys.argv[1])               #0:none, 1:some, 2:fullSplit
+mlv      = np.int64(sys.argv[1])                #0:interfaces, 1:mid-levels
 phs      = np.int64(sys.argv[2])             #PHS RBF exponent (odd number)
 pol      = np.int64(sys.argv[3])                         #polynomial degree
 stc      = np.int64(sys.argv[4])                              #stencil size
 ptb      = np.float64(sys.argv[5])   #random radial perturbation percentage
 rkStages = np.int64(sys.argv[6])     #number of Runge-Kutta stages (3 or 4)
-ns       = np.int64(sys.argv[7])+2                #total number of s levels
+ns       = np.int64(sys.argv[7])                  #total number of s levels
 dt       = 1./np.float64(sys.argv[8])                              #delta t
 
 rSurf, rSurfPrime \
 = common.getTopoFunc( innerRadius, outerRadius, amp, frq )
+
 sFunc, dsdth, dsdr \
 = common.getHeightCoordinate( innerRadius, outerRadius, rSurf, rSurfPrime )
 
@@ -57,7 +58,7 @@ def initialCondition( x, y ) :
 #Set things up for saving:
 
 saveString = waveEquation.getSavestring( c, innerRadius, outerRadius, tf, saveDel, exp, amp, frq \
-, dimSplit, phs, pol, stc, ptb, rkStages, ns, dt )
+, mlv, phs, pol, stc, ptb, rkStages, ns, dt )
 
 if os.path.exists( saveString+'*.npy' ) :
     os.remove( saveString+'*.npy' )                       #remove old files
@@ -73,20 +74,34 @@ t = 0.                                                       #starting time
 nTimesteps = np.int(np.round( tf / dt ))         #total number of timesteps
 
 nth = common.getNth( innerRadius, outerRadius, ns ) #nmbr of angular levels
-dth = 2.*np.pi / nth                                  #constant delta theta
+dth0 = 2.*np.pi / nth                                 #constant delta theta
 th0  = np.linspace( 0., 2.*np.pi, nth+1 )             #vector of all angles
 th0  = th0[0:-1]                         #remove last angle (same as first)
-tmp = ptb * dth                               #relative perturbation factor
+tmp = ptb * dth0                              #relative perturbation factor
 ran = -tmp + 2.*tmp*np.random.rand(nth)         #random perturbation vector
 th = th0.copy()                                     #copy regular th vector
 th = th + ran                                 #th vector after perturbation
 
-ds  = ( outerRadius - innerRadius ) / (ns-2)              #constant delta s
-s0  = np.linspace( innerRadius-ds/2, outerRadius+ds/2, ns )       #s vector
-tmp = ptb * ds                                #relative perturbation factor
-ran = -tmp + 2.*tmp*np.random.rand(ns)          #random perturbation vector
-s   = s0.copy()                                      #copy regular s vector
-s   = s + ran                                  #s vector after perturbation
+if mlv == 1 :
+    ds0  = ( outerRadius - innerRadius ) / (ns-2)         #constant delta s
+    s0  = np.linspace( innerRadius-ds0/2, outerRadius+ds0/2, ns ) #s vector
+    tmp = ptb * ds0                            #relative perturbation factor
+    ran = -tmp + 2.*tmp*np.random.rand(ns)      #random perturbation vector
+    s   = s0.copy()                                  #copy regular s vector
+    s   = s + ran                              #s vector after perturbation
+elif mlv == 0 :
+    ds0 = ( outerRadius - innerRadius ) / (ns-3)          #constant delta s
+    s0 = np.linspace( innerRadius-ds0, outerRadius+ds0, ns )      #s vector
+    tmp = ptb * ds0                           #relative perturbation factor
+    ranBot = -tmp + 2.*tmp*np.random.rand(1)
+    ranMid = -tmp + 2.*tmp*np.random.rand(ns-4)
+    ranTop = -tmp + 2.*tmp*np.random.rand(1)
+    s = s0.copy()                                    #copy regular s vector
+    s[0] = s[0] + ranBot                         #perturb bottom ghost node
+    s[2:-2] = s[2:-2] + ranMid           #perturb interior nodes (no bndry)
+    s[-1] = s[-1] + ranTop                          #perturb top ghost node
+else :
+    sys.exit("\nError: mlv should be 0 or 1.\n")
 
 if plotFromSaved == 1 :
     th = np.load( saveString+'th'+'.npy' )        #load vector of th values
@@ -116,12 +131,12 @@ rri = rr[1:-1,:]                                      #without ghost layers
 dsdthi = dsdth( rri, ththi )             #interior values of dsdth function
 dsdri  = dsdr( rri, ththi )               #interior values of dsdr function
 
-dsdthAll = dsdth( rr, thth )
-dsdrAll  = dsdr( rr, thth )
-rrInv = 1./rr
-rrInv2 = rrInv**2.
-ssInv = 1./ss
-ssInv2 = ssInv**2.
+dsdthAll = dsdth( rr, thth )                 #dsdth values over entire mesh
+dsdrAll  = dsdr( rr, thth )                   #dsdr values over entire mesh
+# rrInv = 1./rr
+# rrInv2 = rrInv**2.
+# ssInv = 1./ss
+# ssInv2 = ssInv**2.
 
 cosTh = np.cos(ththi)                                                #dr/dx
 sinTh = np.sin(ththi)                                                #dr/dy
@@ -218,70 +233,31 @@ if ( pol == 3 ) | ( pol == 4 ) :
     alp = -2.**-10.
 elif ( pol == 5 ) | ( pol == 6 ) :
     alp = 2.**-14.
-elif ( pol == 7 ) | ( pol == 8 ) :
-    alp = -2.**-19.
 else :
-    sys.exit("\nError: pol should be 3, 4, 5, 6, 7, or 8.\n")
-
-phsA = 9
-polA = 7
-stcA = 17
-alpA = -2.**-22.
+    sys.exit("\nError: pol should be 3, 4, 5, or 6.\n")
 
 if stc == pol+1 :
     alp = 0.                           #remove HV if using only polynomials
 
 ###########################################################################
 
-if dimSplit != 2 :
-    
-    if plotFromSaved != 1 :
-    
-        #Get fully 2D Cartesian DMs:
-        
-        stencils = phs2.getStencils( xx.flatten(), yy.flatten() \
-        , xxi.flatten(), yyi.flatten(), stc )
-        
-        if dimSplit == 1 :
-            A = phs2.getAmatrices( stencils, phs, pol )
-            # Wx = phs2.getWeights( stencils, A, "1",  0 )
-            # Wy = phs2.getWeights( stencils, A, "2",  0 )
-        elif dimSplit == 0 :
-            e1 = np.transpose( np.vstack(( -yyi.flatten(), xxi.flatten() )) )
-            nm = np.sqrt( e1[:,0]**2. + e1[:,1]**2. )
-            e1 = e1 / np.transpose(np.tile(nm,(2,1)))
-            e2 = np.transpose( np.vstack((  xxi.flatten(), yyi.flatten() )) )
-            nm = np.sqrt( e2[:,0]**2. + e2[:,1]**2. )
-            e2 = e2 / np.transpose(np.tile(nm,(2,1)))
-            stencils = phs2.rotateStencils( stencils, e1, e2 )
-            A = phs2.getAmatrices( stencils, phs, pol )
-            Wx1 = phs2.getWeights( stencils, A, "1", 0 )
-            Wx2 = phs2.getWeights( stencils, A, "2", 0 )
-            Wx = Wx1 * stencils.dx1dx + Wx2 * stencils.dx2dx
-            Wy = Wx1 * stencils.dx1dy + Wx2 * stencils.dx2dy
-        
-        # Wth = np.transpose(np.tile(-yyi.flatten(),(stc,1))) * Wx \
-            # + np.transpose(np.tile( xxi.flatten(),(stc,1))) * Wy
-        
-        K = np.int( np.round( (phs-1)/2 ) )
-        Whv = phs2.getWeights( stencils, A, "hv", K )
-        Whv = alp * stencils.h**(2*K-1) * Whv
-    
-    if pol == 3 :
-        stc = 9
-    elif pol == 5 :
-        stc = 13
-    else :
-        sys.exit("\nOnly using pol=3 and pol=5 in this case.\n")
+#Parameters for angular approximations:
+
+phsA = 9
+polA = 7
+stcA = 17
+alpA = -2.**-22.
 
 ###########################################################################
 
 #Extra things needed to enforce the Neumann boundary condition for P:
 
-if ( pol==5 | pol==6 ) & ( ns == 14 ) :
-    stcB = 13
-else :
-    stcB = 2*(pol+2)+1
+stcB = stc
+# stcB = min( ns-1, 2*stc )
+# if ( pol==5 | pol==6 ) & ( ns == 14 ) :
+    # stcB = 13
+# else :
+    # stcB = 2*(pol+2)+1
 
 NxBot, NyBot, NxTop, NyTop \
 , TxBot, TyBot, TxTop, TyTop \
@@ -298,7 +274,7 @@ Ws = phs1.getDM( x=s, X=s, m=1     \
 #Simple (but still correct) radial HV:
 Whvs = phs1.getDM( x=s, X=s[1:-1], m=phs-1 \
 , phsDegree=phs, polyDegree=pol, stencilSize=stc )
-Whvs = alp * ( (outerRadius-innerRadius)/(ns-2) ) ** pol * Whvs
+Whvs = alp * ds0**pol * Whvs
 # dsPol = spdiags( ds**pol, np.array([0]), len(ds), len(ds) )
 # Whvs = alp * dsPol.dot(Whvs)                       #scaled radial HV matrix
 
@@ -314,33 +290,34 @@ Whvs = alp * ( (outerRadius-innerRadius)/(ns-2) ) ** pol * Whvs
 
 #Angular PHS-FD weights arranged in a differentiation matrix:
 
-Wlam = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th, m=1      \
+Wlam = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th, m=1 \
 , phsDegree=phsA, polyDegree=polA, stencilSize=stcA )
 Wlam = np.transpose( Wlam )                #work on rows instead of columns
 
-# #Simple (and incorrect) angular HV:
-# Whvlam = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th, m=phsA-1 \
-# , phsDegree=phsA, polyDegree=polA, stencilSize=stcA )
+#Simple (and incorrect) angular HV:
+Whvlam = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th, m=phsA-1 \
+, phsDegree=phsA, polyDegree=polA, stencilSize=stcA )
+Whvlam = alpA * dth0**polA * Whvlam
 # dthPol = spdiags( dth**polA, np.array([0]), len(dth), len(dth) )
 # Whvlam = alpA * dthPol.dot(Whvlam)                #scaled angular HV matrix
-# Whvlam = np.transpose( Whvlam )             #work on rows instead of column
+Whvlam = np.transpose( Whvlam )             #work on rows instead of column
 
 #Complex angular HV:
+# alpDthPol = alpA * dth0**polA
 # alpDthPol = alpA * ( np.tile(dth,(ns-2,1)) ) ** polA
-alpDthPol = alpA * ( 2.*np.pi / nth ) ** polA
 
 ###########################################################################
 
 #Weights for interpolation to boundary, extrapolation to ghost-nodes,
 #and d/ds at boundary:
 
-wIinner = phs1.getWeights( innerRadius, s[0:stcB],   0, phs, pol+1 )
-wEinner = phs1.getWeights( s[0],        s[1:stcB+1], 0, phs, pol+1 )
-wDinner = phs1.getWeights( innerRadius, s[0:stcB],   1, phs, pol+1 )
+wIinner = phs1.getWeights( innerRadius, s[0:stcB],   0, phs, pol )
+wEinner = phs1.getWeights( s[0],        s[1:stcB+1], 0, phs, pol )
+wDinner = phs1.getWeights( innerRadius, s[0:stcB],   1, phs, pol )
 
-wIouter = phs1.getWeights( outerRadius, s[-1:-(stcB+1):-1], 0, phs, pol+1 )
-wEouter = phs1.getWeights( s[-1],       s[-2:-(stcB+2):-1], 0, phs, pol+1 )
-wDouter = phs1.getWeights( outerRadius, s[-1:-(stcB+1):-1], 1, phs, pol+1 )
+wIouter = phs1.getWeights( outerRadius, s[-1:-(stcB+1):-1], 0, phs, pol )
+wEouter = phs1.getWeights( s[-1],       s[-2:-(stcB+2):-1], 0, phs, pol )
+wDouter = phs1.getWeights( outerRadius, s[-1:-(stcB+1):-1], 1, phs, pol )
 
 wIinner = np.transpose( np.tile( wIinner, (nth,1) ) )
 wEinner = np.transpose( np.tile( wEinner, (nth,1) ) )
@@ -364,104 +341,62 @@ Wangular = np.transpose( Wangular )               #act on rows, not columns
 ###########################################################################
 
 #Functions to approximate differential operators and other things:
+    
+def Ds(U) :
+    return Ws[1:-1,:] @ U
 
-if dimSplit == 2 :
-    
-    def Ds(U) :
-        return Ws[1:-1,:] @ U
-    
-    def Dlam(U) :
-        return U[1:-1,:] @ Wlam
-    
-    # def Dr(U) :
-        # return Ds(U) * dsdri
-    
-    # def Dth(U) :
-        # return Dlam(U) + Ds(U) * dsdthi
-    
-    # def Dx(U) :
-        # return cosTh * Dr(U) - sinThOverR * Dth(U)
-    
-    # def Dy(U) :
-        # return sinTh * Dr(U) + cosThOverR * Dth(U)
-    
-    # def L(U) :
-        # # Us = Ws@U
-        # # return Ws@Us + ssInv*Us + ssInv2*((U@Wlam)@Wlam)
-        # Us = Ws@U
-        # Uth = (U@Wlam) + Us*dsdthAll
-        # return Ws@(Us*dsdrAll)*dsdrAll + rrInv*Us*dsdrAll \
-        # +rrInv2 * ( Uth@Wlam + (Ws@Uth)*dsdthAll )
-    
-    # def HV(U) :
-        # for i in range(np.int(np.round((phs-1)/2))) :
-            # U = L(U)
-        # return alpDrPol * U[1:-1,:]
-    
-    def HV(U) :
-        #Angular HV:
-        HVth = ( U @ Wlam ) + dsdthAll * ( Ws @ U )
-        for i in range( polA ) :
-            HVth = ( HVth @ Wlam ) + dsdthAll * ( Ws @ HVth )
-        HVth = alpDthPol * HVth[1:-1,:]
-        #Total HV:
-        return dsdri*(Whvs@U) + HVth
-        # #Simple (incorrect) method:
-        # return ( Whvs @ U ) + ( U[1:-1,:] @ Whvlam )
-    
-elif ( dimSplit == 1 ) | ( dimSplit == 0 ) :
-    
-    def Ds(U) :
-        return Ws[1:-1,:] @ U
-    
-    def Dlam(U) :
-        return U[1:-1,:] @ Wlam
-    
-    # def Dth(U) :
-        # U = U.flatten()
-        # U = np.sum( Wth*U[stencils.idx], axis=1 )
-        # return np.reshape( U, (ns-2,nth) )
-    
-    # def Dx(U) :
-        # return cosTh * Dr(U) - sinThOverR * Dth(U)
-    
-    # def Dy(U) :
-        # return sinTh * Dr(U) + cosThOverR * Dth(U)
-    
-    def HV(U) :
-        U = U.flatten()
-        U = np.sum( Whv*U[stencils.idx], axis=1 )
-        return np.reshape( U, (ns-2,nth) )
+def Dlam(U) :
+    return U[1:-1,:] @ Wlam
 
-# elif dimSplit == 0 :
-    
-    # def Dx(U) :
-        # U = U.flatten()
-        # U = np.sum( Wx*U[stencils.idx], axis=1 )
-        # return np.reshape( U, (ns-2,nth) )
-    
-    # def Dy(U) :
-        # U = U.flatten()
-        # U = np.sum( Wy*U[stencils.idx], axis=1 )
-        # return np.reshape( U, (ns-2,nth) )
-    
-    # def HV(U) :
-        # U = U.flatten()
-        # U = np.sum( Whv*U[stencils.idx], axis=1 )
-        # return np.reshape( U, (ns-2,nth) )
+# def Dr(U) :
+    # return Ds(U) * dsdri
 
+# def Dth(U) :
+    # return Dlam(U) + Ds(U) * dsdthi
+
+# def Dx(U) :
+    # return cosTh * Dr(U) - sinThOverR * Dth(U)
+
+# def Dy(U) :
+    # return sinTh * Dr(U) + cosThOverR * Dth(U)
+
+# def L(U) :
+    # # Us = Ws@U
+    # # return Ws@Us + ssInv*Us + ssInv2*((U@Wlam)@Wlam)
+    # Us = Ws@U
+    # Uth = (U@Wlam) + Us*dsdthAll
+    # return Ws@(Us*dsdrAll)*dsdrAll + rrInv*Us*dsdrAll \
+    # +rrInv2 * ( Uth@Wlam + (Ws@Uth)*dsdthAll )
+
+# def HV(U) :
+    # for i in range(np.int(np.round((phs-1)/2))) :
+        # U = L(U)
+    # return alpDrPol * U[1:-1,:]
+
+def HV(U) :
+    # #Angular HV:
+    # HVth = ( U @ Wlam ) + dsdthAll * ( Ws @ U )
+    # for i in range( polA ) :
+        # HVth = ( HVth @ Wlam ) + dsdthAll * ( Ws @ HVth )
+    # HVth = alpDthPol * HVth[1:-1,:]
+    # #Total HV:
+    # return dsdri*(Whvs@U) + HVth
+    #Simple (incorrect) method:
+    return ( Whvs @ U ) + ( U[1:-1,:] @ Whvlam )
+
+if mlv == 1 :
+    def setGhostNodes( U ) :
+        return waveEquation.setGhostNodesMidLevels( U \
+        , NxBot, NyBot, NxTop, NyTop \
+        , TxBot, TyBot, TxTop, TyTop \
+        , someFactor, stcB \
+        , Wlam, wIinner, wEinner, wDinner, wIouter, wEouter, wDouter )
 else :
-    
-    sys.exit("\nError: dimSplit should be 0, 1, or 2.\n")
-
-def setGhostNodes( U ) :
-    return waveEquation.setGhostNodesNeumann( U \
-    , NxBot, NyBot, NxTop, NyTop \
-    , TxBot, TyBot, TxTop, TyTop \
-    , someFactor, stcB \
-    , Wlam, wIinner, wEinner, wDinner, wIouter, wEouter, wDouter )
-    # return waveEquation.setGhostNodes( U \
-    # , rhoB, rhoT, wIinner, wEinner, wIouter, wEouter, stc )
+    def setGhostNodes( U ) :
+        return waveEquation.setGhostNodesInterfaces( U \
+        , TxBot[0,:], TyBot[0,:], TxTop[0,:], TyTop[0,:] \
+        , someFactor, stcB \
+        , Wlam, wEinner, wDinner, wEouter, wDouter )
 
 def odefun( t, U ) :
     return waveEquation.odefun( t, U \
@@ -504,6 +439,7 @@ for i in np.arange( 0, nTimesteps+1 ) :
             # plt.contourf( xx0, yy0, tmp, 20 )
             plt.contourf( xx0, yy0, tmp, np.arange(1.-.19,1.+.21,.02) )
             plt.axis('equal')
+            # plt.axis([-outerRadius,outerRadius,-outerRadius,outerRadius])
             plt.colorbar()
             fig.savefig( '{0:04d}'.format(np.int(np.round(t)+1e-12))+'.png', bbox_inches = 'tight' )
             plt.clf()

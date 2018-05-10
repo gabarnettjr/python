@@ -10,47 +10,47 @@ from gab.annulus import common, waveEquation
 ###########################################################################
 
 c           = .03                                     #wave speed (c**2=RT)
-innerRadius = 1.
-outerRadius = 2.
+innerRadius = 2.
+outerRadius = 3.
 tf          = 10.                                               #final time
 saveDel     = 1                            #time interval to save snapshots
 exp         = 200.                 #controls steepness of initial condition
 amp         = .10                 #amplitude of trigonometric topo function
 frq         = 9                   #frequency of trigonometric topo function
 
-ord = 2                                        #norm to use for error check
+ord = np.inf                                   #norm to use for error check
 
 contourErrors = 1
 
-dimSplitA = 2
+mlvA      = 1
 phsA      = 5
 polA      = 3
-stcA      = 9
-ptbA      = .30
+stcA      = 7
+ptbA      = .00
 rkStagesA = 3
 
-dimSplitB = 2
+mlvB      = 1
 phsB      = 7
 polB      = 5
 stcB      = 13
 ptbB      = .00
 rkStagesB = 4
 
-dimSplit0 = 2
-phs0      = 9
-pol0      = 7
-stc0      = 17
+mlv0      = 1
+phs0      = 7
+pol0      = 5
+stc0      = 13
 ptb0      = .00
 rkStages0 = 4
 
 t0 = tf                                                    #time to look at
 
-ns0 = 384+2                                           #reference resolution
-ns1 = 12+2
-ns2 = 24+2
-ns3 = 48+2
-ns4 = 96+2
-ns5 = 192+2
+ns0 = 384                                             #reference resolution
+ns1 = 12
+ns2 = 24
+ns3 = 48
+ns4 = 96
+ns5 = 192
 
 dt0 = 1./32.
 dt1 = 1./1.
@@ -61,10 +61,15 @@ dt5 = 1./16.
 
 ###########################################################################
 
-def loadSingleResult( dimSplit, phs, pol, stc, ptb, rkStages, ns, dt, t0 ) :
+def loadSingleResult( mlv, phs, pol, stc, ptb, rkStages, ns, dt, t0 ) :
+    
+    if mlv == 1 :
+        ns = ns + 2
+    else :
+        ns = ns + 3
     
     saveString = waveEquation.getSavestring( c, innerRadius, outerRadius, tf, saveDel, exp, amp, frq \
-    , dimSplit, phs, pol, stc, ptb, rkStages, ns, dt )
+    , mlv, phs, pol, stc, ptb, rkStages, ns, dt )
     
     U  = np.load( saveString + '{0:04d}'.format(np.int(np.round(t0))) + '.npy' )
     s  = np.load( saveString + 's' + '.npy' )
@@ -76,14 +81,14 @@ def loadSingleResult( dimSplit, phs, pol, stc, ptb, rkStages, ns, dt, t0 ) :
 
 #Load reference solution and things to compare it to:
 
-def loadManyResults( dimSplit, phs, pol, stc, ptb, rkStages ) :
+def loadManyResults( mlv, phs, pol, stc, ptb, rkStages ) :
     
-    U0, s0, th0 = loadSingleResult( dimSplit0, phs0, pol0, stc0, ptb0, rkStages0, ns0, dt0, t0 )
-    U1, s1, th1 = loadSingleResult( dimSplit,  phs,  pol,  stc,  ptb,  rkStages,  ns1, dt1, t0 )
-    U2, s2, th2 = loadSingleResult( dimSplit,  phs,  pol,  stc,  ptb,  rkStages,  ns2, dt2, t0 )
-    U3, s3, th3 = loadSingleResult( dimSplit,  phs,  pol,  stc,  ptb,  rkStages,  ns3, dt3, t0 )
-    U4, s4, th4 = loadSingleResult( dimSplit,  phs,  pol,  stc,  ptb,  rkStages,  ns4, dt4, t0 )
-    U5, s5, th5 = loadSingleResult( dimSplit,  phs,  pol,  stc,  ptb,  rkStages,  ns5, dt5, t0 )
+    U0, s0, th0 = loadSingleResult( mlv0, phs0, pol0, stc0, ptb0, rkStages0, ns0, dt0, t0 )
+    U1, s1, th1 = loadSingleResult( mlv,  phs,  pol,  stc,  ptb,  rkStages,  ns1, dt1, t0 )
+    U2, s2, th2 = loadSingleResult( mlv,  phs,  pol,  stc,  ptb,  rkStages,  ns2, dt2, t0 )
+    U3, s3, th3 = loadSingleResult( mlv,  phs,  pol,  stc,  ptb,  rkStages,  ns3, dt3, t0 )
+    U4, s4, th4 = loadSingleResult( mlv,  phs,  pol,  stc,  ptb,  rkStages,  ns4, dt4, t0 )
+    U5, s5, th5 = loadSingleResult( mlv,  phs,  pol,  stc,  ptb,  rkStages,  ns5, dt5, t0 )
     
     return U0, U1, U2, U3, U4, U5 \
     , s0, s1, s2, s3, s4, s5 \
@@ -95,9 +100,9 @@ def loadManyResults( dimSplit, phs, pol, stc, ptb, rkStages ) :
 
 def interpRadial( U0, U1, U2, U3, U4, U5, s0, s1, s2, s3, s4, s5 ) :
     
-    phsR = 7
-    polR = 5
-    stcR = 13
+    phsR = 5
+    polR = 4
+    stcR = 9
     
     W1 = phs1.getDM( x=s1, X=s0[1:-1], m=0, phsDegree=phsR, polyDegree=polR, stencilSize=stcR )
     W2 = phs1.getDM( x=s2, X=s0[1:-1], m=0, phsDegree=phsR, polyDegree=polR, stencilSize=stcR )
@@ -167,10 +172,10 @@ def gatherErrors( U0, U1, U2, U3, U4, U5 ) :
 
 ###########################################################################
 
-def getErrorVector( dimSplit, phs, pol, stc, ptb, rkStages ) :
+def getErrorVector( mlv, phs, pol, stc, ptb, rkStages ) :
     
     U0, U1, U2, U3, U4, U5, s0, s1, s2, s3, s4, s5, th0, th1, th2, th3, th4, th5  \
-    = loadManyResults( dimSplit, phs, pol, stc, ptb, rkStages )
+    = loadManyResults( mlv, phs, pol, stc, ptb, rkStages )
     
     U0, U1, U2, U3, U4, U5 = interpRadial( U0, U1, U2, U3, U4, U5 \
     , s0, s1, s2, s3, s4, s5 )
@@ -187,10 +192,10 @@ def getErrorVector( dimSplit, phs, pol, stc, ptb, rkStages ) :
 #Plot the error to check convergence:
 
 errA, U0, U1, U2, U3, U4, U5, th0, s0 \
-= getErrorVector( dimSplitA, phsA, polA, stcA, ptbA, rkStagesA )
+= getErrorVector( mlvA, phsA, polA, stcA, ptbA, rkStagesA )
 
 errB, U0, U1, U2, U3, U4, U5, th0, s0 \
-= getErrorVector( dimSplitB, phsB, polB, stcB, ptbB, rkStagesB )
+= getErrorVector( mlvB, phsB, polB, stcB, ptbB, rkStagesB )
 
 ns= np.hstack(( ns1, ns2, ns3, ns4, ns5 ))
 ns = ns - 2
