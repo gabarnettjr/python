@@ -15,14 +15,14 @@ from gab.annulus import common, waveEquation
 c           = .03                                     #wave speed (c**2=RT)
 innerRadius = 2.
 outerRadius = 3.
-tf          = 10.                                               #final time
-saveDel     = 1                            #time interval to save snapshots
+tf          = 100.                                              #final time
+saveDel     = 10                           #time interval to save snapshots
 exp         = 200.                 #controls steepness of initial condition
 amp         = .10                 #amplitude of trigonometric topo function
 frq         = 9                   #frequency of trigonometric topo function
 
 plotFromSaved = 0                            #if 1, load instead of compute
-saveContours  = 0                       #switch for saving contours as pngs
+saveContours  = 1                       #switch for saving contours as pngs
 
 mlv      = np.int64(sys.argv[1])                #0:interfaces, 1:mid-levels
 phs      = np.int64(sys.argv[2])             #PHS RBF exponent (odd number)
@@ -219,6 +219,8 @@ print()
 # , xB, yB, "-" \
 # , xT, yT, "-" )
 # plt.axis('equal')
+# tmp = outerRadius + .2
+# plt.axis([-tmp,tmp,-tmp,tmp])
 # plt.xlabel( 'x' )
 # plt.ylabel( 'y' )
 # plt.show()
@@ -271,7 +273,7 @@ NxBot, NyBot, NxTop, NyTop \
 Ws = phs1.getDM( x=s, X=s, m=1     \
 , phsDegree=phs, polyDegree=pol, stencilSize=stc )
 
-#Simple (but still correct) radial HV:
+#Simple (but still correct with dsdr multiplier) radial HV:
 Whvs = phs1.getDM( x=s, X=s[1:-1], m=phs-1 \
 , phsDegree=phs, polyDegree=pol, stencilSize=stc )
 Whvs = alp * ds0**pol * Whvs
@@ -438,8 +440,10 @@ for i in np.arange( 0, nTimesteps+1 ) :
             tmp = Wradial @ ( U[0,:,:] ) @ Wangular
             # plt.contourf( xx0, yy0, tmp, 20 )
             plt.contourf( xx0, yy0, tmp, np.arange(1.-.19,1.+.21,.02) )
+            plt.plot( xB, yB, "k-", xT, yT, "k-" )
             plt.axis('equal')
-            # plt.axis([-outerRadius,outerRadius,-outerRadius,outerRadius])
+            tmp = outerRadius + .2
+            plt.axis([-tmp,tmp,-tmp,tmp])
             plt.colorbar()
             fig.savefig( '{0:04d}'.format(np.int(np.round(t)+1e-12))+'.png', bbox_inches = 'tight' )
             plt.clf()
