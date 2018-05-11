@@ -10,13 +10,13 @@ from gab.annulus import common, waveEquation
 ###########################################################################
 
 c           = .03                                     #wave speed (c**2=RT)
-innerRadius = 2.
-outerRadius = 3.
+innerRadius = 1.
+outerRadius = 2.
 tf          = 10.                                               #final time
 saveDel     = 1                            #time interval to save snapshots
 exp         = 200.                 #controls steepness of initial condition
 amp         = .10                 #amplitude of trigonometric topo function
-frq         = 9                   #frequency of trigonometric topo function
+frq         = 5                   #frequency of trigonometric topo function
 
 ord = np.inf                                   #norm to use for error check
 
@@ -30,10 +30,10 @@ ptbA      = .00
 rkStagesA = 3
 
 mlvB      = 1
-phsB      = 7
-polB      = 5
-stcB      = 13
-ptbB      = .00
+phsB      = 5
+polB      = 3
+stcB      = 7
+ptbB      = .30
 rkStagesB = 4
 
 mlv0      = 1
@@ -100,9 +100,9 @@ def loadManyResults( mlv, phs, pol, stc, ptb, rkStages ) :
 
 def interpRadial( U0, U1, U2, U3, U4, U5, s0, s1, s2, s3, s4, s5 ) :
     
-    phsR = 5
-    polR = 4
-    stcR = 9
+    phsR = 7
+    polR = 5
+    stcR = 13
     
     W1 = phs1.getDM( x=s1, X=s0[1:-1], m=0, phsDegree=phsR, polyDegree=polR, stencilSize=stcR )
     W2 = phs1.getDM( x=s2, X=s0[1:-1], m=0, phsDegree=phsR, polyDegree=polR, stencilSize=stcR )
@@ -216,7 +216,7 @@ plt.legend(( 'A', 'B', '1st order', '2nd order' \
 plt.plot( np.log10(ns), np.log10(errA), 'k.' )
 plt.plot( np.log10(ns), np.log10(errB), 'k.' )
 plt.xlabel( 'log10(ns)' )
-plt.ylabel( 'log10(relErr)' )
+plt.ylabel( 'log10(absErr)' )
 plt.show()
 
 ###########################################################################

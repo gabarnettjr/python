@@ -7,22 +7,22 @@ from scipy.sparse import spdiags
 
 sys.path.append( '../site-packages' )
 
-from gab import rk, phs1, phs2
+from gab import rk, phs1
 from gab.annulus import common, waveEquation
 
 ###########################################################################
 
 c           = .03                                     #wave speed (c**2=RT)
-innerRadius = 2.
-outerRadius = 3.
-tf          = 100.                                              #final time
-saveDel     = 10                           #time interval to save snapshots
+innerRadius = 1.
+outerRadius = 2.
+tf          = 10.                                               #final time
+saveDel     = 1                            #time interval to save snapshots
 exp         = 200.                 #controls steepness of initial condition
 amp         = .10                 #amplitude of trigonometric topo function
-frq         = 9                   #frequency of trigonometric topo function
+frq         = 5                   #frequency of trigonometric topo function
 
 plotFromSaved = 0                            #if 1, load instead of compute
-saveContours  = 1                       #switch for saving contours as pngs
+saveContours  = 0                       #switch for saving contours as pngs
 
 mlv      = np.int64(sys.argv[1])                #0:interfaces, 1:mid-levels
 phs      = np.int64(sys.argv[2])             #PHS RBF exponent (odd number)
@@ -36,21 +36,19 @@ dt       = 1./np.float64(sys.argv[8])                              #delta t
 rSurf, rSurfPrime \
 = common.getTopoFunc( innerRadius, outerRadius, amp, frq )
 
-sFunc, dsdth, dsdr \
-= common.getHeightCoordinate( innerRadius, outerRadius, rSurf, rSurfPrime )
-
 tmp = 17./18.*np.pi
 xc1 = (rSurf(tmp)+outerRadius)/2.*np.cos(tmp)           #x-coord of GA bell
 yc1 = (rSurf(tmp)+outerRadius)/2.*np.sin(tmp)           #y-coord of GA bell
 def initialCondition( x, y ) :
+    #Wendland function:
     r = np.sqrt( 6 * ( (x-xc1)**2. + (y-yc1)**2. ) )
     ind = r<1.
-    f = np.zeros( np.shape(x) )
-    #Wendland function:
-    f[ind] = ( 1. - r[ind] ) ** 10. * ( 429.*r[ind]**4. + 450.*r[ind]**3. \
+    z = np.zeros( np.shape(x) )
+    z[ind] = ( 1. - r[ind] ) ** 10. * ( 429.*r[ind]**4. + 450.*r[ind]**3. \
     + 210.*r[ind]**2. + 50.*r[ind] + 5.  )
-    f = 1. + f/5.
-    return f
+    z = 1. + z/5.
+    return z
+    # #Gaussian:
     # return 1. + np.exp( -exp*( (x-xc1)**2. + (y-yc1)**2. ) )
 
 ###########################################################################
@@ -128,16 +126,6 @@ yyi = yy[1:-1,:]                                      #without ghost layers
 ththi = thth[1:-1,:]                                  #without ghost layers
 rri = rr[1:-1,:]                                      #without ghost layers
 
-dsdthi = dsdth( rri, ththi )             #interior values of dsdth function
-dsdri  = dsdr( rri, ththi )               #interior values of dsdr function
-
-dsdthAll = dsdth( rr, thth )                 #dsdth values over entire mesh
-dsdrAll  = dsdr( rr, thth )                   #dsdr values over entire mesh
-# rrInv = 1./rr
-# rrInv2 = rrInv**2.
-# ssInv = 1./ss
-# ssInv2 = ssInv**2.
-
 cosTh = np.cos(ththi)                                                #dr/dx
 sinTh = np.sin(ththi)                                                #dr/dy
 cosThOverR = cosTh/rri                                              #dth/dy
@@ -148,6 +136,19 @@ rr0 = common.getRadii( thth0, ss0 \
 , innerRadius, outerRadius, rSurf )                  #mesh of regular radii
 xx0 = rr0 * np.cos(thth0)                         #mesh of regular x-coords
 yy0 = rr0 * np.sin(thth0)                         #mesh of regular x-coords
+
+###########################################################################
+
+#Get height coordinate s and its derivatives:
+
+sFunc, dsdth, dsdr \
+= common.getHeightCoordinate( innerRadius, outerRadius, rSurf, rSurfPrime )
+
+dsdthi = dsdth( rri, ththi )             #interior values of dsdth function
+dsdri  = dsdr( rri, ththi )               #interior values of dsdr function
+
+dsdthAll = dsdth( rr, thth )                 #dsdth values over entire mesh
+dsdrAll  = dsdr( rr, thth )                   #dsdr values over entire mesh
 
 ###########################################################################
 
@@ -199,14 +200,14 @@ rhoInv = c**2. / Po
 
 ###########################################################################
 
-#Check the value of the initial condition on inner boundary:
+#Check the value of the initial condition on boundaries:
 
-xB = rSurf(th) * np.cos(th)
-yB = rSurf(th) * np.sin(th)
-xT = outerRadius * np.cos(th)
-yT = outerRadius * np.sin(th)
+xB = rSurf(th0) * np.cos(th0)
+yB = rSurf(th0) * np.sin(th0)
+xT = outerRadius * np.cos(th0)
+yT = outerRadius * np.sin(th0)
 print()
-print( 'max value on boundary =', np.max(np.hstack(( \
+print( 'max value on boundaries =', np.max(np.hstack(( \
 initialCondition(xB,yB),                             \
 initialCondition(xT,yT) ))) )
 print()
@@ -239,7 +240,7 @@ else :
     sys.exit("\nError: pol should be 3, 4, 5, or 6.\n")
 
 if stc == pol+1 :
-    alp = 0.                           #remove HV if using only polynomials
+    alp = 0.                    #remove radial HV if using only polynomials
 
 ###########################################################################
 
@@ -248,14 +249,14 @@ if stc == pol+1 :
 phsA = 9
 polA = 7
 stcA = 17
-alpA = -2.**-22.
+alpA = -2.**-18.
 
 ###########################################################################
 
 #Extra things needed to enforce the Neumann boundary condition for P:
 
-stcB = stc
-# stcB = min( ns-1, 2*stc )
+# stcB = stc
+stcB = min( ns-1, stc+4 )
 # if ( pol==5 | pol==6 ) & ( ns == 14 ) :
     # stcB = 13
 # else :
@@ -296,37 +297,30 @@ Wlam = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th, m=1 \
 , phsDegree=phsA, polyDegree=polA, stencilSize=stcA )
 Wlam = np.transpose( Wlam )                #work on rows instead of columns
 
-#Simple (and incorrect) angular HV:
-Whvlam = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th, m=phsA-1 \
-, phsDegree=phsA, polyDegree=polA, stencilSize=stcA )
-Whvlam = alpA * dth0**polA * Whvlam
-# dthPol = spdiags( dth**polA, np.array([0]), len(dth), len(dth) )
-# Whvlam = alpA * dthPol.dot(Whvlam)                #scaled angular HV matrix
-Whvlam = np.transpose( Whvlam )             #work on rows instead of column
+# #Simple (and incorrect) angular HV:
+# Whvlam = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th, m=phsA-1 \
+# , phsDegree=phsA, polyDegree=polA, stencilSize=stcA )
+# Whvlam = alpA * dth0**polA * Whvlam
+# # dthPol = spdiags( dth**polA, np.array([0]), len(dth), len(dth) )
+# # Whvlam = alpA * dthPol.dot(Whvlam)                #scaled angular HV matrix
+# Whvlam = np.transpose( Whvlam )             #work on rows instead of column
 
 #Complex angular HV:
-# alpDthPol = alpA * dth0**polA
+alpDthPol = alpA * dth0**polA
 # alpDthPol = alpA * ( np.tile(dth,(ns-2,1)) ) ** polA
 
 ###########################################################################
 
-#Weights for interpolation to boundary, extrapolation to ghost-nodes,
-#and d/ds at boundary:
+#Weights for interpolation to boundary (I), extrapolation to
+#ghost-nodes (E), and d/ds at boundary (D):
 
-wIinner = phs1.getWeights( innerRadius, s[0:stcB],   0, phs, pol )
-wEinner = phs1.getWeights( s[0],        s[1:stcB+1], 0, phs, pol )
-wDinner = phs1.getWeights( innerRadius, s[0:stcB],   1, phs, pol )
+wIinner = phs1.getWeights( innerRadius, s[0:stcB],   0, phs, pol+1 )
+wEinner = phs1.getWeights( s[0],        s[1:stcB+1], 0, phs, pol+1 )
+wDinner = phs1.getWeights( innerRadius, s[0:stcB],   1, phs, pol+1 )
 
-wIouter = phs1.getWeights( outerRadius, s[-1:-(stcB+1):-1], 0, phs, pol )
-wEouter = phs1.getWeights( s[-1],       s[-2:-(stcB+2):-1], 0, phs, pol )
-wDouter = phs1.getWeights( outerRadius, s[-1:-(stcB+1):-1], 1, phs, pol )
-
-wIinner = np.transpose( np.tile( wIinner, (nth,1) ) )
-wEinner = np.transpose( np.tile( wEinner, (nth,1) ) )
-wDinner = np.transpose( np.tile( wDinner, (nth,1) ) )
-wIouter = np.transpose( np.tile( wIouter, (nth,1) ) )
-wEouter = np.transpose( np.tile( wEouter, (nth,1) ) )
-wDouter = np.transpose( np.tile( wDouter, (nth,1) ) )
+wIouter = phs1.getWeights( outerRadius, s[-1:-(stcB+1):-1], 0, phs, pol+1 )
+wEouter = phs1.getWeights( s[-1],       s[-2:-(stcB+2):-1], 0, phs, pol+1 )
+wDouter = phs1.getWeights( outerRadius, s[-1:-(stcB+1):-1], 1, phs, pol+1 )
 
 ###########################################################################
 
@@ -376,15 +370,15 @@ def Dlam(U) :
     # return alpDrPol * U[1:-1,:]
 
 def HV(U) :
-    # #Angular HV:
-    # HVth = ( U @ Wlam ) + dsdthAll * ( Ws @ U )
-    # for i in range( polA ) :
-        # HVth = ( HVth @ Wlam ) + dsdthAll * ( Ws @ HVth )
-    # HVth = alpDthPol * HVth[1:-1,:]
-    # #Total HV:
-    # return dsdri*(Whvs@U) + HVth
-    #Simple (incorrect) method:
-    return ( Whvs @ U ) + ( U[1:-1,:] @ Whvlam )
+    #Angular HV:
+    HVth = ( U @ Wlam ) + dsdthAll * ( Ws @ U )
+    for i in range( polA ) :
+        HVth = ( HVth @ Wlam ) + dsdthAll * ( Ws @ HVth )
+    HVth = alpDthPol * HVth[1:-1,:]
+    #Total HV:
+    return dsdri*(Whvs@U) + HVth
+    # #Simple (incorrect) method:
+    # return ( Whvs @ U ) + ( U[1:-1,:] @ Whvlam )
 
 if mlv == 1 :
     def setGhostNodes( U ) :

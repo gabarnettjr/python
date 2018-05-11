@@ -17,17 +17,19 @@ gx       = 20.                             #avg lateral velocity (estimate)
 gs       = .003                           #avg vertical velocity (estimate)
 
 #"theta_pi" or "T_rho_P" or "theta_rho_P":
-formulation  = "theta_rho_P"
+formulation  = "theta_pi"
 
 semiImplicit = 0
 gmresTol     = 1e-9                                          #default: 1e-5
 
 dx    = 500.
-ds    = 100.
-dtExp = 1./3.                                           #explicit time-step
+ds    = 500.
+dtExp = 1./4.                                           #explicit time-step
 dtImp = 1./2.                                           #implicit time-step
 
-FD = 6                                    #Order of lateral FD (2, 4, or 6)
+phs = 5
+pol = 3
+stc = 7
 
 rkStages  = 3
 plotNodes = 0                               #if 1, plot nodes and then exit
@@ -51,8 +53,10 @@ else :
     sys.exit( "Error: semiImplicit should be 0 or 1." )
 
 saveString = saveString + formulation + '/' + testCase + '/' \
++ 'p'  + '{0:1d}'.format(pol)                        \
 + 'dx' + '{0:1d}'.format(np.int(np.round(dx)+1e-12)) \
-+ 'ds' + '{0:1d}'.format(np.int(np.round(ds)+1e-12)) + '/'
++ 'ds' + '{0:1d}'.format(np.int(np.round(ds)+1e-12)) \
++ '/'
 
 if os.path.exists( saveString+'*.npy' ) :
     os.remove( saveString+'*.npy' )
@@ -68,89 +72,109 @@ tf = common.getTfinal( testCase )
 nTimesteps = np.int( np.round(tf/dtImp) + 1e-12 )
 
 xLeft, xRight, nLev, nCol, zTop, zSurf, zSurfPrime, x, z \
-= common.getSpaceDomain( testCase, dx, ds, FD )
+= common.getSpaceDomain( testCase, dx, ds )
 
-s, dsdx, dsdz = common.getHeightCoordinate( zTop, zSurf, zSurfPrime )
+sFunc, dsdx, dsdz = common.getHeightCoordinate( zTop, zSurf, zSurfPrime )
 
-FDo2 = np.int( FD/2 + 1e-12 )
-
-i0 = 1                                            #first interior row index
-i1 = nLev+1                                        #last interior row index
-j0 = FDo2                                      #first interior column index
-j1 = nCol+FDo2                                  #last interior column index
-
-Tx, Tz, Nx, Nz = common.getTanNorm( zSurfPrime, x[0,j0:j1] )
+Tx, Tz, Nx, Nz = common.getTanNorm( zSurfPrime, x[0,:] )
 
 U0, thetaBar, piBar, dpidsBar, Pbar, rhoBar, Tbar \
 , dthetaBarDz, dpiBarDz, dTbarDz, dPbarDz, drhoBarDz \
 = common.getInitialConditions( testCase, formulation \
-, FD, x, z \
+, x, z \
 , Cp, Cv, Rd, g, Po \
 , dsdz )
 
-thetaBarBot = ( thetaBar[0,   j0:j1] + thetaBar[1,     j0:j1] ) / 2.
-thetaBarTop = ( thetaBar[nLev,j0:j1] + thetaBar[nLev+1,j0:j1] ) / 2.
+thetaBarBot = ( thetaBar[0,   :] + thetaBar[1,     :] ) / 2.
+thetaBarTop = ( thetaBar[nLev,:] + thetaBar[nLev+1,:] ) / 2.
 
 if plotNodes == 1 :
-    ind = common.getIndexes( x, z, xLeft, xRight, zSurf, zTop, FD \
-    , nLev, nCol )
-    common.plotNodes( x, z, ind, testCase )
+    common.plotNodes( x, z, testCase )
     sys.exit( "\nDone plotting nodes." )
     
 ###########################################################################
 
 #Derivatives of height coordinate function s, and stuff on interior only:
 
-dsdxBot = dsdx( x[0,j0:j1], zSurf(x[0,j0:j1]) )
-dsdzBot = dsdz( x[0,j0:j1], zSurf(x[0,j0:j1]) )
-dsdxInt = dsdx( x[i0:i1,j0:j1], z[i0:i1,j0:j1] )
-dsdzInt = dsdz( x[i0:i1,j0:j1], z[i0:i1,j0:j1] )
+dsdxBot = dsdx( x[0,:], zSurf(x[0,:]) )
+dsdzBot = dsdz( x[0,:], zSurf(x[0,:]) )
+dsdxInt = dsdx( x[1:-1,:], z[1:-1,:] )
+dsdzInt = dsdz( x[1:-1,:], z[1:-1,:] )
 dsdzAll = dsdz( x, z )
 
-thetaBarInt    = thetaBar   [i0:i1,j0:j1]
-piBarInt       = piBar      [i0:i1,j0:j1]
-dthetaBarDzInt = dthetaBarDz[i0:i1,j0:j1]
-rhoBarInt      = rhoBar     [i0:i1,j0:j1]
-TbarInt        = Tbar       [i0:i1,j0:j1]
-drhoBarDzInt   = drhoBarDz  [i0:i1,j0:j1]
-dTbarDzInt     = dTbarDz    [i0:i1,j0:j1]
+thetaBarInt    = thetaBar   [1:-1,:]
+piBarInt       = piBar      [1:-1,:]
+dthetaBarDzInt = dthetaBarDz[1:-1,:]
+rhoBarInt      = rhoBar     [1:-1,:]
+TbarInt        = Tbar       [1:-1,:]
+drhoBarDzInt   = drhoBarDz  [1:-1,:]
+dTbarDzInt     = dTbarDz    [1:-1,:]
 
 ###########################################################################
 
 #Define finite difference (FD) weights for derivative approximation:
 
-# Wx = phs1.getPeriodicDM( period=xRight-xLeft, x=x[0,:], X=x[0,:], m=1 \
-# , phsDegree=phs, polyDegree=pol, stencilSize=stc )
+s    = sFunc( x[:,0], z[:,0] )
 
-# Ws = phs1.getDM( x=s(x[:,0],z[:,0]), X=s(x[:,0],z[:,0]), m=1 \
-# , phsDegree=phs, polyDegree=pol, stencilSize=stc )
+Ws = phs1.getDM( x=s, X=s[1:-1], m=1 \
+, phsDegree=phs, polyDegree=pol, stencilSize=stc )
 
-if FD == 2 :
-    wx = np.array( [ -1./2., 0., 1./2. ] )
-    wxhv = np.array( [ 1., -2., 1. ] )
-    gamma = 1./2.
-elif FD == 4 :
-    wx = np.array( [ 1./12., -2./3., 0., 2./3., -1./12. ] )
-    wxhv = np.array( [ 1., -4., 6., -4., 1. ] )
-    gamma = -1./12.
-elif FD == 6 :
-    wx = np.array( [ -1./60., 3./20., -3./4., 0., 3./4, -3./20., 1./60. ] )
-    wxhv = np.array( [ 1., -6., 15., -20., 15., -6., 1. ] )
-    gamma = 1./60.
-else :
-    sys.exit( "\nError: FD should be 2, 4, or 6.\n" )
-wx   = wx / dx
-wxhv = gamma * gx * wxhv / dx
+Whvs = phs1.getDM( x=s, X=s[1:-1], m=phs-1 \
+, phsDegree=phs, polyDegree=pol, stencilSize=stc )
 
-ws = np.array( [ -1./2., 0., 1./2. ] )
-wshv = np.array( [ 1., -2., 1. ] )
-ws   = ws / ds
-wshv = 1./2. * gs * wshv / ds
+Wa = phs1.getPeriodicDM( period=xRight-xLeft, x=x[0,:], X=x[0,:], m=1 \
+, phsDegree=phsL, polyDegree=polL, stencilSize=stcL )
+
+Whva = phs1.getPeriodicDM( period=xRight-xLeft, x=x[0,:], X=x[0,:], m=phsL-1 \
+, phsDegree=phsL, polyDegree=polL, stencilSize=stcL )
 
 ###########################################################################
 
-bigTx = np.tile( Tx, (2,1) )
-bigTz = np.tile( Tz, (2,1) )
+#Define finite difference (FD) weights for boundary condition enforcement:
+
+wIbot = phs1.getWeights( 0.,   s[0:stc],   m=0, phsDegree=phs, polyDegree=pol )
+wEbot = phs1.getWeights( s[0], s[1:stc+1], m=0, phsDegree=phs, polyDegree=pol )
+wDbot = phs1.getWeights( 0.,   s[0:stc],   m=1, phsDegree=phs, polyDegree=pol )
+
+wItop = phs1.getWeights( zTop,  s[-1:-(stc+1):-1], m=0, phsDegree=phs, polyDegree=pol )
+wEtop = phs1.getWeights( s[-1], s[-2:-(stc+2):-1], m=0, phsDegree=phs, polyDegree=pol )
+wDtop = phs1.getWeights( zTop,  s[-1:-(stc+1):-1], m=1, phsDegree=phs, polyDegree=pol )
+
+###########################################################################
+
+# if FD == 2 :
+    # wx = np.array( [ -1./2., 0., 1./2. ] )
+    # wxhv = np.array( [ 1., -2., 1. ] )
+    # gamma = 1./2.
+# elif FD == 4 :
+    # wx = np.array( [ 1./12., -2./3., 0., 2./3., -1./12. ] )
+    # wxhv = np.array( [ 1., -4., 6., -4., 1. ] )
+    # gamma = -1./12.
+# elif FD == 6 :
+    # wx = np.array( [ -1./60., 3./20., -3./4., 0., 3./4, -3./20., 1./60. ] )
+    # wxhv = np.array( [ 1., -6., 15., -20., 15., -6., 1. ] )
+    # gamma = 1./60.
+# else :
+    # sys.exit( "\nError: FD should be 2, 4, or 6.\n" )
+# wx   = wx / dx
+# wxhv = gamma * gx * wxhv / dx
+
+# ws = np.array( [ -1./2., 0., 1./2. ] )
+# wshv = np.array( [ 1., -2., 1. ] )
+# ws   = ws / ds
+# wshv = 1./2. * gs * wshv / ds
+
+###########################################################################
+
+TxBot = np.tile( Tx, (stc,1) )
+TzBot = np.tile( Tz, (stc,1) )
+NxBot = np.tile( Nx, (stc-1,1) )
+NzBot = np.tile( Nz, (stc-1,1) )
+
+TxTop = np.ones(( stc, nCol ))
+TzTop = np.zeros(( stc, nCol ))
+NxTop = np.zeros(( stc-1, nCol ))
+NzTop = np.ones(( stc-1, nCol ))
 
 normGradS = np.sqrt( dsdxBot**2. + dsdzBot**2. )
 
@@ -158,17 +182,21 @@ normGradS = np.sqrt( dsdxBot**2. + dsdzBot**2. )
 
 #Define functions for approximating derivatives:
 
-def Dx( U ) :
-    return common.LxFD_2D( U, wx,   j0, j1, FD, FDo2 )
+def Da( U ) :
+    return U[1:-1,:] @ Wa
+    # return common.LxFD_2D( U, wx,   j0, j1, FD, FDo2 )
 
 def Ds( U ) :
-    return common.LsFD_2D( U, ws,   i0, i1 )
+    return Ws @ U
+    # return common.LsFD_2D( U, ws,   i0, i1 )
 
-def HVx( U ) :
-    return common.LxFD_2D( U, wxhv, j0, j1, FD, FDo2 )
+def HVa( U ) :
+    return U[1:-1,:] @ Whva
+    # return common.LxFD_2D( U, wxhv, j0, j1, FD, FDo2 )
 
 def HVs( U ) :
-    return common.LsFD_2D( U, wshv, i0, i1 )
+    return Whvs @ U
+    # return common.LsFD_2D( U, wshv, i0, i1 )
 
 ###########################################################################
 
@@ -179,23 +207,26 @@ if formulation == "theta_pi" :
     from gab.nonhydro import theta_pi
     
     def setGhostNodes( U ) :
-        U = theta_pi.setGhostNodes( U, Dx \
-        , Tx, Tz, Nx, Nz, bigTx, bigTz, j0, j1 \
-        , nLev, nCol, FD, FDo2, ds, thetaBarBot, thetaBarTop \
+        U = theta_pi.setGhostNodes( U, Wa \
+        , TxBot, TzBot, NxBot, NzBot \
+        , TxTop, TzTop, NxTop, NzTop \
+        , wIbot, wEbot, wDbot \
+        , wItop, wEtop, wDtop \
+        , nLev, nCol, stc, ds, thetaBarBot, thetaBarTop \
         , g, Cp, normGradS, dsdxBot, dsdzBot )
         P = []
         return U, P
     
     def implicitPart( U, P ) :
         return theta_pi.implicitPart( U \
-        , Dx, Ds, HVx, HVs \
-        , nLev, nCol, i0, i1, j0, j1, Cp, Cv, Rd, g \
+        , Da, Ds, HV \
+        , nLev, nCol, Cp, Cv, Rd, g \
         , dsdxInt, dsdzInt, thetaBarInt, piBarInt, dthetaBarDzInt )
     
     def explicitPart( U, P ) :
         return theta_pi.explicitPart( U \
-        , Dx, Ds \
-        , nLev, nCol, i0, i1, j0, j1, Cp, Cv, Rd \
+        , Da, Ds \
+        , nLev, nCol, j0, j1, Cp, Cv, Rd \
         , dsdxInt, dsdzInt )
     
 elif formulation == "T_rho_P" :
@@ -250,8 +281,8 @@ else :
 
 def odefun( t, U ) :
     U, P = setGhostNodes( U )
-    V = np.zeros(( 4, nLev+2, nCol+FD ))
-    V[:,i0:i1,j0:j1] = implicitPart(U,P) + explicitPart(U,P)
+    V = np.zeros(( 4, nLev+2, nCol ))
+    V[:,1:-1,:] = implicitPart(U,P) + explicitPart(U,P)
     return V
 
 ###########################################################################
@@ -260,14 +291,13 @@ if semiImplicit == 1 :
     
     def ell( U ) :
         return common.L( U \
-        , dtImp, setGhostNodes, implicitPart, nLev, nCol, FD \
-        , i0, i1, j0, j1 )
+        , dtImp, setGhostNodes, implicitPart, nLev, nCol )
     
-    L = LinearOperator( ( 4*(nLev+2)*(nCol+FD), 4*(nLev+2)*(nCol+FD) ), matvec=ell, dtype=float )
+    L = LinearOperator( ( 4*(nLev+2)*nCol, 4*(nLev+2)*nCol ), matvec=ell, dtype=float )
     
     def leapfrogTimestep( t, U0, P0, U1, P1, dt ) :
         t, U2 = common.leapfrogTimestep( t, U0, P0, U1, P1, dt \
-        , nLev, nCol, FD, i0, i1, j0, j1 \
+        , nLev, nCol \
         , L, implicitPart, explicitPart, gmresTol )
         return t, U2
 
