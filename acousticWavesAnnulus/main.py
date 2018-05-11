@@ -15,14 +15,14 @@ from gab.annulus import common, waveEquation
 c           = .03                                     #wave speed (c**2=RT)
 innerRadius = 1.
 outerRadius = 2.
-tf          = 10.                                               #final time
-saveDel     = 1                            #time interval to save snapshots
+tf          = 100.                                              #final time
+saveDel     = 10                           #time interval to save snapshots
 exp         = 200.                 #controls steepness of initial condition
 amp         = .10                 #amplitude of trigonometric topo function
 frq         = 5                   #frequency of trigonometric topo function
 
 plotFromSaved = 0                            #if 1, load instead of compute
-saveContours  = 0                       #switch for saving contours as pngs
+saveContours  = 1                       #switch for saving contours as pngs
 
 mlv      = np.int64(sys.argv[1])                #0:interfaces, 1:mid-levels
 phs      = np.int64(sys.argv[2])             #PHS RBF exponent (odd number)
@@ -40,16 +40,16 @@ tmp = 17./18.*np.pi
 xc1 = (rSurf(tmp)+outerRadius)/2.*np.cos(tmp)           #x-coord of GA bell
 yc1 = (rSurf(tmp)+outerRadius)/2.*np.sin(tmp)           #y-coord of GA bell
 def initialCondition( x, y ) :
-    #Wendland function:
-    r = np.sqrt( 6 * ( (x-xc1)**2. + (y-yc1)**2. ) )
-    ind = r<1.
-    z = np.zeros( np.shape(x) )
-    z[ind] = ( 1. - r[ind] ) ** 10. * ( 429.*r[ind]**4. + 450.*r[ind]**3. \
-    + 210.*r[ind]**2. + 50.*r[ind] + 5.  )
-    z = 1. + z/5.
-    return z
-    # #Gaussian:
-    # return 1. + np.exp( -exp*( (x-xc1)**2. + (y-yc1)**2. ) )
+    # #Wendland function:
+    # r = np.sqrt( 6 * ( (x-xc1)**2. + (y-yc1)**2. ) )
+    # ind = r<1.
+    # z = np.zeros( np.shape(x) )
+    # z[ind] = ( 1. - r[ind] ) ** 10. * ( 429.*r[ind]**4. + 450.*r[ind]**3. \
+    # + 210.*r[ind]**2. + 50.*r[ind] + 5.  )
+    # z = 1. + z/5.
+    # return z
+    #Gaussian:
+    return 1. + np.exp( -exp*( (x-xc1)**2. + (y-yc1)**2. ) )
 
 ###########################################################################
 
@@ -83,7 +83,7 @@ th = th + ran                                 #th vector after perturbation
 if mlv == 1 :
     ds0  = ( outerRadius - innerRadius ) / (ns-2)         #constant delta s
     s0  = np.linspace( innerRadius-ds0/2, outerRadius+ds0/2, ns ) #s vector
-    tmp = ptb * ds0                            #relative perturbation factor
+    tmp = ptb * ds0                           #relative perturbation factor
     ran = -tmp + 2.*tmp*np.random.rand(ns)      #random perturbation vector
     s   = s0.copy()                                  #copy regular s vector
     s   = s + ran                              #s vector after perturbation
@@ -433,7 +433,7 @@ for i in np.arange( 0, nTimesteps+1 ) :
         if saveContours == 1 :
             tmp = Wradial @ ( U[0,:,:] ) @ Wangular
             # plt.contourf( xx0, yy0, tmp, 20 )
-            plt.contourf( xx0, yy0, tmp, np.arange(1.-.19,1.+.21,.02) )
+            plt.contourf( xx0, yy0, tmp, np.arange(1.-.15,1.+.17,.02) )
             plt.plot( xB, yB, "k-", xT, yT, "k-" )
             plt.axis('equal')
             tmp = outerRadius + .2
