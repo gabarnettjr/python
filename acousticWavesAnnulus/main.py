@@ -15,14 +15,14 @@ from gab.annulus import common, waveEquation
 c           = .03                                     #wave speed (c**2=RT)
 innerRadius = 1.
 outerRadius = 2.
-tf          = 100.                                              #final time
-saveDel     = 10                           #time interval to save snapshots
+tf          = 50.                                               #final time
+saveDel     = 5                            #time interval to save snapshots
 exp         = 200.                 #controls steepness of initial condition
 amp         = .10                 #amplitude of trigonometric topo function
 frq         = 5                   #frequency of trigonometric topo function
 
 plotFromSaved = 0                            #if 1, load instead of compute
-saveContours  = 1                       #switch for saving contours as pngs
+saveContours  = 0                       #switch for saving contours as pngs
 
 mlv      = np.int64(sys.argv[1])                #0:interfaces, 1:mid-levels
 phs      = np.int64(sys.argv[2])             #PHS RBF exponent (odd number)
@@ -37,19 +37,19 @@ rSurf, rSurfPrime \
 = common.getTopoFunc( innerRadius, outerRadius, amp, frq )
 
 tmp = 17./18.*np.pi
-xc1 = (rSurf(tmp)+outerRadius)/2.*np.cos(tmp)           #x-coord of GA bell
-yc1 = (rSurf(tmp)+outerRadius)/2.*np.sin(tmp)           #y-coord of GA bell
+xc1 = (rSurf(tmp)+outerRadius)/2.*np.cos(tmp)                #x-coord of IC
+yc1 = (rSurf(tmp)+outerRadius)/2.*np.sin(tmp)                #y-coord of IC
 def initialCondition( x, y ) :
-    # #Wendland function:
-    # r = np.sqrt( 6 * ( (x-xc1)**2. + (y-yc1)**2. ) )
-    # ind = r<1.
-    # z = np.zeros( np.shape(x) )
-    # z[ind] = ( 1. - r[ind] ) ** 10. * ( 429.*r[ind]**4. + 450.*r[ind]**3. \
-    # + 210.*r[ind]**2. + 50.*r[ind] + 5.  )
-    # z = 1. + z/5.
-    # return z
-    #Gaussian:
-    return 1. + np.exp( -exp*( (x-xc1)**2. + (y-yc1)**2. ) )
+    #Wendland function:
+    r = np.sqrt( 6 * ( (x-xc1)**2. + (y-yc1)**2. ) )
+    ind = r<1.
+    z = np.zeros( np.shape(x) )
+    z[ind] = ( 1. - r[ind] ) ** 10. * ( 429.*r[ind]**4. + 450.*r[ind]**3. \
+    + 210.*r[ind]**2. + 50.*r[ind] + 5.  )
+    z = 1. + z/5.
+    return z
+    # #Gaussian:
+    # return 1. + np.exp( -exp*( (x-xc1)**2. + (y-yc1)**2. ) )
 
 ###########################################################################
 
@@ -233,9 +233,9 @@ print()
 #Hyperviscosity coefficient (alp) for radial and angular directions:
 
 if ( pol == 3 ) | ( pol == 4 ) :
-    alp = -2.**-10.
+    alp = -2.**-5. * c
 elif ( pol == 5 ) | ( pol == 6 ) :
-    alp = 2.**-14.
+    alp = 2.**-9. * c
 else :
     sys.exit("\nError: pol should be 3, 4, 5, or 6.\n")
 
@@ -249,14 +249,14 @@ if stc == pol+1 :
 phsA = 9
 polA = 7
 stcA = 17
-alpA = -2.**-18.
+alpA = -2.**-13. * c
 
 ###########################################################################
 
 #Extra things needed to enforce the Neumann boundary condition for P:
 
 # stcB = stc
-stcB = min( ns-1, stc+4 )
+stcB = min( ns-1, 2*(pol+2)+1 )
 # if ( pol==5 | pol==6 ) & ( ns == 14 ) :
     # stcB = 13
 # else :

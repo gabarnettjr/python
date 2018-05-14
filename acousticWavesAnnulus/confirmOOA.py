@@ -12,8 +12,8 @@ from gab.annulus import common, waveEquation
 c           = .03                                     #wave speed (c**2=RT)
 innerRadius = 1.
 outerRadius = 2.
-tf          = 10.                                               #final time
-saveDel     = 1                            #time interval to save snapshots
+tf          = 50.                                               #final time
+saveDel     = 5                            #time interval to save snapshots
 exp         = 200.                 #controls steepness of initial condition
 amp         = .10                 #amplitude of trigonometric topo function
 frq         = 5                   #frequency of trigonometric topo function
@@ -34,7 +34,7 @@ phsB      = 5
 polB      = 3
 stcB      = 7
 ptbB      = .30
-rkStagesB = 4
+rkStagesB = 3
 
 mlv0      = 1
 phs0      = 7

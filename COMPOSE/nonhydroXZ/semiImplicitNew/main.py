@@ -12,9 +12,7 @@ from gab.nonhydro import common
 
 #"bubble", "igw", "densityCurrent", "doubleDensityCurrent",
 #or "movingDensityCurrent":
-testCase = "igw"
-gx       = 20.                             #avg lateral velocity (estimate)
-gs       = .003                           #avg vertical velocity (estimate)
+testCase = "doubleDensityCurrent"
 
 #"theta_pi" or "T_rho_P" or "theta_rho_P":
 formulation  = "theta_pi"
@@ -22,10 +20,10 @@ formulation  = "theta_pi"
 semiImplicit = 0
 gmresTol     = 1e-9                                          #default: 1e-5
 
-dx    = 500.
-ds    = 500.
-dtExp = 1./4.                                           #explicit time-step
-dtImp = 1./2.                                           #implicit time-step
+dx    = 100.
+ds    = 100.
+dtExp = 1./12.                                          #explicit time-step
+dtImp = 2./1.                                           #implicit time-step
 
 phs = 5
 pol = 3
@@ -36,7 +34,7 @@ plotNodes = 0                               #if 1, plot nodes and then exit
 saveDel   = 100                           #print/save every saveDel seconds
 
 var           = 2                        #determines what to plot (0,1,2,3)
-saveArrays    = 0
+saveArrays    = 1
 saveContours  = 1
 plotFromSaved = 0                   #if 1, results are loaded, not computed
 
@@ -52,10 +50,13 @@ elif semiImplicit == 0 :
 else :
     sys.exit( "Error: semiImplicit should be 0 or 1." )
 
-saveString = saveString + formulation + '/' + testCase + '/' \
-+ 'p'  + '{0:1d}'.format(pol)                        \
-+ 'dx' + '{0:1d}'.format(np.int(np.round(dx)+1e-12)) \
-+ 'ds' + '{0:1d}'.format(np.int(np.round(ds)+1e-12)) \
+saveString = saveString + formulation + '/' + testCase + '/'    \
++ 'phs' + '{0:1d}'.format(phs)                                  \
++ 'pol' + '{0:1d}'.format(pol)                                  \
++ 'stc' + '{0:1d}'.format(stc)                                  \
++ 'dx'  + '{0:1d}'.format(np.int(np.round(dx)+1e-12))           \
++ 'ds'  + '{0:1d}'.format(np.int(np.round(ds)+1e-12))           \
++ 'dti' + '{0:1d}'.format(np.int(np.round(1./dtExp)+1e-12))     \
 + '/'
 
 if os.path.exists( saveString+'*.npy' ) :
@@ -100,6 +101,7 @@ dsdxBot = dsdx( x[0,:], zSurf(x[0,:]) )
 dsdzBot = dsdz( x[0,:], zSurf(x[0,:]) )
 dsdxInt = dsdx( x[1:-1,:], z[1:-1,:] )
 dsdzInt = dsdz( x[1:-1,:], z[1:-1,:] )
+dsdxAll = dsdx( x, z )
 dsdzAll = dsdz( x, z )
 
 thetaBarInt    = thetaBar   [1:-1,:]
@@ -110,23 +112,42 @@ TbarInt        = Tbar       [1:-1,:]
 drhoBarDzInt   = drhoBarDz  [1:-1,:]
 dTbarDzInt     = dTbarDz    [1:-1,:]
 
+s = sFunc( x[:,0], z[:,0] )
+
 ###########################################################################
 
 #Define finite difference (FD) weights for derivative approximation:
 
-s    = sFunc( x[:,0], z[:,0] )
+if ( pol == 3 ) | ( pol == 4 ) :
+    alp = 300. * -2.**-5.
+elif ( pol == 5 ) | ( pol == 6 ) :
+    alp = 300. * 2.**-9.
+else :
+    sys.exit("\nError: pol should be 3, 4, 5, or 6.\n")
 
-Ws = phs1.getDM( x=s, X=s[1:-1], m=1 \
+Ws = phs1.getDM( x=s, X=s, m=1 \
 , phsDegree=phs, polyDegree=pol, stencilSize=stc )
 
 Whvs = phs1.getDM( x=s, X=s[1:-1], m=phs-1 \
 , phsDegree=phs, polyDegree=pol, stencilSize=stc )
 
+Whvs = alp * ds**pol * Whvs
+
+phsL = 9
+polL = 7
+stcL = 17
+alpL = 300. * -2.**-13.
+
 Wa = phs1.getPeriodicDM( period=xRight-xLeft, x=x[0,:], X=x[0,:], m=1 \
 , phsDegree=phsL, polyDegree=polL, stencilSize=stcL )
 
+Wa = np.transpose( Wa )
+
+# alpDxPol = alpL * dx**polL
 Whva = phs1.getPeriodicDM( period=xRight-xLeft, x=x[0,:], X=x[0,:], m=phsL-1 \
 , phsDegree=phsL, polyDegree=polL, stencilSize=stcL )
+Whva = alpL * dx**polL * Whva
+Whva = np.transpose( Whva )
 
 ###########################################################################
 
@@ -184,19 +205,19 @@ normGradS = np.sqrt( dsdxBot**2. + dsdzBot**2. )
 
 def Da( U ) :
     return U[1:-1,:] @ Wa
-    # return common.LxFD_2D( U, wx,   j0, j1, FD, FDo2 )
 
 def Ds( U ) :
-    return Ws @ U
-    # return common.LsFD_2D( U, ws,   i0, i1 )
+    return Ws[1:-1,:] @ U
 
-def HVa( U ) :
-    return U[1:-1,:] @ Whva
-    # return common.LxFD_2D( U, wxhv, j0, j1, FD, FDo2 )
-
-def HVs( U ) :
-    return Whvs @ U
-    # return common.LsFD_2D( U, wshv, i0, i1 )
+def HV( U ) :
+    # #Lateral HV:
+    # HVL = ( U @ Wa ) + dsdxAll * ( Ws @ U )
+    # for i in range( polL ) :
+        # HVL = ( HVL @ Wa ) + dsdxAll * ( Ws @ HVL )
+    # HVL = alpDxPol * HVL[1:-1,:]
+    # #Total HV:
+    # return dsdzInt*(Whvs@U) + HVL
+    return ( U[1:-1,:] @ Whva ) + ( Whvs @ U )
 
 ###########################################################################
 
@@ -226,7 +247,7 @@ if formulation == "theta_pi" :
     def explicitPart( U, P ) :
         return theta_pi.explicitPart( U \
         , Da, Ds \
-        , nLev, nCol, j0, j1, Cp, Cv, Rd \
+        , nLev, nCol, Cp, Cv, Rd \
         , dsdxInt, dsdzInt )
     
 elif formulation == "T_rho_P" :
@@ -329,7 +350,7 @@ def saveContourPlot( U, t ) :
     U = getStandardVariables( U )
     common.saveContourPlot( U, t \
     , testCase, var, fig \
-    , x, z, CL, FDo2 \
+    , x, z, CL \
     , xLeft, xRight, zTop, dx, ds )
 
 ###########################################################################
