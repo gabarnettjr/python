@@ -12,18 +12,18 @@ from gab.nonhydro import common
 
 #"bubble", "igw", "densityCurrent", "doubleDensityCurrent",
 #or "movingDensityCurrent":
-testCase = "doubleDensityCurrent"
+testCase = "igw"
 
 #"theta_pi" or "T_rho_P" or "theta_rho_P":
-formulation  = "theta_pi"
+formulation  = "T_rho_P"
 
 semiImplicit = 0
-gmresTol     = 1e-9                                          #default: 1e-5
+gmresTol     = 1e-6                                          #default: 1e-5
 
-dx    = 100.
-ds    = 100.
-dtExp = 1./12.                                          #explicit time-step
-dtImp = 2./1.                                           #implicit time-step
+dx    = 500.
+ds    = 125.
+dtExp = 1./2.                                           #explicit time-step
+dtImp = 1./1.                                           #implicit time-step
 
 phs = 5
 pol = 3
@@ -118,12 +118,16 @@ s = sFunc( x[:,0], z[:,0] )
 
 #Define finite difference (FD) weights for derivative approximation:
 
-if ( pol == 3 ) | ( pol == 4 ) :
-    alp = 300. * -2.**-5.
-elif ( pol == 5 ) | ( pol == 6 ) :
-    alp = 300. * 2.**-9.
+if phs == 3 :
+    alp = 2.**-7. * 300.
+elif phs == 5 :
+    alp = -2.**-5. * 300.
+elif phs == 7 :
+    alp = 2.**-9. * 300.
+elif phs == 9 :
+    alp = -2.**-13. * 300.
 else :
-    sys.exit("\nError: pol should be 3, 4, 5, or 6.\n")
+    sys.exit("\nError: phs should be 3, 5, 7, or 9.\n")
 
 Ws = phs1.getDM( x=s, X=s, m=1 \
 , phsDegree=phs, polyDegree=pol, stencilSize=stc )
@@ -131,22 +135,22 @@ Ws = phs1.getDM( x=s, X=s, m=1 \
 Whvs = phs1.getDM( x=s, X=s[1:-1], m=phs-1 \
 , phsDegree=phs, polyDegree=pol, stencilSize=stc )
 
-Whvs = alp * ds**pol * Whvs
+Whvs = alp * ds**(phs-2) * Whvs
 
 phsL = 9
 polL = 7
 stcL = 17
-alpL = 300. * -2.**-13.
+alpL = -2.**-13. * 300.
 
 Wa = phs1.getPeriodicDM( period=xRight-xLeft, x=x[0,:], X=x[0,:], m=1 \
 , phsDegree=phsL, polyDegree=polL, stencilSize=stcL )
 
 Wa = np.transpose( Wa )
 
-# alpDxPol = alpL * dx**polL
+# alpDxPol = alpL * dx**(phsL-2)
 Whva = phs1.getPeriodicDM( period=xRight-xLeft, x=x[0,:], X=x[0,:], m=phsL-1 \
 , phsDegree=phsL, polyDegree=polL, stencilSize=stcL )
-Whva = alpL * dx**polL * Whva
+Whva = alpL * dx**(phsL-2) * Whva
 Whva = np.transpose( Whva )
 
 ###########################################################################
@@ -255,22 +259,25 @@ elif formulation == "T_rho_P" :
     from gab.nonhydro import T_rho_P
     
     def setGhostNodes( U ) :
-        U, P = T_rho_P.setGhostNodes( U, Dx \
-        , Tx, Tz, Nx, Nz, bigTx, bigTz, j0, j1 \
-        , nLev, nCol, FD, FDo2, ds, Pbar, rhoBar, Tbar \
+        U, P = T_rho_P.setGhostNodes( U, Wa \
+        , TxBot, TzBot, NxBot, NzBot \
+        , TxTop, TzTop, NxTop, NzTop \
+        , wIbot, wEbot, wDbot \
+        , wItop, wEtop, wDtop \
+        , nLev, nCol, stc, ds, Pbar, rhoBar, Tbar \
         , g, Rd, normGradS, dsdxBot, dsdzBot )
         return U, P
     
     def implicitPart( U, P ) :
         return T_rho_P.implicitPart( U, P \
-        , Dx, Ds, HVx, HVs \
-        , nLev, nCol, i0, i1, j0, j1, Cp, Cv, Rd, g \
+        , Da, Ds, HV \
+        , nLev, nCol, Cp, Cv, Rd, g \
         , dsdxInt, dsdzInt, rhoBarInt, TbarInt, drhoBarDzInt, dTbarDzInt )
     
     def explicitPart( U, P ) :
         return T_rho_P.explicitPart( U, P \
-        , Dx, Ds \
-        , nLev, nCol, i0, i1, j0, j1, Cv, Rd, g \
+        , Da, Ds \
+        , nLev, nCol, Cv, Rd, g \
         , dsdxInt, dsdzInt, rhoBarInt )
     
 elif formulation == "theta_rho_P" :

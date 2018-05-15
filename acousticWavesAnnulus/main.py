@@ -15,14 +15,14 @@ from gab.annulus import common, waveEquation
 c           = .03                                     #wave speed (c**2=RT)
 innerRadius = 1.
 outerRadius = 2.
-tf          = 50.                                               #final time
-saveDel     = 5                            #time interval to save snapshots
+tf          = 400.                                              #final time
+saveDel     = 50                           #time interval to save snapshots
 exp         = 200.                 #controls steepness of initial condition
 amp         = .10                 #amplitude of trigonometric topo function
 frq         = 5                   #frequency of trigonometric topo function
 
 plotFromSaved = 0                            #if 1, load instead of compute
-saveContours  = 0                       #switch for saving contours as pngs
+saveContours  = 1                       #switch for saving contours as pngs
 
 mlv      = np.int64(sys.argv[1])                #0:interfaces, 1:mid-levels
 phs      = np.int64(sys.argv[2])             #PHS RBF exponent (odd number)
@@ -297,17 +297,17 @@ Wlam = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th, m=1 \
 , phsDegree=phsA, polyDegree=polA, stencilSize=stcA )
 Wlam = np.transpose( Wlam )                #work on rows instead of columns
 
-# #Simple (and incorrect) angular HV:
-# Whvlam = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th, m=phsA-1 \
-# , phsDegree=phsA, polyDegree=polA, stencilSize=stcA )
-# Whvlam = alpA * dth0**polA * Whvlam
-# # dthPol = spdiags( dth**polA, np.array([0]), len(dth), len(dth) )
-# # Whvlam = alpA * dthPol.dot(Whvlam)                #scaled angular HV matrix
-# Whvlam = np.transpose( Whvlam )             #work on rows instead of column
+#Simple (and incorrect) angular HV:
+Whvlam = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th, m=phsA-1 \
+, phsDegree=phsA, polyDegree=polA, stencilSize=stcA )
+Whvlam = alpA * dth0**polA * Whvlam
+# dthPol = spdiags( dth**polA, np.array([0]), len(dth), len(dth) )
+# Whvlam = alpA * dthPol.dot(Whvlam)                #scaled angular HV matrix
+Whvlam = np.transpose( Whvlam )             #work on rows instead of column
 
-#Complex angular HV:
-alpDthPol = alpA * dth0**polA
-# alpDthPol = alpA * ( np.tile(dth,(ns-2,1)) ) ** polA
+# #Complex angular HV:
+# alpDthPol = alpA * dth0**polA
+# # alpDthPol = alpA * ( np.tile(dth,(ns-2,1)) ) ** polA
 
 ###########################################################################
 
@@ -370,15 +370,15 @@ def Dlam(U) :
     # return alpDrPol * U[1:-1,:]
 
 def HV(U) :
-    #Angular HV:
-    HVth = ( U @ Wlam ) + dsdthAll * ( Ws @ U )
-    for i in range( polA ) :
-        HVth = ( HVth @ Wlam ) + dsdthAll * ( Ws @ HVth )
-    HVth = alpDthPol * HVth[1:-1,:]
-    #Total HV:
-    return dsdri*(Whvs@U) + HVth
-    # #Simple (incorrect) method:
-    # return ( Whvs @ U ) + ( U[1:-1,:] @ Whvlam )
+    # #Angular HV:
+    # HVth = ( U @ Wlam ) + dsdthAll * ( Ws @ U )
+    # for i in range( polA ) :
+        # HVth = ( HVth @ Wlam ) + dsdthAll * ( Ws @ HVth )
+    # HVth = alpDthPol * HVth[1:-1,:]
+    # #Total HV:
+    # return dsdri*(Whvs@U) + HVth
+    #Simple (incorrect) method:
+    return ( Whvs @ U ) + ( U[1:-1,:] @ Whvlam )
 
 if mlv == 1 :
     def setGhostNodes( U ) :

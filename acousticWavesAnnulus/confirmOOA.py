@@ -18,7 +18,7 @@ exp         = 200.                 #controls steepness of initial condition
 amp         = .10                 #amplitude of trigonometric topo function
 frq         = 5                   #frequency of trigonometric topo function
 
-ord = np.inf                                   #norm to use for error check
+ord = 2                                        #norm to use for error check
 
 contourErrors = 1
 
@@ -43,7 +43,7 @@ stc0      = 13
 ptb0      = .00
 rkStages0 = 4
 
-t0 = tf                                                    #time to look at
+t0 = 10                                                    #time to look at
 
 ns0 = 384                                             #reference resolution
 ns1 = 12
