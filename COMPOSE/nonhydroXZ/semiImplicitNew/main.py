@@ -14,14 +14,14 @@ from gab.nonhydro import common
 #or "movingDensityCurrent":
 testCase = "igw"
 
-#"theta_pi" or "T_rho_P" or "theta_rho_P":
-formulation  = "T_rho_P"
+#"theta_pi" or "T_rho_P" or "theta_rho_P" or "HOMMEstyle":
+formulation  = "HOMMEstyle"
 
 semiImplicit = 0
 gmresTol     = 1e-6                                          #default: 1e-5
 
 dx    = 500.
-ds    = 125.
+ds    = 500.
 dtExp = 1./2.                                           #explicit time-step
 dtImp = 1./1.                                           #implicit time-step
 
@@ -31,10 +31,10 @@ stc = 7
 
 rkStages  = 3
 plotNodes = 0                               #if 1, plot nodes and then exit
-saveDel   = 100                           #print/save every saveDel seconds
+saveDel   = 1                             #print/save every saveDel seconds
 
-var           = 2                        #determines what to plot (0,1,2,3)
-saveArrays    = 1
+var           = 3                        #determines what to plot (0,1,2,3)
+saveArrays    = 0
 saveContours  = 1
 plotFromSaved = 0                   #if 1, results are loaded, not computed
 
@@ -75,6 +75,8 @@ nTimesteps = np.int( np.round(tf/dtImp) + 1e-12 )
 xLeft, xRight, nLev, nCol, zTop, zSurf, zSurfPrime, x, z \
 = common.getSpaceDomain( testCase, dx, ds )
 
+zBot = zSurf(x[0,:])
+
 sFunc, dsdx, dsdz = common.getHeightCoordinate( zTop, zSurf, zSurfPrime )
 
 Tx, Tz, Nx, Nz = common.getTanNorm( zSurfPrime, x[0,:] )
@@ -111,6 +113,8 @@ rhoBarInt      = rhoBar     [1:-1,:]
 TbarInt        = Tbar       [1:-1,:]
 drhoBarDzInt   = drhoBarDz  [1:-1,:]
 dTbarDzInt     = dTbarDz    [1:-1,:]
+dpidsBarInt    = dpidsBar   [1:-1,:]
+PbarInt        = Pbar       [1:-1,:]
 
 s = sFunc( x[:,0], z[:,0] )
 
@@ -164,30 +168,6 @@ wDbot = phs1.getWeights( 0.,   s[0:stc],   m=1, phsDegree=phs, polyDegree=pol )
 wItop = phs1.getWeights( zTop,  s[-1:-(stc+1):-1], m=0, phsDegree=phs, polyDegree=pol )
 wEtop = phs1.getWeights( s[-1], s[-2:-(stc+2):-1], m=0, phsDegree=phs, polyDegree=pol )
 wDtop = phs1.getWeights( zTop,  s[-1:-(stc+1):-1], m=1, phsDegree=phs, polyDegree=pol )
-
-###########################################################################
-
-# if FD == 2 :
-    # wx = np.array( [ -1./2., 0., 1./2. ] )
-    # wxhv = np.array( [ 1., -2., 1. ] )
-    # gamma = 1./2.
-# elif FD == 4 :
-    # wx = np.array( [ 1./12., -2./3., 0., 2./3., -1./12. ] )
-    # wxhv = np.array( [ 1., -4., 6., -4., 1. ] )
-    # gamma = -1./12.
-# elif FD == 6 :
-    # wx = np.array( [ -1./60., 3./20., -3./4., 0., 3./4, -3./20., 1./60. ] )
-    # wxhv = np.array( [ 1., -6., 15., -20., 15., -6., 1. ] )
-    # gamma = 1./60.
-# else :
-    # sys.exit( "\nError: FD should be 2, 4, or 6.\n" )
-# wx   = wx / dx
-# wxhv = gamma * gx * wxhv / dx
-
-# ws = np.array( [ -1./2., 0., 1./2. ] )
-# wshv = np.array( [ 1., -2., 1. ] )
-# ws   = ws / ds
-# wshv = 1./2. * gs * wshv / ds
 
 ###########################################################################
 
@@ -302,6 +282,40 @@ elif formulation == "theta_rho_P" :
         , Dx, Ds \
         , nLev, nCol, i0, i1, j0, j1, Cv, Rd, g \
         , dsdxInt, dsdzInt, rhoBarInt )
+
+elif formulation == "HOMMEstyle" :
+    
+    from gab.nonhydro import HOMMEstyle
+    
+    def setGhostNodes( U ) :
+        U, P = HOMMEstyle.setGhostNodes( U \
+        , Wa, Ws \
+        , TxBot, TzBot, NxBot, NzBot \
+        , TxTop, TzTop, NxTop, NzTop \
+        , wIbot, wEbot, wDbot \
+        , wItop, wEtop, wDtop \
+        , nLev, nCol, stc \
+        , Po, g, Rd, Cv, Cp, zBot, zTop )
+        return U, P
+    
+    def implicitPart( U, P ) :
+        return HOMMEstyle.implicitPart( U, P \
+        , nLev, nCol )
+    
+    def explicitPart( U, P ) :
+        return HOMMEstyle.explicitPart( U, P \
+        , Da, Ds, HV \
+        , nLev, nCol, g )
+    
+    def verticalRemap( U ) :
+        ztmp = U[4,:,:] / g
+        for j in range( nCol ) :
+            W = phs1.getDM( x=ztmp[:,j], X=z[1:-1,j], m=0 \
+            , phsDegree=phs, polyDegree=pol, stencilSize=stc )
+            for i in range(4) :
+                U[i,1:-1,j] = W.dot( U[i,:,j] )
+        U[4,:,:] = g * z
+        return U
     
 else :
     
@@ -309,7 +323,7 @@ else :
 
 def odefun( t, U ) :
     U, P = setGhostNodes( U )
-    V = np.zeros(( 4, nLev+2, nCol ))
+    V = np.zeros(( np.shape(U)[0], nLev+2, nCol ))
     V[:,1:-1,:] = implicitPart(U,P) + explicitPart(U,P)
     return V
 
@@ -317,17 +331,23 @@ def odefun( t, U ) :
 
 if semiImplicit == 1 :
     
-    def ell( U ) :
-        return common.L( U \
-        , dtImp, setGhostNodes, implicitPart, nLev, nCol )
+    if formulation == "HOMMEstyle" :
+        
+        sys.exit("\nError: HOMMEstyle doesn't support semi-implicit yet.\n")
     
-    L = LinearOperator( ( 4*(nLev+2)*nCol, 4*(nLev+2)*nCol ), matvec=ell, dtype=float )
-    
-    def leapfrogTimestep( t, U0, P0, U1, P1, dt ) :
-        t, U2 = common.leapfrogTimestep( t, U0, P0, U1, P1, dt \
-        , nLev, nCol \
-        , L, implicitPart, explicitPart, gmresTol )
-        return t, U2
+    else :
+        
+        def ell( U ) :
+            return common.L( U \
+            , dtImp, setGhostNodes, implicitPart, nLev, nCol )
+        
+        L = LinearOperator( ( 4*(nLev+2)*nCol, 4*(nLev+2)*nCol ), matvec=ell, dtype=float )
+        
+        def leapfrogTimestep( t, U0, P0, U1, P1, dt ) :
+            t, U2 = common.leapfrogTimestep( t, U0, P0, U1, P1, dt \
+            , nLev, nCol \
+            , L, implicitPart, explicitPart, gmresTol )
+            return t, U2
 
 ###########################################################################
 
@@ -387,6 +407,10 @@ for i in range(1,nTimesteps+1) :
     
     if np.mod( i, np.int(np.round(saveDel/dtImp)) ) == 0 :
         
+        if formulation == "HOMMEstyle" :
+            U1 = verticalRemap( U1 )
+            U1, P1 = setGhostNodes( U1 )
+        
         if plotFromSaved == 0 :
             if saveArrays == 1 :
                 np.save( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy', U1 )
@@ -402,6 +426,8 @@ for i in range(1,nTimesteps+1) :
         
     if plotFromSaved == 0 :
         if semiImplicit == 0 :
+            if ( np.mod(i,100) == 0 ) & ( formulation == "HOMMEstyle" ) :
+                U1 = verticalRemap(U1)
             t, U2 = rk( t, U1, odefun, dtImp )
         elif semiImplicit == 1 :
             t, U2 = leapfrogTimestep( t, U0, P0, U1, P1, dtImp )
