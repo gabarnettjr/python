@@ -31,7 +31,7 @@ stc = 7
 
 rkStages  = 3
 plotNodes = 0                               #if 1, plot nodes and then exit
-saveDel   = 1                             #print/save every saveDel seconds
+saveDel   = 100                           #print/save every saveDel seconds
 
 var           = 3                        #determines what to plot (0,1,2,3)
 saveArrays    = 0
@@ -87,6 +87,11 @@ U0, thetaBar, piBar, dpidsBar, Pbar, rhoBar, Tbar \
 , x, z \
 , Cp, Cv, Rd, g, Po \
 , dsdz )
+
+backgroundStates = np.zeros(( 3, nLev+2, nCol ))
+backgroundStates[0,:,:] = thetaBar
+backgroundStates[1,:,:] = dpidsBar
+backgroundStates[2,:,:] = Pbar
 
 thetaBarBot = ( thetaBar[0,   :] + thetaBar[1,     :] ) / 2.
 thetaBarTop = ( thetaBar[nLev,:] + thetaBar[nLev+1,:] ) / 2.
@@ -201,7 +206,7 @@ def HV( U ) :
     # HVL = alpDxPol * HVL[1:-1,:]
     # #Total HV:
     # return dsdzInt*(Whvs@U) + HVL
-    return ( U[1:-1,:] @ Whva ) + ( Whvs @ U )
+    return ( U[1:-1,:] @ Whva )
 
 ###########################################################################
 
@@ -220,7 +225,8 @@ if formulation == "theta_pi" :
         , nLev, nCol, stc, ds, thetaBarBot, thetaBarTop \
         , g, Cp, normGradS, dsdxBot, dsdzBot )
         P = []
-        return U, P
+        backgroundStatesTmp = []
+        return U, P, backgroundStatesTmp
     
     def implicitPart( U, P ) :
         return theta_pi.implicitPart( U \
@@ -234,6 +240,12 @@ if formulation == "theta_pi" :
         , nLev, nCol, Cp, Cv, Rd \
         , dsdxInt, dsdzInt )
     
+    def odefun( t, U ) :
+        U, P = setGhostNodes( U )
+        V = np.zeros(( np.shape(U)[0], nLev+2, nCol ))
+        V[:,1:-1,:] = implicitPart(U,P) + explicitPart(U,P)
+        return V
+    
 elif formulation == "T_rho_P" :
     
     from gab.nonhydro import T_rho_P
@@ -246,7 +258,8 @@ elif formulation == "T_rho_P" :
         , wItop, wEtop, wDtop \
         , nLev, nCol, stc, ds, Pbar, rhoBar, Tbar \
         , g, Rd, normGradS, dsdxBot, dsdzBot )
-        return U, P
+        backgroundStatesTmp = []
+        return U, P, backgroundStatesTmp
     
     def implicitPart( U, P ) :
         return T_rho_P.implicitPart( U, P \
@@ -260,6 +273,12 @@ elif formulation == "T_rho_P" :
         , nLev, nCol, Cv, Rd, g \
         , dsdxInt, dsdzInt, rhoBarInt )
     
+    def odefun( t, U ) :
+        U, P = setGhostNodes( U )
+        V = np.zeros(( np.shape(U)[0], nLev+2, nCol ))
+        V[:,1:-1,:] = implicitPart(U,P) + explicitPart(U,P)
+        return V
+    
 elif formulation == "theta_rho_P" :
     
     from gab.nonhydro import theta_rho_P
@@ -269,7 +288,8 @@ elif formulation == "theta_rho_P" :
         , Tx, Tz, Nx, Nz, bigTx, bigTz, j0, j1 \
         , nLev, nCol, FD, FDo2, ds, Pbar, rhoBar, thetaBar \
         , g, Rd, Cp, Cv, Po, normGradS, dsdxBot, dsdzBot )
-        return U, P
+        backgroundStatesTmp = []
+        return U, P, backgroundStatesTmp
     
     def implicitPart( U, P ) :
         return theta_rho_P.implicitPart( U, P \
@@ -282,50 +302,100 @@ elif formulation == "theta_rho_P" :
         , Dx, Ds \
         , nLev, nCol, i0, i1, j0, j1, Cv, Rd, g \
         , dsdxInt, dsdzInt, rhoBarInt )
+    
+    def odefun( t, U ) :
+        U, P = setGhostNodes( U )
+        V = np.zeros(( np.shape(U)[0], nLev+2, nCol ))
+        V[:,1:-1,:] = implicitPart(U,P) + explicitPart(U,P)
+        return V
 
 elif formulation == "HOMMEstyle" :
     
     from gab.nonhydro import HOMMEstyle
     
+    def verticalRemap( U, z, Z ) :
+        z = np.tile( z, (np.shape(U)[0],1,1) )
+        Z = np.tile( Z, (np.shape(U)[0],1,1) )
+        V = np.zeros( np.shape(U) )
+        z0 = z[:,0:nLev,:]
+        z1 = z[:,1:nLev+1,:]
+        z2 = z[:,2:nLev+2,:]
+        ZZ = Z[:,1:-1,:]
+        V[:,1:-1,:] = \
+          ( ZZ - z1 ) * ( ZZ - z2 ) * U[:,0:nLev+0,:] / ( z0 - z1 ) / ( z0 - z2 ) \
+        + ( ZZ - z0 ) * ( ZZ - z2 ) * U[:,1:nLev+1,:] / ( z1 - z0 ) / ( z1 - z2 ) \
+        + ( ZZ - z0 ) * ( ZZ - z1 ) * U[:,2:nLev+2,:] / ( z2 - z0 ) / ( z2 - z1 )
+        z0 = z[:,0,:]
+        z1 = z[:,1,:]
+        z2 = z[:,2,:]
+        ZZ = Z[:,0,:]
+        V[:,0,:] = \
+          ( ZZ - z1 ) * ( ZZ - z2 ) * U[:,0,:] / ( z0 - z1 ) / ( z0 - z2 ) \
+        + ( ZZ - z0 ) * ( ZZ - z2 ) * U[:,1,:] / ( z1 - z0 ) / ( z1 - z2 ) \
+        + ( ZZ - z0 ) * ( ZZ - z1 ) * U[:,2,:] / ( z2 - z0 ) / ( z2 - z1 )
+        z0 = z[:,-3,:]
+        z1 = z[:,-2,:]
+        z2 = z[:,-1,:]
+        ZZ = Z[:,-1,:]
+        V[:,-1,:] = \
+          ( ZZ - z1 ) * ( ZZ - z2 ) * U[:,-3,:] / ( z0 - z1 ) / ( z0 - z2 ) \
+        + ( ZZ - z0 ) * ( ZZ - z2 ) * U[:,-2,:] / ( z1 - z0 ) / ( z1 - z2 ) \
+        + ( ZZ - z0 ) * ( ZZ - z1 ) * U[:,-1,:] / ( z2 - z0 ) / ( z2 - z1 )
+        return V
+        #############################
+        # z = np.tile( z, (np.shape(U)[0],1,1) )
+        # Z = np.tile( Z, (np.shape(U)[0],1,1) )
+        # slope = ( U[:,2:nLev+2,:] - U[:,0:nLev,:] ) / ( z[:,2:nLev+2,:] - z[:,0:nLev,:] )
+        # U = U[:,0:nLev,:] + slope * ( Z - z[:,0:nLev,:] )
+        # return U
+        #############################
+        # dim = len(np.shape(U))
+        # if dim == 2 :
+            # V = np.zeros( np.shape(Z) )
+        # elif dim == 3 :
+            # V = np.zeros(( np.shape(U)[0], np.shape(Z)[0], np.shape(Z)[1] ))
+        # else :
+            # sys.exit("\nError: U should have dim 2 or 3.\n")
+        # for j in range( nCol ) :
+            # W = phs1.getDM( x=z[:,j], X=Z[:,j], m=0 \
+            # , phsDegree=phs, polyDegree=pol, stencilSize=stc )
+            # if dim == 2 :
+                # V[:,j] = W.dot( U[:,j] )
+            # else :
+                # for i in range(np.shape(U)[0]) :
+                    # V[i,:,j] = W.dot( U[i,:,j] )
+        # return V
+    
     def setGhostNodes( U ) :
-        U, P = HOMMEstyle.setGhostNodes( U \
+        U, P, backgroundStatesTmp = HOMMEstyle.setGhostNodes( U \
+        , verticalRemap \
         , Wa, Ws \
         , TxBot, TzBot, NxBot, NzBot \
         , TxTop, TzTop, NxTop, NzTop \
         , wIbot, wEbot, wDbot \
         , wItop, wEtop, wDtop \
-        , nLev, nCol, stc \
-        , Po, g, Rd, Cv, Cp, zBot, zTop )
-        return U, P
+        , nLev, nCol, stc, backgroundStates \
+        , Po, g, Rd, Cv, Cp, zBot, zTop, z )
+        return U, P, backgroundStatesTmp
     
     def implicitPart( U, P ) :
         return HOMMEstyle.implicitPart( U, P \
         , nLev, nCol )
     
-    def explicitPart( U, P ) :
-        return HOMMEstyle.explicitPart( U, P \
-        , Da, Ds, HV \
-        , nLev, nCol, g )
+    def explicitPart( U, P, backgroundStatesTmp ) :
+        return HOMMEstyle.explicitPart( U, P, backgroundStatesTmp \
+        , Da, Ds, HV, verticalRemap \
+        , nLev, nCol, g, wIbot, wItop, stc, z )
     
-    def verticalRemap( U ) :
-        ztmp = U[4,:,:] / g
-        for j in range( nCol ) :
-            W = phs1.getDM( x=ztmp[:,j], X=z[1:-1,j], m=0 \
-            , phsDegree=phs, polyDegree=pol, stencilSize=stc )
-            for i in range(4) :
-                U[i,1:-1,j] = W.dot( U[i,:,j] )
-        U[4,:,:] = g * z
-        return U
+    def odefun( t, U ) :
+        U, P, backgroundStatesTmp = setGhostNodes( U )
+        V = np.zeros(( np.shape(U)[0], nLev+2, nCol ))
+        V[:,1:-1,:] = implicitPart(U,P) + explicitPart(U,P,backgroundStatesTmp)
+        return V
     
 else :
     
     sys.exit( "\nError: formulation should be 'theta_pi', 'T_rho_P' or 'theta_rho_P'.\n" )
-
-def odefun( t, U ) :
-    U, P = setGhostNodes( U )
-    V = np.zeros(( np.shape(U)[0], nLev+2, nCol ))
-    V[:,1:-1,:] = implicitPart(U,P) + explicitPart(U,P)
-    return V
 
 ###########################################################################
 
@@ -385,7 +455,7 @@ def saveContourPlot( U, t ) :
 #Eulerian time-stepping for first large time step
 
 #Save initial conditions and contour of first frame:
-U0, P0 = setGhostNodes( U0 )
+U0, P0, tmp = setGhostNodes( U0 )
 if saveArrays == 1 :
     np.save( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy', U0 )
 U1 = U0
@@ -397,7 +467,7 @@ if saveContours == 1 :
 for i in range( np.int( np.round(dtImp/dtExp) + 1e-12 ) ) :
     t, U1 = rk( t, U1, odefun, dtExp )
 
-U1, P1 = setGhostNodes( U1 )
+U1, P1, tmp = setGhostNodes( U1 )
 
 ###########################################################################
 
@@ -407,9 +477,11 @@ for i in range(1,nTimesteps+1) :
     
     if np.mod( i, np.int(np.round(saveDel/dtImp)) ) == 0 :
         
+        et = printInfo( U1, P1, et, t )
+        
         if formulation == "HOMMEstyle" :
-            U1 = verticalRemap( U1 )
-            U1, P1 = setGhostNodes( U1 )
+            U1 = verticalRemap( U1, U1[4,:,:]/g, z )
+            U1, P1, tmp = setGhostNodes( U1 )
         
         if plotFromSaved == 0 :
             if saveArrays == 1 :
@@ -419,21 +491,21 @@ for i in range(1,nTimesteps+1) :
         else :
             sys.exit( "\nError: plotFromSaved should be 0 or 1.\n" )
         
-        et = printInfo( U1, P1, et, t )
+        # et = printInfo( U1, P1, et, t )
         
         if saveContours == 1 :
             saveContourPlot( U1, t )
         
     if plotFromSaved == 0 :
         if semiImplicit == 0 :
-            if ( np.mod(i,100) == 0 ) & ( formulation == "HOMMEstyle" ) :
-                U1 = verticalRemap(U1)
+            # if ( np.mod(i,100) == 0 ) & ( formulation == "HOMMEstyle" ) :
+                # U1 = verticalRemap( U1, U1[4,:,:]/g, z )
             t, U2 = rk( t, U1, odefun, dtImp )
         elif semiImplicit == 1 :
             t, U2 = leapfrogTimestep( t, U0, P0, U1, P1, dtImp )
         else :
             sys.exit( "\nError: semiImplicit should be 0 or 1.\n" )
-        U2, P2 = setGhostNodes( U2 )
+        U2, P2, tmp = setGhostNodes( U2 )
         U0 = U1
         U1 = U2
         P0 = P1
