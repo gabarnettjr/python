@@ -12,17 +12,17 @@ from gab.nonhydro import common
 
 #"bubble", "igw", "densityCurrent", "doubleDensityCurrent",
 #or "movingDensityCurrent":
-testCase = "igw"
+testCase = "bubble"
 
 #"theta_pi" or "T_rho_P" or "theta_rho_P" or "HOMMEstyle":
-formulation  = "HOMMEstyle"
+formulation  = "T_rho_P"
 
 semiImplicit = 0
-gmresTol     = 1e-6                                          #default: 1e-5
+gmresTol     = 1e-5                                          #default: 1e-5
 
-dx    = 500.
-ds    = 500.
-dtExp = 1./4.                                           #explicit time-step
+dx    = 100.
+ds    = 100.
+dtExp = 1./8.                                           #explicit time-step
 dtImp = 1./1.                                           #implicit time-step
 
 phs = 5
@@ -34,7 +34,7 @@ plotNodes = 0                               #if 1, plot nodes and then exit
 saveDel   = 100                           #print/save every saveDel seconds
 
 var           = 1                        #determines what to plot (0,1,2,3)
-saveArrays    = 0
+saveArrays    = 1
 saveContours  = 1
 plotFromSaved = 0                   #if 1, results are loaded, not computed
 
@@ -128,6 +128,7 @@ s = sFunc( x[:,0], z[:,0] )
 #Define finite difference (FD) weights for derivative approximation:
 
 if phs == 3 :
+    # alp = 2.**-1. * 300.
     alp = 2.**-7. * 300.
 elif phs == 5 :
     alp = -2.**-5. * 300.
@@ -206,7 +207,7 @@ def HV( U ) :
     # HVL = alpDxPol * HVL[1:-1,:]
     # #Total HV:
     # return dsdzInt*(Whvs@U) + HVL
-    return ( U[1:-1,:] @ Whva )
+    return ( U[1:-1,:] @ Whva ) + ( Whvs @ U )
 
 ###########################################################################
 
@@ -241,7 +242,7 @@ if formulation == "theta_pi" :
         , dsdxInt, dsdzInt )
     
     def odefun( t, U ) :
-        U, P = setGhostNodes( U )
+        U, P, tmp = setGhostNodes( U )
         V = np.zeros(( np.shape(U)[0], nLev+2, nCol ))
         V[:,1:-1,:] = implicitPart(U,P) + explicitPart(U,P)
         return V
@@ -274,7 +275,7 @@ elif formulation == "T_rho_P" :
         , dsdxInt, dsdzInt, rhoBarInt )
     
     def odefun( t, U ) :
-        U, P = setGhostNodes( U )
+        U, P, tmp = setGhostNodes( U )
         V = np.zeros(( np.shape(U)[0], nLev+2, nCol ))
         V[:,1:-1,:] = implicitPart(U,P) + explicitPart(U,P)
         return V
@@ -284,27 +285,30 @@ elif formulation == "theta_rho_P" :
     from gab.nonhydro import theta_rho_P
     
     def setGhostNodes( U ) :
-        U, P = theta_rho_P.setGhostNodes( U, Dx \
-        , Tx, Tz, Nx, Nz, bigTx, bigTz, j0, j1 \
-        , nLev, nCol, FD, FDo2, ds, Pbar, rhoBar, thetaBar \
+        U, P = theta_rho_P.setGhostNodes( U, Wa \
+        , TxBot, TzBot, NxBot, NzBot \
+        , TxTop, TzTop, NxTop, NzTop \
+        , wIbot, wEbot, wDbot \
+        , wItop, wEtop, wDtop \
+        , nLev, nCol, stc, ds, Pbar, rhoBar, thetaBar \
         , g, Rd, Cp, Cv, Po, normGradS, dsdxBot, dsdzBot )
         backgroundStatesTmp = []
         return U, P, backgroundStatesTmp
     
     def implicitPart( U, P ) :
         return theta_rho_P.implicitPart( U, P \
-        , Dx, Ds, HVx, HVs \
-        , nLev, nCol, i0, i1, j0, j1, Cp, Cv, Rd, g \
+        , Da, Ds, HV \
+        , nLev, nCol, Cp, Cv, Rd, g \
         , dsdxInt, dsdzInt, rhoBarInt, drhoBarDzInt, dthetaBarDzInt )
     
     def explicitPart( U, P ) :
         return theta_rho_P.explicitPart( U, P \
-        , Dx, Ds \
-        , nLev, nCol, i0, i1, j0, j1, Cv, Rd, g \
+        , Da, Ds \
+        , nLev, nCol, Cv, Rd, g \
         , dsdxInt, dsdzInt, rhoBarInt )
     
     def odefun( t, U ) :
-        U, P = setGhostNodes( U )
+        U, P, tmp = setGhostNodes( U )
         V = np.zeros(( np.shape(U)[0], nLev+2, nCol ))
         V[:,1:-1,:] = implicitPart(U,P) + explicitPart(U,P)
         return V
@@ -317,14 +321,16 @@ elif formulation == "HOMMEstyle" :
         z = np.tile( z, (np.shape(U)[0],1,1) )
         Z = np.tile( Z, (np.shape(U)[0],1,1) )
         V = np.zeros( np.shape(U) )
-        z0 = z[:,0:nLev,:]
+        #quadratic on interior:
+        z0 = z[:,0:nLev+0,:]
         z1 = z[:,1:nLev+1,:]
         z2 = z[:,2:nLev+2,:]
-        ZZ = Z[:,1:-1,:]
-        V[:,1:-1,:] = \
+        ZZ = Z[:,1:nLev+1,:]
+        V[:,1:nLev+1,:] = \
           ( ZZ - z1 ) * ( ZZ - z2 ) * U[:,0:nLev+0,:] / ( z0 - z1 ) / ( z0 - z2 ) \
         + ( ZZ - z0 ) * ( ZZ - z2 ) * U[:,1:nLev+1,:] / ( z1 - z0 ) / ( z1 - z2 ) \
         + ( ZZ - z0 ) * ( ZZ - z1 ) * U[:,2:nLev+2,:] / ( z2 - z0 ) / ( z2 - z1 )
+        #quadratic on bottom:
         z0 = z[:,0,:]
         z1 = z[:,1,:]
         z2 = z[:,2,:]
@@ -333,15 +339,39 @@ elif formulation == "HOMMEstyle" :
           ( ZZ - z1 ) * ( ZZ - z2 ) * U[:,0,:] / ( z0 - z1 ) / ( z0 - z2 ) \
         + ( ZZ - z0 ) * ( ZZ - z2 ) * U[:,1,:] / ( z1 - z0 ) / ( z1 - z2 ) \
         + ( ZZ - z0 ) * ( ZZ - z1 ) * U[:,2,:] / ( z2 - z0 ) / ( z2 - z1 )
-        z0 = z[:,-3,:]
-        z1 = z[:,-2,:]
-        z2 = z[:,-1,:]
-        ZZ = Z[:,-1,:]
-        V[:,-1,:] = \
-          ( ZZ - z1 ) * ( ZZ - z2 ) * U[:,-3,:] / ( z0 - z1 ) / ( z0 - z2 ) \
-        + ( ZZ - z0 ) * ( ZZ - z2 ) * U[:,-2,:] / ( z1 - z0 ) / ( z1 - z2 ) \
-        + ( ZZ - z0 ) * ( ZZ - z1 ) * U[:,-1,:] / ( z2 - z0 ) / ( z2 - z1 )
+        #quadratic on top:
+        z0 = z[:,nLev-1,:]
+        z1 = z[:,nLev+0,:]
+        z2 = z[:,nLev+1,:]
+        ZZ = Z[:,nLev+1,:]
+        V[:,nLev+1,:] = \
+          ( ZZ - z1 ) * ( ZZ - z2 ) * U[:,nLev-1,:] / ( z0 - z1 ) / ( z0 - z2 ) \
+        + ( ZZ - z0 ) * ( ZZ - z2 ) * U[:,nLev+0,:] / ( z1 - z0 ) / ( z1 - z2 ) \
+        + ( ZZ - z0 ) * ( ZZ - z1 ) * U[:,nLev+1,:] / ( z2 - z0 ) / ( z2 - z1 )
         return V
+        #############################
+        # #linear on interior:
+        # z0 = z[:,0:nLev+0,:]
+        # z1 = z[:,2:nLev+2,:]
+        # ZZ = Z[:,1:nLev+1,:]
+        # V[:,1:nLev+1,:] = \
+          # ( ZZ - z1 ) * U[:,0:nLev+0,:] / ( z0 - z1 ) \
+        # + ( ZZ - z0 ) * U[:,2:nLev+2,:] / ( z1 - z0 )
+        # #linear on bottom:
+        # z0 = z[:,0,:]
+        # z1 = z[:,1,:]
+        # ZZ = Z[:,0,:]
+        # V[:,0,:] = \
+          # ( ZZ - z1 ) * U[:,0,:] / ( z0 - z1 ) \
+        # + ( ZZ - z0 ) * U[:,1,:] / ( z1 - z0 )
+        # #linear on top:
+        # z0 = z[:,nLev-1,:]
+        # z1 = z[:,nLev,:]
+        # ZZ = Z[:,nLev+1,:]
+        # V[:,nLev+1,:] = \
+          # ( ZZ - z1 ) * U[:,nLev+0,:] / ( z0 - z1 ) \
+        # + ( ZZ - z0 ) * U[:,nLev+1,:] / ( z1 - z0 )
+        # return V
         #############################
         # z = np.tile( z, (np.shape(U)[0],1,1) )
         # Z = np.tile( Z, (np.shape(U)[0],1,1) )
@@ -375,7 +405,7 @@ elif formulation == "HOMMEstyle" :
         , wIbot, wEbot, wDbot \
         , wItop, wEtop, wDtop \
         , nLev, nCol, stc, backgroundStates \
-        , Po, g, Rd, Cv, Cp, zBot, zTop, z )
+        , Po, g, Rd, Cv, Cp, zBot, zTop, x, z, sFunc )
         return U, P, backgroundStatesTmp
     
     def implicitPart( U, P ) :
@@ -391,8 +421,8 @@ elif formulation == "HOMMEstyle" :
         U, P, backgroundStatesTmp = setGhostNodes( U )
         V = np.zeros(( np.shape(U)[0], nLev+2, nCol ))
         V[:,1:-1,:] = implicitPart(U,P) + explicitPart(U,P,backgroundStatesTmp)
-        # V[4,0,:] = -U[0,0,:] * ( U[4,0,:] @ Wa ) + g*U[1,0,:]
-        # V[4,-1,:] = -U[0,-1,:] * ( U[4,-1,:] @ Wa ) + g*U[1,-1,:]
+        V[4,0,:] = -U[0,0,:] * ( U[4,0,:] @ Wa ) + g*U[1,0,:]
+        V[4,-1,:] = -U[0,-1,:] * ( U[4,-1,:] @ Wa ) + g*U[1,-1,:]
         return V
     
 else :
@@ -500,7 +530,7 @@ for i in range(1,nTimesteps+1) :
         
     if plotFromSaved == 0 :
         if semiImplicit == 0 :
-            if ( np.mod(i,100) == 0 ) & ( formulation == "HOMMEstyle" ) :
+            if ( np.mod(i,1) == 0 ) & ( formulation == "HOMMEstyle" ) :
                 U1 = verticalRemap( U1, U1[4,:,:]/g, z )
             t, U2 = rk( t, U1, odefun, dtImp )
         elif semiImplicit == 1 :
