@@ -12,17 +12,17 @@ from gab.nonhydro import common
 
 #"bubble", "igw", "densityCurrent", "doubleDensityCurrent",
 #or "movingDensityCurrent":
-testCase = "bubble"
+testCase = "movingDensityCurrent"
 
 #"theta_pi" or "T_rho_P" or "theta_rho_P" or "HOMMEstyle":
-formulation  = "T_rho_P"
+formulation  = "theta_pi"
 
 semiImplicit = 0
 gmresTol     = 1e-5                                          #default: 1e-5
 
 dx    = 100.
 ds    = 100.
-dtExp = 1./8.                                           #explicit time-step
+dtExp = 1./12.                                          #explicit time-step
 dtImp = 1./1.                                           #implicit time-step
 
 phs = 5
@@ -33,7 +33,7 @@ rkStages  = 3
 plotNodes = 0                               #if 1, plot nodes and then exit
 saveDel   = 100                           #print/save every saveDel seconds
 
-var           = 1                        #determines what to plot (0,1,2,3)
+var           = 2                        #determines what to plot (0,1,2,3)
 saveArrays    = 1
 saveContours  = 1
 plotFromSaved = 0                   #if 1, results are loaded, not computed
@@ -132,12 +132,12 @@ if phs == 3 :
     alp = 2.**-7. * 300.
 elif phs == 5 :
     alp = -2.**-5. * 300.
-elif phs == 7 :
-    alp = 2.**-9. * 300.
-elif phs == 9 :
-    alp = -2.**-13. * 300.
+# elif phs == 7 :
+    # alp = 2.**-9. * 300.
+# elif phs == 9 :
+    # alp = -2.**-13. * 300.
 else :
-    sys.exit("\nError: phs should be 3, 5, 7, or 9.\n")
+    sys.exit("\nError: phs should be 3 or 5.\n")
 
 Ws = phs1.getDM( x=s, X=s, m=1 \
 , phsDegree=phs, polyDegree=pol, stencilSize=stc )
@@ -147,10 +147,10 @@ Whvs = phs1.getDM( x=s, X=s[1:-1], m=phs-1 \
 
 Whvs = alp * ds**(phs-2) * Whvs
 
-phsL = 9
-polL = 7
-stcL = 17
-alpL = -2.**-13. * 300.
+phsL = 7
+polL = 5
+stcL = 13
+alpL = 2.**-10. * 300.
 
 Wa = phs1.getPeriodicDM( period=xRight-xLeft, x=x[0,:], X=x[0,:], m=1 \
 , phsDegree=phsL, polyDegree=polL, stencilSize=stcL )
@@ -421,8 +421,8 @@ elif formulation == "HOMMEstyle" :
         U, P, backgroundStatesTmp = setGhostNodes( U )
         V = np.zeros(( np.shape(U)[0], nLev+2, nCol ))
         V[:,1:-1,:] = implicitPart(U,P) + explicitPart(U,P,backgroundStatesTmp)
-        V[4,0,:] = -U[0,0,:] * ( U[4,0,:] @ Wa ) + g*U[1,0,:]
-        V[4,-1,:] = -U[0,-1,:] * ( U[4,-1,:] @ Wa ) + g*U[1,-1,:]
+        # V[4,0,:] = -U[0,0,:] * ( U[4,0,:] @ Wa ) + g*U[1,0,:]
+        # V[4,-1,:] = -U[0,-1,:] * ( U[4,-1,:] @ Wa ) + g*U[1,-1,:]
         return V
     
 else :
@@ -511,9 +511,9 @@ for i in range(1,nTimesteps+1) :
         
         if plotFromSaved == 0 :
             if saveArrays == 1 :
-                if formulation == "HOMMEstyle" :
-                    U1 = verticalRemap( U1, U1[4,:,:]/g, z )
-                    U1, P1, tmp = setGhostNodes( U1 )
+                # if formulation == "HOMMEstyle" :
+                    # U1 = verticalRemap( U1, U1[4,:,:]/g, z )
+                    # U1, P1, tmp = setGhostNodes( U1 )
                 np.save( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy', U1 )
         elif plotFromSaved == 1 :
             U1 = np.load( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy' )
@@ -523,15 +523,15 @@ for i in range(1,nTimesteps+1) :
         et = printInfo( U1, P1, et, t )
         
         if saveContours == 1 :
-            if formulation == "HOMMEstyle" :
-                U1 = verticalRemap( U1, U1[4,:,:]/g, z )
-                U1, P1, tmp = setGhostNodes( U1 )
+            # if formulation == "HOMMEstyle" :
+                # U1 = verticalRemap( U1, U1[4,:,:]/g, z )
+                # U1, P1, tmp = setGhostNodes( U1 )
             saveContourPlot( U1, t )
         
     if plotFromSaved == 0 :
         if semiImplicit == 0 :
-            if ( np.mod(i,1) == 0 ) & ( formulation == "HOMMEstyle" ) :
-                U1 = verticalRemap( U1, U1[4,:,:]/g, z )
+            # if ( np.mod(i,1) == 0 ) & ( formulation == "HOMMEstyle" ) :
+                # U1 = verticalRemap( U1, U1[4,:,:]/g, z )
             t, U2 = rk( t, U1, odefun, dtImp )
         elif semiImplicit == 1 :
             t, U2 = leapfrogTimestep( t, U0, P0, U1, P1, dtImp )
