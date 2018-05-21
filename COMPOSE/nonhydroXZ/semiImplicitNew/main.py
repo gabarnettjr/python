@@ -12,17 +12,17 @@ from gab.nonhydro import common
 
 #"bubble", "igw", "densityCurrent", "doubleDensityCurrent",
 #or "movingDensityCurrent":
-testCase = "movingDensityCurrent"
+testCase = "igw"
 
 #"theta_pi" or "T_rho_P" or "theta_rho_P" or "HOMMEstyle":
-formulation  = "theta_pi"
+formulation  = "HOMMEstyle"
 
 semiImplicit = 0
 gmresTol     = 1e-5                                          #default: 1e-5
 
-dx    = 100.
-ds    = 100.
-dtExp = 1./12.                                          #explicit time-step
+dx    = 500.
+ds    = 500.
+dtExp = 1./8.                                           #explicit time-step
 dtImp = 1./1.                                           #implicit time-step
 
 phs = 5
@@ -33,7 +33,7 @@ rkStages  = 3
 plotNodes = 0                               #if 1, plot nodes and then exit
 saveDel   = 100                           #print/save every saveDel seconds
 
-var           = 2                        #determines what to plot (0,1,2,3)
+var           = 3                        #determines what to plot (0,1,2,3)
 saveArrays    = 1
 saveContours  = 1
 plotFromSaved = 0                   #if 1, results are loaded, not computed
@@ -379,22 +379,13 @@ elif formulation == "HOMMEstyle" :
         # U = U[:,0:nLev,:] + slope * ( Z - z[:,0:nLev,:] )
         # return U
         #############################
-        # dim = len(np.shape(U))
-        # if dim == 2 :
-            # V = np.zeros( np.shape(Z) )
-        # elif dim == 3 :
-            # V = np.zeros(( np.shape(U)[0], np.shape(Z)[0], np.shape(Z)[1] ))
-        # else :
-            # sys.exit("\nError: U should have dim 2 or 3.\n")
+        # pages = np.shape(U)[0]
         # for j in range( nCol ) :
             # W = phs1.getDM( x=z[:,j], X=Z[:,j], m=0 \
             # , phsDegree=phs, polyDegree=pol, stencilSize=stc )
-            # if dim == 2 :
-                # V[:,j] = W.dot( U[:,j] )
-            # else :
-                # for i in range(np.shape(U)[0]) :
-                    # V[i,:,j] = W.dot( U[i,:,j] )
-        # return V
+            # for i in range(pages) :
+                # U[i,:,j] = W.dot( U[i,:,j] )
+        # return U
     
     def setGhostNodes( U ) :
         U, P, backgroundStatesTmp = HOMMEstyle.setGhostNodes( U \
@@ -405,7 +396,7 @@ elif formulation == "HOMMEstyle" :
         , wIbot, wEbot, wDbot \
         , wItop, wEtop, wDtop \
         , nLev, nCol, stc, backgroundStates \
-        , Po, g, Rd, Cv, Cp, zBot, zTop, x, z, sFunc )
+        , Po, g, Rd, Cv, Cp, zBot, zTop, z )
         return U, P, backgroundStatesTmp
     
     def implicitPart( U, P ) :
@@ -421,8 +412,8 @@ elif formulation == "HOMMEstyle" :
         U, P, backgroundStatesTmp = setGhostNodes( U )
         V = np.zeros(( np.shape(U)[0], nLev+2, nCol ))
         V[:,1:-1,:] = implicitPart(U,P) + explicitPart(U,P,backgroundStatesTmp)
-        # V[4,0,:] = -U[0,0,:] * ( U[4,0,:] @ Wa ) + g*U[1,0,:]
-        # V[4,-1,:] = -U[0,-1,:] * ( U[4,-1,:] @ Wa ) + g*U[1,-1,:]
+        V[4,0,:]  = -U[0,0,:]  * ( U[4,0,:] @ Wa ) + g*U[1,0,:]
+        V[4,-1,:] = -U[0,-1,:] * ( U[4,-1,:] @ Wa ) + g*U[1,-1,:]
         return V
     
 else :
@@ -512,7 +503,8 @@ for i in range(1,nTimesteps+1) :
         if plotFromSaved == 0 :
             if saveArrays == 1 :
                 # if formulation == "HOMMEstyle" :
-                    # U1 = verticalRemap( U1, U1[4,:,:]/g, z )
+                    # U1[0:4,:,:] = verticalRemap( U1[0:4,:,:], U1[4,:,:]/g, z )
+                    # U1[4,:,:] = g*z
                     # U1, P1, tmp = setGhostNodes( U1 )
                 np.save( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy', U1 )
         elif plotFromSaved == 1 :
@@ -523,15 +515,17 @@ for i in range(1,nTimesteps+1) :
         et = printInfo( U1, P1, et, t )
         
         if saveContours == 1 :
-            # if formulation == "HOMMEstyle" :
-                # U1 = verticalRemap( U1, U1[4,:,:]/g, z )
-                # U1, P1, tmp = setGhostNodes( U1 )
+            if formulation == "HOMMEstyle" :
+                U1[0:4,:,:] = verticalRemap( U1[0:4,:,:], U1[4,:,:]/g, z )
+                U1[4,:,:] = g*z
+                U1, P1, tmp = setGhostNodes( U1 )
             saveContourPlot( U1, t )
         
     if plotFromSaved == 0 :
         if semiImplicit == 0 :
             # if ( np.mod(i,1) == 0 ) & ( formulation == "HOMMEstyle" ) :
-                # U1 = verticalRemap( U1, U1[4,:,:]/g, z )
+                # U1[0:4,:,:] = verticalRemap( U1[0:4,:,:], U1[4,:,:]/g, z )
+                # U1[4,:,:] = g*z
             t, U2 = rk( t, U1, odefun, dtImp )
         elif semiImplicit == 1 :
             t, U2 = leapfrogTimestep( t, U0, P0, U1, P1, dtImp )
