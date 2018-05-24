@@ -3,6 +3,7 @@ import os
 import numpy as np
 import time
 from scipy.sparse.linalg import LinearOperator
+import matplotlib.pyplot as plt
 
 sys.path.append( '../../../site-packages' )
 from gab import rk, phs1
@@ -17,13 +18,15 @@ testCase = "igw"
 #"theta_pi" or "T_rho_P" or "theta_rho_P" or "HOMMEstyle":
 formulation  = "HOMMEstyle"
 
+VL = 1
+
 semiImplicit = 0
 gmresTol     = 1e-5                                          #default: 1e-5
 
 dx    = 500.
 ds    = 500.
-dtExp = 1./8.                                           #explicit time-step
-dtImp = 1./1.                                           #implicit time-step
+dtExp = 1./2.                                           #explicit time-step
+dtImp = 1./2.                                           #implicit time-step
 
 phs = 5
 pol = 3
@@ -34,7 +37,7 @@ plotNodes = 0                               #if 1, plot nodes and then exit
 saveDel   = 100                           #print/save every saveDel seconds
 
 var           = 3                        #determines what to plot (0,1,2,3)
-saveArrays    = 1
+saveArrays    = 0
 saveContours  = 1
 plotFromSaved = 0                   #if 1, results are loaded, not computed
 
@@ -106,6 +109,8 @@ if plotNodes == 1 :
 
 dsdxBot = dsdx( x[0,:], zSurf(x[0,:]) )
 dsdzBot = dsdz( x[0,:], zSurf(x[0,:]) )
+dsdxTop = dsdx( x[0,:], zTop )
+dsdzTop = dsdz( x[0,:], zTop )
 dsdxInt = dsdx( x[1:-1,:], z[1:-1,:] )
 dsdzInt = dsdz( x[1:-1,:], z[1:-1,:] )
 dsdxAll = dsdx( x, z )
@@ -170,10 +175,12 @@ Whva = np.transpose( Whva )
 wIbot = phs1.getWeights( 0.,   s[0:stc],   m=0, phsDegree=phs, polyDegree=pol )
 wEbot = phs1.getWeights( s[0], s[1:stc+1], m=0, phsDegree=phs, polyDegree=pol )
 wDbot = phs1.getWeights( 0.,   s[0:stc],   m=1, phsDegree=phs, polyDegree=pol )
+wHbot = phs1.getWeights( 0.,   s[1:stc+1], m=0, phsDegree=phs, polyDegree=pol )
 
 wItop = phs1.getWeights( zTop,  s[-1:-(stc+1):-1], m=0, phsDegree=phs, polyDegree=pol )
 wEtop = phs1.getWeights( s[-1], s[-2:-(stc+2):-1], m=0, phsDegree=phs, polyDegree=pol )
 wDtop = phs1.getWeights( zTop,  s[-1:-(stc+1):-1], m=1, phsDegree=phs, polyDegree=pol )
+wHtop = phs1.getWeights( zTop,  s[-2:-(stc+2):-1], m=0, phsDegree=phs, polyDegree=pol )
 
 ###########################################################################
 
@@ -207,11 +214,103 @@ def HV( U ) :
     # HVL = alpDxPol * HVL[1:-1,:]
     # #Total HV:
     # return dsdzInt*(Whvs@U) + HVL
-    return ( U[1:-1,:] @ Whva ) + ( Whvs @ U )
+    return ( U[1:-1,:] @ Whva )
 
 ###########################################################################
 
 #Important functions for time stepping:
+
+def verticalRemap( U, z, Z ) :
+    z = np.tile( z, (np.shape(U)[0],1,1) )
+    Z = np.tile( Z, (np.shape(U)[0],1,1) )
+    V = np.zeros( np.shape(U) )
+    #quadratic on bottom:
+    z0 = z[:,0,:]
+    z1 = z[:,1,:]
+    z2 = z[:,2,:]
+    ZZ = Z[:,0,:]
+    V[:,0,:] = \
+      ( ZZ - z1 ) * ( ZZ - z2 ) * U[:,0,:] / ( z0 - z1 ) / ( z0 - z2 ) \
+    + ( ZZ - z0 ) * ( ZZ - z2 ) * U[:,1,:] / ( z1 - z0 ) / ( z1 - z2 ) \
+    + ( ZZ - z0 ) * ( ZZ - z1 ) * U[:,2,:] / ( z2 - z0 ) / ( z2 - z1 )
+    #quadratic on interior:
+    z0 = z[:,0:nLev+0,:]
+    z1 = z[:,1:nLev+1,:]
+    z2 = z[:,2:nLev+2,:]
+    ZZ = Z[:,1:nLev+1,:]
+    V[:,1:nLev+1,:] = \
+      ( ZZ - z1 ) * ( ZZ - z2 ) * U[:,0:nLev+0,:] / ( z0 - z1 ) / ( z0 - z2 ) \
+    + ( ZZ - z0 ) * ( ZZ - z2 ) * U[:,1:nLev+1,:] / ( z1 - z0 ) / ( z1 - z2 ) \
+    + ( ZZ - z0 ) * ( ZZ - z1 ) * U[:,2:nLev+2,:] / ( z2 - z0 ) / ( z2 - z1 )
+    #quadratic on top:
+    z0 = z[:,nLev-1,:]
+    z1 = z[:,nLev+0,:]
+    z2 = z[:,nLev+1,:]
+    ZZ = Z[:,nLev+1,:]
+    V[:,nLev+1,:] = \
+      ( ZZ - z1 ) * ( ZZ - z2 ) * U[:,nLev-1,:] / ( z0 - z1 ) / ( z0 - z2 ) \
+    + ( ZZ - z0 ) * ( ZZ - z2 ) * U[:,nLev+0,:] / ( z1 - z0 ) / ( z1 - z2 ) \
+    + ( ZZ - z0 ) * ( ZZ - z1 ) * U[:,nLev+1,:] / ( z2 - z0 ) / ( z2 - z1 )
+    return V
+    #############################
+    #VERY SLOW PHS re-map:
+    # V = np.zeros( np.shape(U) )
+    # pages = np.shape(U)[0]
+    # for j in range( nCol ) :
+        # W = phs1.getDM( x=z[:,j], X=Z[:,j], m=0 \
+        # , phsDegree=phs, polyDegree=pol, stencilSize=stc )
+        # for i in range(pages) :
+            # V[i,:,j] = W.dot( U[i,:,j] )
+    # return V
+
+def verticalDerivative( U, z ) :
+    z = np.tile( z, (np.shape(U)[0],1,1) )
+    V = np.zeros( np.shape(U) )
+    #derivative of parabola on bottom:
+    z0 = z[:,0,:]
+    z1 = z[:,1,:]
+    z2 = z[:,2,:]
+    ZZ = z[:,1,:]
+    V[:,0,:] \
+    = ( ( ZZ - z1 ) + ( ZZ - z2 ) ) * U[:,0,:] / ( z0 - z1 ) / ( z0 - z2 ) \
+    + ( ( ZZ - z0 ) + ( ZZ - z2 ) ) * U[:,1,:] / ( z1 - z0 ) / ( z1 - z2 ) \
+    + ( ( ZZ - z0 ) + ( ZZ - z1 ) ) * U[:,2,:] / ( z2 - z0 ) / ( z2 - z1 )
+    #derivative of parabola on interior:
+    z0 = z[:,0:nLev+0,:]
+    z1 = z[:,1:nLev+1,:]
+    z2 = z[:,2:nLev+2,:]
+    ZZ = z[:,1:nLev+1,:]
+    V[:,1:nLev+1,:] \
+    = ( ( ZZ - z1 ) + ( ZZ - z2 ) ) * U[:,0:nLev+0,:] / ( z0 - z1 ) / ( z0 - z2 ) \
+    + ( ( ZZ - z0 ) + ( ZZ - z2 ) ) * U[:,1:nLev+1,:] / ( z1 - z0 ) / ( z1 - z2 ) \
+    + ( ( ZZ - z0 ) + ( ZZ - z1 ) ) * U[:,2:nLev+2,:] / ( z2 - z0 ) / ( z2 - z1 )
+    #derivative of parabola on top:
+    z0 = z[:,-3,:]
+    z1 = z[:,-2,:]
+    z2 = z[:,-1,:]
+    ZZ = z[:,-1,:]
+    V[:,-1,:] \
+    = ( ( ZZ - z1 ) + ( ZZ - z2 ) ) * U[:,-3,:] / ( z0 - z1 ) / ( z0 - z2 ) \
+    + ( ( ZZ - z0 ) + ( ZZ - z2 ) ) * U[:,-2,:] / ( z1 - z0 ) / ( z1 - z2 ) \
+    + ( ( ZZ - z0 ) + ( ZZ - z1 ) ) * U[:,-1,:] / ( z2 - z0 ) / ( z2 - z1 )
+    return V
+
+# #check vertical remap/derivative:
+# tmp = ds/2.
+# ran = tmp * ( -1. + 2. * np.random.rand(np.shape(U0)[1],np.shape(U0)[2]) )
+# ztmp = z + ran
+# print(np.max(np.abs(ztmp-z)))
+# tmp0 = U0
+# tmp0[2,:,:] = tmp0[2,:,:] - thetaBar
+# tmp = verticalRemap( tmp0, z, ztmp )
+# tmp = verticalDerivative( tmp, ztmp )
+# tmp = verticalRemap( tmp, ztmp, z )
+# tmp = verticalDerivative(tmp0,z)[2,:,:] - tmp[2,:,:]
+# # tmp = tmp[2,:,:]
+# plt.contourf( x, z, tmp )
+# plt.colorbar()
+# plt.show()
+# sys.exit("\nStop here for now.\n")
 
 if formulation == "theta_pi" :
     
@@ -317,86 +416,17 @@ elif formulation == "HOMMEstyle" :
     
     from gab.nonhydro import HOMMEstyle
     
-    def verticalRemap( U, z, Z ) :
-        z = np.tile( z, (np.shape(U)[0],1,1) )
-        Z = np.tile( Z, (np.shape(U)[0],1,1) )
-        V = np.zeros( np.shape(U) )
-        #quadratic on interior:
-        z0 = z[:,0:nLev+0,:]
-        z1 = z[:,1:nLev+1,:]
-        z2 = z[:,2:nLev+2,:]
-        ZZ = Z[:,1:nLev+1,:]
-        V[:,1:nLev+1,:] = \
-          ( ZZ - z1 ) * ( ZZ - z2 ) * U[:,0:nLev+0,:] / ( z0 - z1 ) / ( z0 - z2 ) \
-        + ( ZZ - z0 ) * ( ZZ - z2 ) * U[:,1:nLev+1,:] / ( z1 - z0 ) / ( z1 - z2 ) \
-        + ( ZZ - z0 ) * ( ZZ - z1 ) * U[:,2:nLev+2,:] / ( z2 - z0 ) / ( z2 - z1 )
-        #quadratic on bottom:
-        z0 = z[:,0,:]
-        z1 = z[:,1,:]
-        z2 = z[:,2,:]
-        ZZ = Z[:,0,:]
-        V[:,0,:] = \
-          ( ZZ - z1 ) * ( ZZ - z2 ) * U[:,0,:] / ( z0 - z1 ) / ( z0 - z2 ) \
-        + ( ZZ - z0 ) * ( ZZ - z2 ) * U[:,1,:] / ( z1 - z0 ) / ( z1 - z2 ) \
-        + ( ZZ - z0 ) * ( ZZ - z1 ) * U[:,2,:] / ( z2 - z0 ) / ( z2 - z1 )
-        #quadratic on top:
-        z0 = z[:,nLev-1,:]
-        z1 = z[:,nLev+0,:]
-        z2 = z[:,nLev+1,:]
-        ZZ = Z[:,nLev+1,:]
-        V[:,nLev+1,:] = \
-          ( ZZ - z1 ) * ( ZZ - z2 ) * U[:,nLev-1,:] / ( z0 - z1 ) / ( z0 - z2 ) \
-        + ( ZZ - z0 ) * ( ZZ - z2 ) * U[:,nLev+0,:] / ( z1 - z0 ) / ( z1 - z2 ) \
-        + ( ZZ - z0 ) * ( ZZ - z1 ) * U[:,nLev+1,:] / ( z2 - z0 ) / ( z2 - z1 )
-        return V
-        #############################
-        # #linear on interior:
-        # z0 = z[:,0:nLev+0,:]
-        # z1 = z[:,2:nLev+2,:]
-        # ZZ = Z[:,1:nLev+1,:]
-        # V[:,1:nLev+1,:] = \
-          # ( ZZ - z1 ) * U[:,0:nLev+0,:] / ( z0 - z1 ) \
-        # + ( ZZ - z0 ) * U[:,2:nLev+2,:] / ( z1 - z0 )
-        # #linear on bottom:
-        # z0 = z[:,0,:]
-        # z1 = z[:,1,:]
-        # ZZ = Z[:,0,:]
-        # V[:,0,:] = \
-          # ( ZZ - z1 ) * U[:,0,:] / ( z0 - z1 ) \
-        # + ( ZZ - z0 ) * U[:,1,:] / ( z1 - z0 )
-        # #linear on top:
-        # z0 = z[:,nLev-1,:]
-        # z1 = z[:,nLev,:]
-        # ZZ = Z[:,nLev+1,:]
-        # V[:,nLev+1,:] = \
-          # ( ZZ - z1 ) * U[:,nLev+0,:] / ( z0 - z1 ) \
-        # + ( ZZ - z0 ) * U[:,nLev+1,:] / ( z1 - z0 )
-        # return V
-        #############################
-        # z = np.tile( z, (np.shape(U)[0],1,1) )
-        # Z = np.tile( Z, (np.shape(U)[0],1,1) )
-        # slope = ( U[:,2:nLev+2,:] - U[:,0:nLev,:] ) / ( z[:,2:nLev+2,:] - z[:,0:nLev,:] )
-        # U = U[:,0:nLev,:] + slope * ( Z - z[:,0:nLev,:] )
-        # return U
-        #############################
-        # pages = np.shape(U)[0]
-        # for j in range( nCol ) :
-            # W = phs1.getDM( x=z[:,j], X=Z[:,j], m=0 \
-            # , phsDegree=phs, polyDegree=pol, stencilSize=stc )
-            # for i in range(pages) :
-                # U[i,:,j] = W.dot( U[i,:,j] )
-        # return U
-    
     def setGhostNodes( U ) :
         U, P, backgroundStatesTmp = HOMMEstyle.setGhostNodes( U \
         , verticalRemap \
         , Wa, Ws \
         , TxBot, TzBot, NxBot, NzBot \
         , TxTop, TzTop, NxTop, NzTop \
-        , wIbot, wEbot, wDbot \
-        , wItop, wEtop, wDtop \
+        , wIbot, wEbot, wDbot, wHbot \
+        , wItop, wEtop, wDtop, wHtop \
+        , dsdxBot, dsdzBot, dsdxTop, dsdzTop \
         , nLev, nCol, stc, backgroundStates \
-        , Po, g, Rd, Cv, Cp, zBot, zTop, z )
+        , Po, g, Rd, Cv, Cp, zBot, zTop, z, VL )
         return U, P, backgroundStatesTmp
     
     def implicitPart( U, P ) :
@@ -406,14 +436,14 @@ elif formulation == "HOMMEstyle" :
     def explicitPart( U, P, backgroundStatesTmp ) :
         return HOMMEstyle.explicitPart( U, P, backgroundStatesTmp \
         , Da, Ds, HV, verticalRemap \
-        , nLev, nCol, g, wIbot, wItop, stc, z )
+        , nLev, nCol, g, wIbot, wItop, stc, z, VL )
     
     def odefun( t, U ) :
         U, P, backgroundStatesTmp = setGhostNodes( U )
         V = np.zeros(( np.shape(U)[0], nLev+2, nCol ))
         V[:,1:-1,:] = implicitPart(U,P) + explicitPart(U,P,backgroundStatesTmp)
-        V[4,0,:]  = -U[0,0,:]  * ( U[4,0,:] @ Wa ) + g*U[1,0,:]
-        V[4,-1,:] = -U[0,-1,:] * ( U[4,-1,:] @ Wa ) + g*U[1,-1,:]
+        # V[4,0,:]  = -U[0,0,:]  * ( U[4,0,:] @ Wa ) + g*U[1,0,:]
+        # V[4,-1,:] = -U[0,-1,:] * ( U[4,-1,:] @ Wa ) + g*U[1,-1,:]
         return V
     
 else :
@@ -502,10 +532,10 @@ for i in range(1,nTimesteps+1) :
         
         if plotFromSaved == 0 :
             if saveArrays == 1 :
-                # if formulation == "HOMMEstyle" :
-                    # U1[0:4,:,:] = verticalRemap( U1[0:4,:,:], U1[4,:,:]/g, z )
-                    # U1[4,:,:] = g*z
-                    # U1, P1, tmp = setGhostNodes( U1 )
+                if ( formulation == "HOMMEstyle" ) & ( VL == 1 ) :
+                    U1[0:4,:,:] = verticalRemap( U1[0:4,:,:], U1[4,:,:]/g, z )
+                    U1[4,:,:] = g*z
+                    U1, P1, tmp = setGhostNodes( U1 )
                 np.save( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy', U1 )
         elif plotFromSaved == 1 :
             U1 = np.load( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy' )
@@ -515,7 +545,7 @@ for i in range(1,nTimesteps+1) :
         et = printInfo( U1, P1, et, t )
         
         if saveContours == 1 :
-            if formulation == "HOMMEstyle" :
+            if ( formulation == "HOMMEstyle" ) & ( VL == 1 ) :
                 U1[0:4,:,:] = verticalRemap( U1[0:4,:,:], U1[4,:,:]/g, z )
                 U1[4,:,:] = g*z
                 U1, P1, tmp = setGhostNodes( U1 )
@@ -523,9 +553,9 @@ for i in range(1,nTimesteps+1) :
         
     if plotFromSaved == 0 :
         if semiImplicit == 0 :
-            # if ( np.mod(i,1) == 0 ) & ( formulation == "HOMMEstyle" ) :
-                # U1[0:4,:,:] = verticalRemap( U1[0:4,:,:], U1[4,:,:]/g, z )
-                # U1[4,:,:] = g*z
+            if ( np.mod(i,1) == 0 ) & ( formulation == "HOMMEstyle" ) & ( VL == 1 ) :
+                U1[0:4,:,:] = verticalRemap( U1[0:4,:,:], U1[4,:,:]/g, z )
+                U1[4,:,:] = g*z
             t, U2 = rk( t, U1, odefun, dtImp )
         elif semiImplicit == 1 :
             t, U2 = leapfrogTimestep( t, U0, P0, U1, P1, dtImp )
