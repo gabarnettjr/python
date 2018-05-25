@@ -13,19 +13,19 @@ from gab.nonhydro import common
 
 #"bubble", "igw", "densityCurrent", "doubleDensityCurrent",
 #or "movingDensityCurrent":
-testCase = "igw"
+testCase = "doubleDensityCurrent"
 
 #"theta_pi" or "T_rho_P" or "theta_rho_P" or "HOMMEstyle":
-formulation  = "HOMMEstyle"
+formulation  = "T_rho_P"
 
-VL = 1
+VL = 0
 
 semiImplicit = 0
 gmresTol     = 1e-5                                          #default: 1e-5
 
-dx    = 500.
-ds    = 500.
-dtExp = 1./2.                                           #explicit time-step
+dx    = 200.
+ds    = 200.
+dtExp = 1./6.                                           #explicit time-step
 dtImp = 1./2.                                           #implicit time-step
 
 phs = 5
@@ -34,7 +34,7 @@ stc = 7
 
 rkStages  = 3
 plotNodes = 0                               #if 1, plot nodes and then exit
-saveDel   = 100                           #print/save every saveDel seconds
+saveDel   = 50                            #print/save every saveDel seconds
 
 var           = 3                        #determines what to plot (0,1,2,3)
 saveArrays    = 0
@@ -91,10 +91,11 @@ U0, thetaBar, piBar, dpidsBar, Pbar, rhoBar, Tbar \
 , Cp, Cv, Rd, g, Po \
 , dsdz )
 
-backgroundStates = np.zeros(( 3, nLev+2, nCol ))
+backgroundStates = np.zeros(( 4, nLev+2, nCol ))
 backgroundStates[0,:,:] = thetaBar
 backgroundStates[1,:,:] = dpidsBar
 backgroundStates[2,:,:] = Pbar
+backgroundStates[3,:,:] = dthetaBarDz
 
 thetaBarBot = ( thetaBar[0,   :] + thetaBar[1,     :] ) / 2.
 thetaBarTop = ( thetaBar[nLev,:] + thetaBar[nLev+1,:] ) / 2.
@@ -214,7 +215,7 @@ def HV( U ) :
     # HVL = alpDxPol * HVL[1:-1,:]
     # #Total HV:
     # return dsdzInt*(Whvs@U) + HVL
-    return ( U[1:-1,:] @ Whva )
+    return ( U[1:-1,:] @ Whva ) + ( Whvs @ U )
 
 ###########################################################################
 
@@ -224,33 +225,47 @@ def verticalRemap( U, z, Z ) :
     z = np.tile( z, (np.shape(U)[0],1,1) )
     Z = np.tile( Z, (np.shape(U)[0],1,1) )
     V = np.zeros( np.shape(U) )
+    # #linear on bottom:
+    # z0 = z[:,0,:]
+    # z1 = z[:,1,:]
+    # ZZ = Z[:,0,:]
+    # V[:,0,:] = \
+      # ( ZZ - z1 ) * U[:,0,:] / ( z0 - z1 ) \
+    # + ( ZZ - z0 ) * U[:,1,:] / ( z1 - z0 )
     #quadratic on bottom:
-    z0 = z[:,0,:]
-    z1 = z[:,1,:]
-    z2 = z[:,2,:]
-    ZZ = Z[:,0,:]
+    z0 = z[:,0,:].copy()
+    z1 = z[:,1,:].copy()
+    z2 = z[:,2,:].copy()
+    ZZ = Z[:,0,:].copy()
     V[:,0,:] = \
       ( ZZ - z1 ) * ( ZZ - z2 ) * U[:,0,:] / ( z0 - z1 ) / ( z0 - z2 ) \
     + ( ZZ - z0 ) * ( ZZ - z2 ) * U[:,1,:] / ( z1 - z0 ) / ( z1 - z2 ) \
     + ( ZZ - z0 ) * ( ZZ - z1 ) * U[:,2,:] / ( z2 - z0 ) / ( z2 - z1 )
     #quadratic on interior:
-    z0 = z[:,0:nLev+0,:]
-    z1 = z[:,1:nLev+1,:]
-    z2 = z[:,2:nLev+2,:]
-    ZZ = Z[:,1:nLev+1,:]
+    z0 = z[:,0:nLev+0,:].copy()
+    z1 = z[:,1:nLev+1,:].copy()
+    z2 = z[:,2:nLev+2,:].copy()
+    ZZ = Z[:,1:nLev+1,:].copy()
     V[:,1:nLev+1,:] = \
       ( ZZ - z1 ) * ( ZZ - z2 ) * U[:,0:nLev+0,:] / ( z0 - z1 ) / ( z0 - z2 ) \
     + ( ZZ - z0 ) * ( ZZ - z2 ) * U[:,1:nLev+1,:] / ( z1 - z0 ) / ( z1 - z2 ) \
     + ( ZZ - z0 ) * ( ZZ - z1 ) * U[:,2:nLev+2,:] / ( z2 - z0 ) / ( z2 - z1 )
     #quadratic on top:
-    z0 = z[:,nLev-1,:]
-    z1 = z[:,nLev+0,:]
-    z2 = z[:,nLev+1,:]
-    ZZ = Z[:,nLev+1,:]
+    z0 = z[:,nLev-1,:].copy()
+    z1 = z[:,nLev+0,:].copy()
+    z2 = z[:,nLev+1,:].copy()
+    ZZ = Z[:,nLev+1,:].copy()
     V[:,nLev+1,:] = \
       ( ZZ - z1 ) * ( ZZ - z2 ) * U[:,nLev-1,:] / ( z0 - z1 ) / ( z0 - z2 ) \
     + ( ZZ - z0 ) * ( ZZ - z2 ) * U[:,nLev+0,:] / ( z1 - z0 ) / ( z1 - z2 ) \
     + ( ZZ - z0 ) * ( ZZ - z1 ) * U[:,nLev+1,:] / ( z2 - z0 ) / ( z2 - z1 )
+    # #linear on top:
+    # z0 = z[:,-2,:]
+    # z1 = z[:,-1,:]
+    # ZZ = Z[:,-1,:]
+    # V[:,-1,:] = \
+      # ( ZZ - z1 ) * U[:,-2,:] / ( z0 - z1 ) \
+    # + ( ZZ - z0 ) * U[:,-1,:] / ( z1 - z0 )
     return V
     #############################
     #VERY SLOW PHS re-map:
@@ -418,7 +433,7 @@ elif formulation == "HOMMEstyle" :
     
     def setGhostNodes( U ) :
         U, P, backgroundStatesTmp = HOMMEstyle.setGhostNodes( U \
-        , verticalRemap \
+        , verticalRemap, dsdz, testCase \
         , Wa, Ws \
         , TxBot, TzBot, NxBot, NzBot \
         , TxTop, TzTop, NxTop, NzTop \
@@ -426,7 +441,7 @@ elif formulation == "HOMMEstyle" :
         , wItop, wEtop, wDtop, wHtop \
         , dsdxBot, dsdzBot, dsdxTop, dsdzTop \
         , nLev, nCol, stc, backgroundStates \
-        , Po, g, Rd, Cv, Cp, zBot, zTop, z, VL )
+        , Po, g, Rd, Cv, Cp, zBot, zTop, x, z, VL )
         return U, P, backgroundStatesTmp
     
     def implicitPart( U, P ) :
@@ -533,7 +548,7 @@ for i in range(1,nTimesteps+1) :
         if plotFromSaved == 0 :
             if saveArrays == 1 :
                 if ( formulation == "HOMMEstyle" ) & ( VL == 1 ) :
-                    U1[0:4,:,:] = verticalRemap( U1[0:4,:,:], U1[4,:,:]/g, z )
+                    U1[0:4,:,:] = verticalRemap( U1[0:4,:,:], U1[4,:,:], g*z )
                     U1[4,:,:] = g*z
                     U1, P1, tmp = setGhostNodes( U1 )
                 np.save( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy', U1 )
@@ -546,7 +561,8 @@ for i in range(1,nTimesteps+1) :
         
         if saveContours == 1 :
             if ( formulation == "HOMMEstyle" ) & ( VL == 1 ) :
-                U1[0:4,:,:] = verticalRemap( U1[0:4,:,:], U1[4,:,:]/g, z )
+                U1, P1, tmp = setGhostNodes( U1 )
+                U1[0:4,:,:] = verticalRemap( U1[0:4,:,:], U1[4,:,:], g*z )
                 U1[4,:,:] = g*z
                 U1, P1, tmp = setGhostNodes( U1 )
             saveContourPlot( U1, t )
@@ -554,9 +570,10 @@ for i in range(1,nTimesteps+1) :
     if plotFromSaved == 0 :
         if semiImplicit == 0 :
             if ( np.mod(i,1) == 0 ) & ( formulation == "HOMMEstyle" ) & ( VL == 1 ) :
-                U1[0:4,:,:] = verticalRemap( U1[0:4,:,:], U1[4,:,:]/g, z )
+                U1, P1, tmp = setGhostNodes( U1 )
+                U1[0:4,:,:] = verticalRemap( U1[0:4,:,:], U1[4,:,:], g*z )
                 U1[4,:,:] = g*z
-            t, U2 = rk( t, U1, odefun, dtImp )
+            t, U2 = rk( t, U1, odefun, dtExp )
         elif semiImplicit == 1 :
             t, U2 = leapfrogTimestep( t, U0, P0, U1, P1, dtImp )
         else :
