@@ -1,4 +1,4 @@
-#I think this only works in Python3.  Not sure why.
+#!/usr/bin/python3
 
 import f
 
