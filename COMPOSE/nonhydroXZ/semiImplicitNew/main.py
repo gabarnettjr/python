@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 import sys
 import os
 import numpy as np
@@ -13,19 +15,19 @@ from gab.nonhydro import common
 
 #"bubble", "igw", "densityCurrent", "doubleDensityCurrent",
 #or "movingDensityCurrent":
-testCase = "doubleDensityCurrent"
+testCase = "igw"
 
 #"theta_pi" or "T_rho_P" or "theta_rho_P" or "HOMMEstyle":
-formulation  = "T_rho_P"
+formulation  = "HOMMEstyle"
 
 VL = 0
 
 semiImplicit = 0
 gmresTol     = 1e-5                                          #default: 1e-5
 
-dx    = 200.
-ds    = 200.
-dtExp = 1./6.                                           #explicit time-step
+dx    = 500.
+ds    = 500.
+dtExp = 1./2.                                           #explicit time-step
 dtImp = 1./2.                                           #implicit time-step
 
 phs = 5
@@ -38,7 +40,7 @@ saveDel   = 50                            #print/save every saveDel seconds
 
 var           = 3                        #determines what to plot (0,1,2,3)
 saveArrays    = 0
-saveContours  = 1
+saveContours  = 0
 plotFromSaved = 0                   #if 1, results are loaded, not computed
 
 ###########################################################################
