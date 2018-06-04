@@ -18,7 +18,7 @@ from gab.nonhydro import common
 testCase = "igw"
 
 #"theta_pi" or "T_rho_P" or "theta_rho_P" or "HOMMEstyle":
-formulation  = "theta_pi"
+formulation  = "HOMMEstyle"
 
 VL = 0
 
