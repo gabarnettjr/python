@@ -18,7 +18,7 @@ from gab.nonhydro import common
 testCase = "igw"
 
 #"theta_pi" or "T_rho_P" or "theta_rho_P" or "HOMMEstyle":
-formulation  = "HOMMEstyle"
+formulation  = "theta_pi"
 
 VL = 0
 
@@ -36,7 +36,7 @@ stc = 7
 
 rkStages  = 3
 plotNodes = 0                               #if 1, plot nodes and then exit
-saveDel   = 50                            #print/save every saveDel seconds
+saveDel   = 100                            #print/save every saveDel seconds
 
 var           = 3                        #determines what to plot (0,1,2,3)
 saveArrays    = 0
@@ -204,10 +204,12 @@ normGradS = np.sqrt( dsdxBot**2. + dsdzBot**2. )
 #Define functions for approximating derivatives:
 
 def Da( U ) :
-    return U[1:-1,:] @ Wa
+    # return U[1:-1,:] @ Wa
+    return Wa.dot(U[1:-1,:].T).T
+    # return U[1:-1,:].dot(Wa)
 
 def Ds( U ) :
-    return Ws[1:-1,:] @ U
+    return Ws[1:-1,:].dot( U )
 
 def HV( U ) :
     # #Lateral HV:
@@ -217,7 +219,7 @@ def HV( U ) :
     # HVL = alpDxPol * HVL[1:-1,:]
     # #Total HV:
     # return dsdzInt*(Whvs@U) + HVL
-    return ( U[1:-1,:] @ Whva ) + ( Whvs @ U )
+    return Whva.dot(U[1:-1,:].T).T + Whvs.dot(U)
 
 ###########################################################################
 
