@@ -47,28 +47,21 @@ plotFromSaved = 1                   #if 1, results are loaded, not computed
 
 t = 0.
 
-if saveArrays == 1 :
-    saveString = '/mnt/'
-elif saveContours == 1 :
-    saveString = ''
-else :
-    sys.exit("\nError: saveArrays and saveContours should not both be 1.\n")
-
 if semiImplicit == 1 :
-    saveString = os.path.join(saveString,'C:/Users/gabarne/Downloads/linuxTest/semiImplicitResults/')
+    saveString = './semiImplicitResults'
 elif semiImplicit == 0 :
     dtImp = dtExp
-    saveString = os.path.join(saveString,'C:/Users/gabarne/Downloads/linuxTest/explicitResults/')
+    saveString = './explicitResults'
 else :
     sys.exit( "Error: semiImplicit should be 0 or 1." )
 
-saveString = saveString + formulation + '/' + testCase + '/'    \
-+ 'phs' + '{0:1d}'.format(phs)                                  \
-+ 'pol' + '{0:1d}'.format(pol)                                  \
-+ 'stc' + '{0:1d}'.format(stc)                                  \
-+ 'dx'  + '{0:1d}'.format(np.int(np.round(dx)+1e-12))           \
-+ 'ds'  + '{0:1d}'.format(np.int(np.round(ds)+1e-12))           \
-+ 'dti' + '{0:1d}'.format(np.int(np.round(1./dtExp)+1e-12))     \
+saveString = saveString + '/' + formulation + '/' + testCase + '/' \
++ 'phs' + '{0:1d}'.format(phs)                                     \
++ 'pol' + '{0:1d}'.format(pol)                                     \
++ 'stc' + '{0:1d}'.format(stc)                                     \
++ 'dx'  + '{0:1d}'.format(np.int(np.round(dx)+1e-12))              \
++ 'ds'  + '{0:1d}'.format(np.int(np.round(ds)+1e-12))              \
++ 'dti' + '{0:1d}'.format(np.int(np.round(1./dtExp)+1e-12))        \
 + '/'
 
 if os.path.exists( saveString+'*.npy' ) :

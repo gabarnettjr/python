@@ -1,0 +1,3 @@
+gameOfThrones/*.pyc
+gameOfThrones/__pycache__/*.pyc
+jupyter/.ipynb_checkpoints
