@@ -39,19 +39,26 @@ plotNodes = 0                               #if 1, plot nodes and then exit
 saveDel   = 100                            #print/save every saveDel seconds
 
 var           = 3                        #determines what to plot (0,1,2,3)
-saveArrays    = 1
-saveContours  = 0
-plotFromSaved = 0                   #if 1, results are loaded, not computed
+saveArrays    = 0
+saveContours  = 1
+plotFromSaved = 1                   #if 1, results are loaded, not computed
 
 ###########################################################################
 
 t = 0.
 
+if saveArrays == 1 :
+    saveString = '/mnt/'
+elif saveContours == 1 :
+    saveString = ''
+else :
+    sys.exit("\nError: saveArrays and saveContours should not both be 1.\n")
+
 if semiImplicit == 1 :
-    saveString = '/mnt/c/Users/gabarne/Downloads/linuxTest/semiImplicitResults/'
+    saveString = os.path.join(saveString,'C:/Users/gabarne/Downloads/linuxTest/semiImplicitResults/')
 elif semiImplicit == 0 :
     dtImp = dtExp
-    saveString = '/mnt/c/Users/gabarne/Downloads/linuxTest/explicitResults/'
+    saveString = os.path.join(saveString,'C:/Users/gabarne/Downloads/linuxTest/explicitResults/')
 else :
     sys.exit( "Error: semiImplicit should be 0 or 1." )
 
