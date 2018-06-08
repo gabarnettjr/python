@@ -18,7 +18,7 @@ from gab.nonhydro import common
 testCase = "igw"
 
 #"theta_pi" or "T_rho_P" or "theta_rho_P" or "HOMMEstyle":
-formulation  = "HOMMEstyle"
+formulation  = "T_rho_P"
 
 VL = 0
 
@@ -39,7 +39,7 @@ plotNodes = 0                               #if 1, plot nodes and then exit
 saveDel   = 100                            #print/save every saveDel seconds
 
 var           = 3                        #determines what to plot (0,1,2,3)
-saveArrays    = 0
+saveArrays    = 1
 saveContours  = 0
 plotFromSaved = 0                   #if 1, results are loaded, not computed
 
@@ -48,10 +48,10 @@ plotFromSaved = 0                   #if 1, results are loaded, not computed
 t = 0.
 
 if semiImplicit == 1 :
-    saveString = './semiImplicitResults/'
+    saveString = '/mnt/c/Users/gabarne/Downloads/linuxTest/semiImplicitResults/'
 elif semiImplicit == 0 :
     dtImp = dtExp
-    saveString = './explicitResults/'
+    saveString = '/mnt/c/Users/gabarne/Downloads/linuxTest/explicitResults/'
 else :
     sys.exit( "Error: semiImplicit should be 0 or 1." )
 
