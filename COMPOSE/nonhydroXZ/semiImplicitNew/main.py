@@ -64,8 +64,8 @@ saveString = saveString + '/' + formulation + '/' + testCase + '/' \
 + 'dti' + '{0:1d}'.format(np.int(np.round(1./dtExp)+1e-12))        \
 + '/'
 
-if os.path.exists( saveString+'*.npy' ) :
-    os.remove( saveString+'*.npy' )
+if os.path.exists( saveString + '*.npy' ) :
+    os.remove( saveString + '*.npy' )
 
 if not os.path.exists( saveString ) :
     os.makedirs( saveString )
