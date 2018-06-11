@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 import sys
 import os
 import time
@@ -16,12 +17,12 @@ c           = .03                                     #wave speed (c**2=RT)
 innerRadius = 1.
 outerRadius = 2.
 tf          = 400.                                              #final time
-saveDel     = 50                           #time interval to save snapshots
+saveDel     = 25                           #time interval to save snapshots
 exp         = 200.                 #controls steepness of initial condition
 amp         = .10                 #amplitude of trigonometric topo function
 frq         = 5                   #frequency of trigonometric topo function
 
-plotFromSaved = 0                            #if 1, load instead of compute
+plotFromSaved = 1                            #if 1, load instead of compute
 saveContours  = 1                       #switch for saving contours as pngs
 
 mlv      = np.int64(sys.argv[1])                #0:interfaces, 1:mid-levels
@@ -339,10 +340,10 @@ Wangular = np.transpose( Wangular )               #act on rows, not columns
 #Functions to approximate differential operators and other things:
     
 def Ds(U) :
-    return Ws[1:-1,:] @ U
+    return Ws[1:-1,:].dot(U)
 
 def Dlam(U) :
-    return U[1:-1,:] @ Wlam
+    return Wlam.dot(U[1:-1,:].T).T
 
 # def Dr(U) :
     # return Ds(U) * dsdri
@@ -378,7 +379,7 @@ def HV(U) :
     # #Total HV:
     # return dsdri*(Whvs@U) + HVth
     #Simple (incorrect) method:
-    return ( Whvs @ U ) + ( U[1:-1,:] @ Whvlam )
+    return Whvs.dot(U) + Whvlam.dot(U[1:-1,:].T).T
 
 if mlv == 1 :
     def setGhostNodes( U ) :
@@ -414,7 +415,8 @@ else :
 
 #Main time-stepping loop:
 
-fig = plt.figure( figsize = (18,14) )
+if saveContours == 1 :
+    fig = plt.figure( figsize = (18,14) )
 et = time.clock()
 
 for i in np.arange( 0, nTimesteps+1 ) :
@@ -431,7 +433,8 @@ for i in np.arange( 0, nTimesteps+1 ) :
             np.save( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy', U )
         
         if saveContours == 1 :
-            tmp = Wradial @ ( U[0,:,:] ) @ Wangular
+            tmp = Wradial.dot(U[0,:,:])               #radial interpolation
+            tmp = Wangular.dot(tmp.T).T              #angular interpolation
             # plt.contourf( xx0, yy0, tmp, 20 )
             plt.contourf( xx0, yy0, tmp, np.arange(1.-.15,1.+.17,.02) )
             plt.plot( xB, yB, "k-", xT, yT, "k-" )
