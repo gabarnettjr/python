@@ -296,7 +296,6 @@ Whvs = alp * ds0**pol * Whvs
 
 Wlam = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th, m=1 \
 , phsDegree=phsA, polyDegree=polA, stencilSize=stcA )
-Wlam = np.transpose( Wlam )                #work on rows instead of columns
 
 #Simple (and incorrect) angular HV:
 Whvlam = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th, m=phsA-1 \
@@ -304,7 +303,6 @@ Whvlam = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th, m=phsA-1 \
 Whvlam = alpA * dth0**polA * Whvlam
 # dthPol = spdiags( dth**polA, np.array([0]), len(dth), len(dth) )
 # Whvlam = alpA * dthPol.dot(Whvlam)                #scaled angular HV matrix
-Whvlam = np.transpose( Whvlam )             #work on rows instead of column
 
 # #Complex angular HV:
 # alpDthPol = alpA * dth0**polA
@@ -332,8 +330,6 @@ Wradial = phs1.getDM( x=s, X=s0[1:-1], m=0 \
 
 Wangular = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th0, m=0 \
 , phsDegree=phsA, polyDegree=polA, stencilSize=stcA )
-
-Wangular = np.transpose( Wangular )               #act on rows, not columns
 
 ###########################################################################
 
