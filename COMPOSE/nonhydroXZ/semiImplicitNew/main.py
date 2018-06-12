@@ -1,5 +1,4 @@
 #!/usr/bin/python3
-
 import sys
 import os
 import numpy as np
@@ -21,27 +20,26 @@ testCase = "igw"
 formulation  = "theta_rho_P"
 
 VL = 0
+semiImplicit = 1                  #if 1 then do semi-implicit time-stepping
+gmresTol     = 1e-9         #only matters if semiImplicit=1.  Default: 1e-5
 
-semiImplicit = 0
-gmresTol     = 1e-5                                          #default: 1e-5
-
-dx    = 500.
-ds    = 500.
+dx    = 500.                                            #horizontal spacing
+ds    = 500.                                              #vertical spacing
 dtExp = 1./2.                                           #explicit time-step
-dtImp = 1./2.                                           #implicit time-step
+dtImp = 8./2.                                           #implicit time-step
 
-phs = 5
-pol = 3
-stc = 7
+phs = 5                  #exponent of polyharmonic spline RBF (odd integer)
+pol = 3                           #highest degree of polynomials to include
+stc = 7                                                    #1D stencil-size
 
-rkStages  = 3
+rkStages  = 3                        #number of Runge-Kutta stages (3 or 4)
 plotNodes = 0                               #if 1, plot nodes and then exit
-saveDel   = 100                            #print/save every saveDel seconds
+saveDel   = 100                           #print/save every saveDel seconds
 
-var           = 3                        #determines what to plot (0,1,2,3)
-saveArrays    = 0
-saveContours  = 1
-plotFromSaved = 1                   #if 1, results are loaded, not computed
+var           = 2                        #determines what to plot (0,1,2,3)
+saveArrays    = 1                   #if 1 then save arrays, if 0 then don't
+saveContours  = 0                 #if 1 then save contours, if 0 then don't
+plotFromSaved = 0           #if 1 then load results, if 0 then compute them
 
 ###########################################################################
 
@@ -136,14 +134,14 @@ s = sFunc( x[:,0], z[:,0] )
 #Define finite difference (FD) weights for derivative approximation:
 
 if phs == 3 :
-    # alp = 2.**-1. * 300.
+#     alp = 2.**-1. * 300.
     alp = 2.**-7. * 300.
 elif phs == 5 :
     alp = -2.**-5. * 300.
 # elif phs == 7 :
-    # alp = 2.**-9. * 300.
+#     alp = 2.**-9. * 300.
 # elif phs == 9 :
-    # alp = -2.**-13. * 300.
+#     alp = -2.**-13. * 300.
 else :
     sys.exit("\nError: phs should be 3 or 5.\n")
 
@@ -163,13 +161,10 @@ alpL = 2.**-10. * 300.
 Wa = phs1.getPeriodicDM( period=xRight-xLeft, x=x[0,:], X=x[0,:], m=1 \
 , phsDegree=phsL, polyDegree=polL, stencilSize=stcL )
 
-Wa = np.transpose( Wa )
-
 # alpDxPol = alpL * dx**(phsL-2)
 Whva = phs1.getPeriodicDM( period=xRight-xLeft, x=x[0,:], X=x[0,:], m=phsL-1 \
 , phsDegree=phsL, polyDegree=polL, stencilSize=stcL )
 Whva = alpL * dx**(phsL-2) * Whva
-Whva = np.transpose( Whva )
 
 ###########################################################################
 
@@ -204,9 +199,7 @@ normGradS = np.sqrt( dsdxBot**2. + dsdzBot**2. )
 #Define functions for approximating derivatives:
 
 def Da( U ) :
-    # return U[1:-1,:] @ Wa
     return Wa.dot(U[1:-1,:].T).T
-    # return U[1:-1,:].dot(Wa)
 
 def Ds( U ) :
     return Ws[1:-1,:].dot( U )
@@ -215,7 +208,7 @@ def HV( U ) :
     # #Lateral HV:
     # HVL = ( U @ Wa ) + dsdxAll * ( Ws @ U )
     # for i in range( polL ) :
-        # HVL = ( HVL @ Wa ) + dsdxAll * ( Ws @ HVL )
+    #     HVL = ( HVL @ Wa ) + dsdxAll * ( Ws @ HVL )
     # HVL = alpDxPol * HVL[1:-1,:]
     # #Total HV:
     # return dsdzInt*(Whvs@U) + HVL
@@ -225,7 +218,7 @@ def HV( U ) :
 
 #Important functions for time stepping:
 
-def verticalRemap( U, z, Z ) :
+def verticalRemap( U, z, Z ) :                           #used only if VL=1
     z = np.tile( z, (np.shape(U)[0],1,1) )
     Z = np.tile( Z, (np.shape(U)[0],1,1) )
     V = np.zeros( np.shape(U) )
@@ -234,7 +227,7 @@ def verticalRemap( U, z, Z ) :
     # z1 = z[:,1,:]
     # ZZ = Z[:,0,:]
     # V[:,0,:] = \
-      # ( ZZ - z1 ) * U[:,0,:] / ( z0 - z1 ) \
+    #   ( ZZ - z1 ) * U[:,0,:] / ( z0 - z1 ) \
     # + ( ZZ - z0 ) * U[:,1,:] / ( z1 - z0 )
     #quadratic on bottom:
     z0 = z[:,0,:].copy()
@@ -268,18 +261,18 @@ def verticalRemap( U, z, Z ) :
     # z1 = z[:,-1,:]
     # ZZ = Z[:,-1,:]
     # V[:,-1,:] = \
-      # ( ZZ - z1 ) * U[:,-2,:] / ( z0 - z1 ) \
+    #   ( ZZ - z1 ) * U[:,-2,:] / ( z0 - z1 ) \
     # + ( ZZ - z0 ) * U[:,-1,:] / ( z1 - z0 )
     return V
     #############################
-    #VERY SLOW PHS re-map:
+    # #VERY SLOW PHS re-map (to verify fast quadratic one above):
     # V = np.zeros( np.shape(U) )
     # pages = np.shape(U)[0]
     # for j in range( nCol ) :
-        # W = phs1.getDM( x=z[:,j], X=Z[:,j], m=0 \
-        # , phsDegree=phs, polyDegree=pol, stencilSize=stc )
-        # for i in range(pages) :
-            # V[i,:,j] = W.dot( U[i,:,j] )
+    #     W = phs1.getDM( x=z[:,j], X=Z[:,j], m=0 \
+    #     , phsDegree=phs, polyDegree=pol, stencilSize=stc )
+    #     for i in range(pages) :
+    #         V[i,:,j] = W.dot( U[i,:,j] )
     # return V
 
 def verticalDerivative( U, z ) :
@@ -503,6 +496,7 @@ else :
     sys.exit( "\nError: rkStages should be 3 or 4.  rk2 is not stable for this problem.\n" )
 
 def getStandardVariables( U ) :
+    #Regardless of the formulation, this returns U=(u,w,theta,pi,(phi)).
     return common.getStandardVariables( U \
     , setGhostNodes, formulation, Tbar, Pbar, thetaBar, piBar, dpidsBar, dsdzAll \
     , Po, Rd, Cp, Cv, g )
@@ -531,7 +525,8 @@ U0, P0, tmp = setGhostNodes( U0 )
 if saveArrays == 1 :
     np.save( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy', U0 )
 U1 = U0
-et = printInfo( U0, P0, time.clock(), t )
+et = time.time()
+et = printInfo( U0, P0, et, t )
 if saveContours == 1 :
     saveContourPlot( U0, t )
 
@@ -545,7 +540,7 @@ U1, P1, tmp = setGhostNodes( U1 )
 
 #The rest of the time-stepping:
 
-for i in range(1,nTimesteps+1) :
+for i in range( 1, nTimesteps+1 ) :
     
     if np.mod( i, np.int(np.round(saveDel/dtImp)) ) == 0 :
         
