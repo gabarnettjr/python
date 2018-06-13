@@ -14,19 +14,19 @@ from gab.nonhydro import common
 
 #"bubble", "igw", "densityCurrent", "doubleDensityCurrent",
 #or "movingDensityCurrent":
-testCase = "igw"
+testCase = "bubble"
 
 #"theta_pi" or "T_rho_P" or "theta_rho_P" or "HOMMEstyle":
-formulation  = "theta_rho_P"
+formulation  = "HOMMEstyle"
 
-VL = 0
-semiImplicit = 1                  #if 1 then do semi-implicit time-stepping
+VL = 0                                  #if 1 then do vertically lagrangian
+semiImplicit = 0                  #if 1 then do semi-implicit time-stepping
 gmresTol     = 1e-9         #only matters if semiImplicit=1.  Default: 1e-5
 
-dx    = 500.                                            #horizontal spacing
-ds    = 500.                                              #vertical spacing
-dtExp = 1./2.                                           #explicit time-step
-dtImp = 8./2.                                           #implicit time-step
+dx    = 200.                                            #horizontal spacing
+ds    = 200.                                              #vertical spacing
+dtExp = 1./4.                                           #explicit time-step
+dtImp = 4                                               #implicit time-step
 
 phs = 5                  #exponent of polyharmonic spline RBF (odd integer)
 pol = 3                           #highest degree of polynomials to include
@@ -36,9 +36,9 @@ rkStages  = 3                        #number of Runge-Kutta stages (3 or 4)
 plotNodes = 0                               #if 1, plot nodes and then exit
 saveDel   = 100                           #print/save every saveDel seconds
 
-var           = 2                        #determines what to plot (0,1,2,3)
+var           = 3                        #determines what to plot (0,1,2,3)
 saveArrays    = 1                   #if 1 then save arrays, if 0 then don't
-saveContours  = 0                 #if 1 then save contours, if 0 then don't
+saveContours  = 1                 #if 1 then save contours, if 0 then don't
 plotFromSaved = 0           #if 1 then load results, if 0 then compute them
 
 ###########################################################################
@@ -73,6 +73,7 @@ if not os.path.exists( saveString ) :
 Cp, Cv, Rd, g, Po = common.getConstants()
 
 tf = common.getTfinal( testCase )
+# tf = 100.
 nTimesteps = np.int( np.round(tf/dtImp) + 1e-12 )
 
 xLeft, xRight, nLev, nCol, zTop, zSurf, zSurfPrime, x, z \
@@ -559,19 +560,19 @@ for i in range( 1, nTimesteps+1 ) :
         et = printInfo( U1, P1, et, t )
         
         if saveContours == 1 :
-            if ( formulation == "HOMMEstyle" ) & ( VL == 1 ) :
-                U1, P1, tmp = setGhostNodes( U1 )
-                U1[0:4,:,:] = verticalRemap( U1[0:4,:,:], U1[4,:,:], g*z )
-                U1[4,:,:] = g*z
-                U1, P1, tmp = setGhostNodes( U1 )
+            # if ( formulation == "HOMMEstyle" ) & ( VL == 1 ) :
+            #     U1, P1, tmp = setGhostNodes( U1 )
+            #     U1[0:4,:,:] = verticalRemap( U1[0:4,:,:], U1[4,:,:], g*z )
+            #     U1[4,:,:] = g*z
+            #     U1, P1, tmp = setGhostNodes( U1 )
             saveContourPlot( U1, t )
         
     if plotFromSaved == 0 :
         if semiImplicit == 0 :
-            if ( np.mod(i,1) == 0 ) & ( formulation == "HOMMEstyle" ) & ( VL == 1 ) :
-                U1, P1, tmp = setGhostNodes( U1 )
-                U1[0:4,:,:] = verticalRemap( U1[0:4,:,:], U1[4,:,:], g*z )
-                U1[4,:,:] = g*z
+            # if ( np.mod(i,10) == 0 ) & ( formulation == "HOMMEstyle" ) & ( VL == 1 ) :
+            #     U1, P1, tmp = setGhostNodes( U1 )
+            #     U1[0:4,:,:] = verticalRemap( U1[0:4,:,:], U1[4,:,:], g*z )
+            #     U1[4,:,:] = g*z
             t, U2 = rk( t, U1, odefun, dtExp )
         elif semiImplicit == 1 :
             t, U2 = leapfrogTimestep( t, U0, P0, U1, P1, dtImp )
