@@ -37,7 +37,7 @@ plotNodes = 0                               #if 1, plot nodes and then exit
 saveDel   = 100                           #print/save every saveDel seconds
 
 var           = 3                        #determines what to plot (0,1,2,3)
-saveArrays    = 1                   #if 1 then save arrays, if 0 then don't
+saveArrays    = 0                   #if 1 then save arrays, if 0 then don't
 saveContours  = 1                 #if 1 then save contours, if 0 then don't
 plotFromSaved = 0           #if 1 then load results, if 0 then compute them
 
@@ -132,10 +132,10 @@ s = sFunc( x[:,0], z[:,0] )
 
 ###########################################################################
 
-#Define finite difference (FD) weights for derivative approximation:
+#Define vertical (FD) weights for derivative approximation:
 
 if phs == 3 :
-#     alp = 2.**-1. * 300.
+    # alp = 2.**-1. * 300.
     alp = 2.**-7. * 300.
 elif phs == 5 :
     alp = -2.**-5. * 300.
@@ -153,6 +153,10 @@ Whvs = phs1.getDM( x=s, X=s[1:-1], m=phs-1 \
 , phsDegree=phs, polyDegree=pol, stencilSize=stc )
 
 Whvs = alp * ds**(phs-2) * Whvs
+
+###########################################################################
+
+#same thing but lateral:
 
 phsL = 7
 polL = 5
@@ -199,13 +203,13 @@ normGradS = np.sqrt( dsdxBot**2. + dsdzBot**2. )
 
 #Define functions for approximating derivatives:
 
-def Da( U ) :
+def Da(U) :
     return Wa.dot(U[1:-1,:].T).T
 
-def Ds( U ) :
-    return Ws[1:-1,:].dot( U )
+def Ds(U) :
+    return Ws[1:-1,:].dot(U)
 
-def HV( U ) :
+def HV(U) :
     # #Lateral HV:
     # HVL = ( U @ Wa ) + dsdxAll * ( Ws @ U )
     # for i in range( polL ) :
