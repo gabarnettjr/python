@@ -14,29 +14,29 @@ from gab.nonhydro import common
 
 #"bubble", "igw", "densityCurrent", "doubleDensityCurrent",
 #or "movingDensityCurrent":
-testCase = "doubleDensityCurrent"
+testCase = "igw"
 
 #"theta_pi" or "T_rho_P" or "theta_rho_P" or "HOMMEstyle":
-formulation  = "HOMMEstyle"
+formulation  = "theta_pi"
 
-VL = 1                                  #if 1 then do vertically lagrangian
+VL = 0                                  #if 1 then do vertically lagrangian
 semiImplicit = 0                  #if 1 then do semi-implicit time-stepping
 gmresTol     = 1e-9         #only matters if semiImplicit=1.  Default: 1e-5
 
-dx    = 50.                                            #horizontal spacing
-ds    = 50.                                              #vertical spacing
-dtExp = 1./16.                                          #explicit time-step
+dx    = np.float64(sys.argv[1])                         #horizontal spacing
+ds    = np.float64(sys.argv[1])                           #vertical spacing
+dtExp = 1./np.float64(sys.argv[2])                      #explicit time-step
 dtImp = 2                                               #implicit time-step
 
-phs = 3                  #exponent of polyharmonic spline RBF (odd integer)
-pol = 2                           #highest degree of polynomials to include
-stc = 3                                                    #1D stencil-size
+phs = 5                  #exponent of polyharmonic spline RBF (odd integer)
+pol = 3                           #highest degree of polynomials to include
+stc = 7                                                    #1D stencil-size
 
 rkStages  = 3                        #number of Runge-Kutta stages (3 or 4)
 plotNodes = 0                               #if 1, plot nodes and then exit
-saveDel   = 1                             #print/save every saveDel seconds
+saveDel   = 100                           #print/save every saveDel seconds
 
-var           = 3                        #determines what to plot (0,1,2,3)
+var           = 1                        #determines what to plot (0,1,2,3)
 saveArrays    = 0                   #if 1 then save arrays, if 0 then don't
 saveContours  = 1                 #if 1 then save contours, if 0 then don't
 plotFromSaved = 0           #if 1 then load results, if 0 then compute them
@@ -72,8 +72,8 @@ if not os.path.exists( saveString ) :
 
 Cp, Cv, Rd, g, Po = common.getConstants()
 
-# tf = common.getTfinal( testCase )
-tf = 10.
+tf = common.getTfinal( testCase )
+# tf = 10.
 nTimesteps = np.int( np.round(tf/dtImp) + 1e-12 )
 
 xLeft, xRight, nLev, nCol, zTop, zSurf, zSurfPrime, x, z \
@@ -233,33 +233,13 @@ def verticalRemap( U, z, Z ) :                           #used only if VL=1
     # V[:,0,:] = \
     #   ( ZZ - z1 ) * U[:,0,:] / ( z0 - z1 ) \
     # + ( ZZ - z0 ) * U[:,1,:] / ( z1 - z0 )
-    #quadratic on bottom:
-    z0 = z[:,0,:].copy()
-    z1 = z[:,1,:].copy()
-    z2 = z[:,2,:].copy()
-    ZZ = Z[:,0,:].copy()
-    V[:,0,:] = \
-      ( ZZ - z1 ) * ( ZZ - z2 ) * U[:,0,:] / ( z0 - z1 ) / ( z0 - z2 ) \
-    + ( ZZ - z0 ) * ( ZZ - z2 ) * U[:,1,:] / ( z1 - z0 ) / ( z1 - z2 ) \
-    + ( ZZ - z0 ) * ( ZZ - z1 ) * U[:,2,:] / ( z2 - z0 ) / ( z2 - z1 )
-    #quadratic on interior:
-    z0 = z[:,0:nLev+0,:].copy()
-    z1 = z[:,1:nLev+1,:].copy()
-    z2 = z[:,2:nLev+2,:].copy()
-    ZZ = Z[:,1:nLev+1,:].copy()
-    V[:,1:nLev+1,:] = \
-      ( ZZ - z1 ) * ( ZZ - z2 ) * U[:,0:nLev+0,:] / ( z0 - z1 ) / ( z0 - z2 ) \
-    + ( ZZ - z0 ) * ( ZZ - z2 ) * U[:,1:nLev+1,:] / ( z1 - z0 ) / ( z1 - z2 ) \
-    + ( ZZ - z0 ) * ( ZZ - z1 ) * U[:,2:nLev+2,:] / ( z2 - z0 ) / ( z2 - z1 )
-    #quadratic on top:
-    z0 = z[:,nLev-1,:].copy()
-    z1 = z[:,nLev+0,:].copy()
-    z2 = z[:,nLev+1,:].copy()
-    ZZ = Z[:,nLev+1,:].copy()
-    V[:,nLev+1,:] = \
-      ( ZZ - z1 ) * ( ZZ - z2 ) * U[:,nLev-1,:] / ( z0 - z1 ) / ( z0 - z2 ) \
-    + ( ZZ - z0 ) * ( ZZ - z2 ) * U[:,nLev+0,:] / ( z1 - z0 ) / ( z1 - z2 ) \
-    + ( ZZ - z0 ) * ( ZZ - z1 ) * U[:,nLev+1,:] / ( z2 - z0 ) / ( z2 - z1 )
+    # #linear on interior:
+    # z0 = z[:,0:nLev+0,:]
+    # z1 = z[:,2:nLev+2,:]
+    # ZZ = Z[:,1:nLev+1,:]
+    # V[:,1:nLev+1,:] = \
+    #   ( ZZ - z1 ) * U[:,0:nLev+0,:] / ( z0 - z1 ) \
+    # + ( ZZ - z0 ) * U[:,2:nLev+2,:] / ( z1 - z0 )
     # #linear on top:
     # z0 = z[:,-2,:]
     # z1 = z[:,-1,:]
@@ -267,6 +247,33 @@ def verticalRemap( U, z, Z ) :                           #used only if VL=1
     # V[:,-1,:] = \
     #   ( ZZ - z1 ) * U[:,-2,:] / ( z0 - z1 ) \
     # + ( ZZ - z0 ) * U[:,-1,:] / ( z1 - z0 )
+    #quadratic on bottom:
+    z0 = z[:,0,:]
+    z1 = z[:,1,:]
+    z2 = z[:,2,:]
+    ZZ = Z[:,0,:]
+    V[:,0,:] = \
+      ( ZZ - z1 ) * ( ZZ - z2 ) * U[:,0,:] / ( z0 - z1 ) / ( z0 - z2 ) \
+    + ( ZZ - z0 ) * ( ZZ - z2 ) * U[:,1,:] / ( z1 - z0 ) / ( z1 - z2 ) \
+    + ( ZZ - z0 ) * ( ZZ - z1 ) * U[:,2,:] / ( z2 - z0 ) / ( z2 - z1 )
+    #quadratic on interior:
+    z0 = z[:,0:nLev+0,:]
+    z1 = z[:,1:nLev+1,:]
+    z2 = z[:,2:nLev+2,:]
+    ZZ = Z[:,1:nLev+1,:]
+    V[:,1:nLev+1,:] = \
+      ( ZZ - z1 ) * ( ZZ - z2 ) * U[:,0:nLev+0,:] / ( z0 - z1 ) / ( z0 - z2 ) \
+    + ( ZZ - z0 ) * ( ZZ - z2 ) * U[:,1:nLev+1,:] / ( z1 - z0 ) / ( z1 - z2 ) \
+    + ( ZZ - z0 ) * ( ZZ - z1 ) * U[:,2:nLev+2,:] / ( z2 - z0 ) / ( z2 - z1 )
+    #quadratic on top:
+    z0 = z[:,nLev-1,:]
+    z1 = z[:,nLev+0,:]
+    z2 = z[:,nLev+1,:]
+    ZZ = Z[:,nLev+1,:]
+    V[:,nLev+1,:] = \
+      ( ZZ - z1 ) * ( ZZ - z2 ) * U[:,nLev-1,:] / ( z0 - z1 ) / ( z0 - z2 ) \
+    + ( ZZ - z0 ) * ( ZZ - z2 ) * U[:,nLev+0,:] / ( z1 - z0 ) / ( z1 - z2 ) \
+    + ( ZZ - z0 ) * ( ZZ - z1 ) * U[:,nLev+1,:] / ( z2 - z0 ) / ( z2 - z1 )
     return V
     #############################
     # #VERY SLOW PHS re-map (to verify fast quadratic one above):
@@ -311,32 +318,29 @@ def verticalDerivative( U, z ) :
     + ( ( ZZ - z0 ) + ( ZZ - z1 ) ) * U[:,-1,:] / ( z2 - z0 ) / ( z2 - z1 )
     return V
 
-#check vertical remap/derivative:
-tmp = ds/4.
-ran = tmp * ( -1. + 2. * np.random.rand(np.shape(U0)[1],np.shape(U0)[2]) )
-ztmp = z + ran
-print(np.max(np.abs(ztmp-z)))
-tmp0 = U0
-tmp = verticalRemap( tmp0, z, ztmp )
-# tmp = verticalDerivative( tmp, ztmp )
-tmp = verticalRemap( tmp, ztmp, z )
-tmpA = tmp[2,:,:]
-tmpB = tmp0[2,:,:]
-# tmpB = verticalDerivative(tmp0,z)[2,:,:]
-tmp = tmpB - tmpA
-fig,ax = plt.subplots( 3, 1 )
-# ax[0].set_aspect('equal')
-# ax[1].set_aspect('equal')
-# ax[2].set_aspect('equal')
-alp = 16
-p0 = ax[0].contourf( x, z, tmpA, np.linspace(-alp,alp,20) )
-p1 = ax[1].contourf( x, z, tmpB, np.linspace(-alp,alp,20) )
-p2 = ax[2].contourf( x, z, tmp, 20 )
-plt.colorbar( p0, ax=ax[0] )
-plt.colorbar( p1, ax=ax[1] )
-plt.colorbar( p2, ax=ax[2] )
-plt.show()
-sys.exit("\nStop here for now.\n")
+# #check vertical remap/derivative:
+# tmp = ds/4.
+# ran = tmp * ( -1. + 2. * np.random.rand(np.shape(U0)[1],np.shape(U0)[2]) )
+# ztmp = z + ran
+# tmp0 = U0
+# tmp = verticalRemap( tmp0, z, ztmp )
+# # tmp = verticalDerivative( tmp, ztmp )
+# tmp = verticalRemap( tmp, ztmp, z )
+# tmpA = tmp[2,:,:]
+# tmpB = tmp0[2,:,:]
+# # tmpB = verticalDerivative(tmp0,z)[2,:,:]
+# tmp = tmpB - tmpA
+# fig, ax = plt.subplots( 3, 1 )
+# alp = 0.
+# bet = .01
+# plot0 = ax[0].contourf( x, z, tmpA, np.linspace(alp,bet,20) )
+# plot1 = ax[1].contourf( x, z, tmpB, np.linspace(alp,bet,20) )
+# plot2 = ax[2].contourf( x, z, tmp, 20 )
+# for i in range(len(ax)) :
+#     # ax[i].set_aspect('equal')
+#     plt.colorbar( eval('plot{0:d}'.format(i)), ax=ax[i] )
+# plt.show()
+# sys.exit("\nStop here for now.\n")
 
 if formulation == "theta_pi" :
     
