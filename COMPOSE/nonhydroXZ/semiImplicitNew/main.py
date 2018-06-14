@@ -26,7 +26,7 @@ gmresTol     = 1e-9         #only matters if semiImplicit=1.  Default: 1e-5
 dx    = 200.                                            #horizontal spacing
 ds    = 200.                                              #vertical spacing
 dtExp = 1./4.                                           #explicit time-step
-dtImp = 4                                               #implicit time-step
+dtImp = 2                                               #implicit time-step
 
 phs = 5                  #exponent of polyharmonic spline RBF (odd integer)
 pol = 3                           #highest degree of polynomials to include
@@ -151,7 +151,6 @@ Ws = phs1.getDM( x=s, X=s, m=1 \
 
 Whvs = phs1.getDM( x=s, X=s[1:-1], m=phs-1 \
 , phsDegree=phs, polyDegree=pol, stencilSize=stc )
-
 Whvs = alp * ds**(phs-2) * Whvs
 
 ###########################################################################
@@ -561,19 +560,18 @@ for i in range( 1, nTimesteps+1 ) :
         else :
             sys.exit( "\nError: plotFromSaved should be 0 or 1.\n" )
         
-        et = printInfo( U1, P1, et, t )
-        
         if saveContours == 1 :
-            # if ( formulation == "HOMMEstyle" ) & ( VL == 1 ) :
-            #     U1, P1, tmp = setGhostNodes( U1 )
-            #     U1[0:4,:,:] = verticalRemap( U1[0:4,:,:], U1[4,:,:], g*z )
-            #     U1[4,:,:] = g*z
-            #     U1, P1, tmp = setGhostNodes( U1 )
+            if ( formulation == "HOMMEstyle" ) & ( VL == 1 ) :
+                U1[0:4,:,:] = verticalRemap( U1[0:4,:,:], U1[4,:,:], g*z )
+                U1[4,:,:] = g*z
+                U1, P1, tmp = setGhostNodes( U1 )
             saveContourPlot( U1, t )
         
+        et = printInfo( U1, P1, et, t )
+
     if plotFromSaved == 0 :
         if semiImplicit == 0 :
-            # if ( np.mod(i,10) == 0 ) & ( formulation == "HOMMEstyle" ) & ( VL == 1 ) :
+            # if ( np.mod(i,1) == 0 ) & ( formulation == "HOMMEstyle" ) & ( VL == 1 ) :
             #     U1, P1, tmp = setGhostNodes( U1 )
             #     U1[0:4,:,:] = verticalRemap( U1[0:4,:,:], U1[4,:,:], g*z )
             #     U1[4,:,:] = g*z
