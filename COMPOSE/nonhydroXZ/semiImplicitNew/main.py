@@ -14,27 +14,27 @@ from gab.nonhydro import common
 
 #"bubble", "igw", "densityCurrent", "doubleDensityCurrent",
 #or "movingDensityCurrent":
-testCase = "bubble"
+testCase = "doubleDensityCurrent"
 
 #"theta_pi" or "T_rho_P" or "theta_rho_P" or "HOMMEstyle":
 formulation  = "HOMMEstyle"
 
-VL = 0                                  #if 1 then do vertically lagrangian
+VL = 1                                  #if 1 then do vertically lagrangian
 semiImplicit = 0                  #if 1 then do semi-implicit time-stepping
 gmresTol     = 1e-9         #only matters if semiImplicit=1.  Default: 1e-5
 
-dx    = 200.                                            #horizontal spacing
-ds    = 200.                                              #vertical spacing
-dtExp = 1./4.                                           #explicit time-step
+dx    = 50.                                            #horizontal spacing
+ds    = 50.                                              #vertical spacing
+dtExp = 1./16.                                          #explicit time-step
 dtImp = 2                                               #implicit time-step
 
-phs = 5                  #exponent of polyharmonic spline RBF (odd integer)
-pol = 3                           #highest degree of polynomials to include
-stc = 7                                                    #1D stencil-size
+phs = 3                  #exponent of polyharmonic spline RBF (odd integer)
+pol = 2                           #highest degree of polynomials to include
+stc = 3                                                    #1D stencil-size
 
 rkStages  = 3                        #number of Runge-Kutta stages (3 or 4)
 plotNodes = 0                               #if 1, plot nodes and then exit
-saveDel   = 100                           #print/save every saveDel seconds
+saveDel   = 1                             #print/save every saveDel seconds
 
 var           = 3                        #determines what to plot (0,1,2,3)
 saveArrays    = 0                   #if 1 then save arrays, if 0 then don't
@@ -72,8 +72,8 @@ if not os.path.exists( saveString ) :
 
 Cp, Cv, Rd, g, Po = common.getConstants()
 
-tf = common.getTfinal( testCase )
-# tf = 100.
+# tf = common.getTfinal( testCase )
+tf = 10.
 nTimesteps = np.int( np.round(tf/dtImp) + 1e-12 )
 
 xLeft, xRight, nLev, nCol, zTop, zSurf, zSurfPrime, x, z \
@@ -311,22 +311,32 @@ def verticalDerivative( U, z ) :
     + ( ( ZZ - z0 ) + ( ZZ - z1 ) ) * U[:,-1,:] / ( z2 - z0 ) / ( z2 - z1 )
     return V
 
-# #check vertical remap/derivative:
-# tmp = ds/2.
-# ran = tmp * ( -1. + 2. * np.random.rand(np.shape(U0)[1],np.shape(U0)[2]) )
-# ztmp = z + ran
-# print(np.max(np.abs(ztmp-z)))
-# tmp0 = U0
-# tmp0[2,:,:] = tmp0[2,:,:] - thetaBar
-# tmp = verticalRemap( tmp0, z, ztmp )
+#check vertical remap/derivative:
+tmp = ds/4.
+ran = tmp * ( -1. + 2. * np.random.rand(np.shape(U0)[1],np.shape(U0)[2]) )
+ztmp = z + ran
+print(np.max(np.abs(ztmp-z)))
+tmp0 = U0
+tmp = verticalRemap( tmp0, z, ztmp )
 # tmp = verticalDerivative( tmp, ztmp )
-# tmp = verticalRemap( tmp, ztmp, z )
-# tmp = verticalDerivative(tmp0,z)[2,:,:] - tmp[2,:,:]
-# # tmp = tmp[2,:,:]
-# plt.contourf( x, z, tmp )
-# plt.colorbar()
-# plt.show()
-# sys.exit("\nStop here for now.\n")
+tmp = verticalRemap( tmp, ztmp, z )
+tmpA = tmp[2,:,:]
+tmpB = tmp0[2,:,:]
+# tmpB = verticalDerivative(tmp0,z)[2,:,:]
+tmp = tmpB - tmpA
+fig,ax = plt.subplots( 3, 1 )
+# ax[0].set_aspect('equal')
+# ax[1].set_aspect('equal')
+# ax[2].set_aspect('equal')
+alp = 16
+p0 = ax[0].contourf( x, z, tmpA, np.linspace(-alp,alp,20) )
+p1 = ax[1].contourf( x, z, tmpB, np.linspace(-alp,alp,20) )
+p2 = ax[2].contourf( x, z, tmp, 20 )
+plt.colorbar( p0, ax=ax[0] )
+plt.colorbar( p1, ax=ax[1] )
+plt.colorbar( p2, ax=ax[2] )
+plt.show()
+sys.exit("\nStop here for now.\n")
 
 if formulation == "theta_pi" :
     
