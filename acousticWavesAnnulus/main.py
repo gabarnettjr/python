@@ -16,8 +16,8 @@ from gab.annulus import common, waveEquation
 c           = .03                                     #wave speed (c**2=RT)
 innerRadius = 1.
 outerRadius = 2.
-tf          = 400.                                              #final time
-saveDel     = 25                           #time interval to save snapshots
+tf          = 20.                                               #final time
+saveDel     = 2                            #time interval to save snapshots
 exp         = 200.                 #controls steepness of initial condition
 amp         = .10                 #amplitude of trigonometric topo function
 frq         = 5                   #frequency of trigonometric topo function
@@ -56,11 +56,12 @@ def initialCondition( x, y ) :
 
 #Set things up for saving:
 
-saveString = waveEquation.getSavestring( c, innerRadius, outerRadius, tf, saveDel, exp, amp, frq \
+saveString = waveEquation.getSavestring( c, innerRadius, outerRadius \
+, tf, saveDel, exp, amp, frq \
 , mlv, phs, pol, stc, ptb, rkStages, ns, dt )
 
-if os.path.exists( saveString+'*.npy' ) :
-    os.remove( saveString+'*.npy' )                       #remove old files
+if os.path.exists( saveString + '*.npy' ) :
+    os.remove( saveString + '*.npy' )                     #remove old files
 
 if not os.path.exists( saveString ) :
     os.makedirs( saveString )                         #make new directories
@@ -82,7 +83,7 @@ th = th0.copy()                                     #copy regular th vector
 th = th + ran                                 #th vector after perturbation
 
 if mlv == 1 :
-    ds0  = ( outerRadius - innerRadius ) / (ns-2)         #constant delta s
+    ds0 = ( outerRadius - innerRadius ) / (ns-2)          #constant delta s
     s0  = np.linspace( innerRadius-ds0/2, outerRadius+ds0/2, ns ) #s vector
     tmp = ptb * ds0                           #relative perturbation factor
     ran = -tmp + 2.*tmp*np.random.rand(ns)      #random perturbation vector
@@ -90,7 +91,7 @@ if mlv == 1 :
     s   = s + ran                              #s vector after perturbation
 elif mlv == 0 :
     ds0 = ( outerRadius - innerRadius ) / (ns-3)          #constant delta s
-    s0 = np.linspace( innerRadius-ds0, outerRadius+ds0, ns )      #s vector
+    s0  = np.linspace( innerRadius-ds0, outerRadius+ds0, ns )     #s vector
     tmp = ptb * ds0                           #relative perturbation factor
     ranBot = -tmp + 2.*tmp*np.random.rand(1)
     ranMid = -tmp + 2.*tmp*np.random.rand(ns-4)
@@ -103,11 +104,11 @@ else :
     sys.exit("\nError: mlv should be 0 or 1.\n")
 
 if plotFromSaved == 1 :
-    th = np.load( saveString+'th'+'.npy' )        #load vector of th values
-    s = np.load( saveString+'s'+'.npy' )           #load vector of s values
+    th = np.load( saveString + 'th' + '.npy' )    #load vector of th values
+    s  = np.load( saveString + 's'  + '.npy' )     #load vector of s values
 else :
-    np.save( saveString+'th'+'.npy', th )         #save vector of th values
-    np.save( saveString+'s'+'.npy', s )            #save vector of s values
+    np.save( saveString + 'th' + '.npy', th )     #save vector of th values
+    np.save( saveString + 's'  + '.npy', s )       #save vector of s values
 
 tmp = np.hstack(( th[-1]-2.*np.pi, th, th[0]+2.*np.pi ))
 dth = ( tmp[2:nth+2] - tmp[0:nth] ) / 2.             #non-constant delta th
@@ -122,10 +123,10 @@ rr = common.getRadii( thth, ss \
 , innerRadius, outerRadius, rSurf )                #mesh of perturbed radii
 xx = rr * np.cos(thth)                               #mesh of x-coordinates
 yy = rr * np.sin(thth)                               #mesh of y-coordinates
-xxi = xx[1:-1,:]                                      #without ghost layers
-yyi = yy[1:-1,:]                                      #without ghost layers
-ththi = thth[1:-1,:]                                  #without ghost layers
-rri = rr[1:-1,:]                                      #without ghost layers
+xxi = xx[1:-1,:]                                    #x without ghost layers
+yyi = yy[1:-1,:]                                    #y without ghost layers
+ththi = thth[1:-1,:]                               #th without ghost layers
+rri = rr[1:-1,:]                                    #r without ghost layers
 
 cosTh = np.cos(ththi)                                                #dr/dx
 sinTh = np.sin(ththi)                                                #dr/dy
@@ -153,32 +154,32 @@ dsdrAll  = dsdr( rr, thth )                   #dsdr values over entire mesh
 
 ###########################################################################
 
-#Plot the coordinate transformation functions and then exit:
-
+# #Plot the coordinate transformation functions and then exit:
+# 
 # plt.contourf( xxi, yyi, sFunc(rri,ththi), 20 )
 # plt.axis( 'equal' )
 # plt.colorbar()
 # plt.title( 's' )
 # plt.show()
-
+# 
 # plt.contourf( xxi, yyi, dsdthi, 20 )
 # plt.axis( 'equal' )
 # plt.colorbar()
 # plt.title( 'ds/dth' )
 # plt.show()
-
+# 
 # plt.contourf( xxi, yyi, dsdri, 20 )
 # plt.axis( 'equal' )
 # plt.colorbar()
 # plt.title( 'ds/dr' )
 # plt.show()
-
+# 
 # sys.exit("\nStop here for now.\n")
 
 ###########################################################################
 
-#Plot the perturbed radii and then exit:
-
+# #Plot the perturbed radii and then exit:
+# 
 # fig, ax = plt.subplots( 1, 2, figsize=(8,4) )
 # ax[0].plot( s0, s0, '-', s0, s, '.' )       #plot of initial vs perturbed s
 # ax[0].set_xlabel('s0')
@@ -187,7 +188,7 @@ dsdrAll  = dsdr( rr, thth )                   #dsdr values over entire mesh
 # ax[1].set_xlabel('s')
 # ax[1].set_ylabel('ds')
 # plt.show()
-
+# 
 # sys.exit("\nStop here for now.\n")
 
 ###########################################################################
@@ -215,8 +216,8 @@ print()
 
 ###########################################################################
 
-#Plot the nodes and then exit:
-
+# #Plot the nodes and then exit:
+# 
 # plt.plot( xx.flatten(), yy.flatten(), "." \
 # , xB, yB, "-" \
 # , xT, yT, "-" )
@@ -226,7 +227,7 @@ print()
 # plt.xlabel( 'x' )
 # plt.ylabel( 'y' )
 # plt.show()
-
+# 
 # sys.exit("\nStop here for now.\n")
 
 ###########################################################################
@@ -256,12 +257,12 @@ alpA = -2.**-13. * c
 
 #Extra things needed to enforce the Neumann boundary condition for P:
 
-# stcB = stc
-stcB = min( ns-1, 2*(pol+2)+1 )
+stcB = stc
+# stcB = min( ns-1, 2*(pol+2)+1 )
 # if ( pol==5 | pol==6 ) & ( ns == 14 ) :
-    # stcB = 13
+#     stcB = 13
 # else :
-    # stcB = 2*(pol+2)+1
+#     stcB = 2*(pol+2)+1
 
 NxBot, NyBot, NxTop, NyTop \
 , TxBot, TyBot, TxTop, TyTop \
@@ -282,7 +283,7 @@ Whvs = alp * ds0**pol * Whvs
 # dsPol = spdiags( ds**pol, np.array([0]), len(ds), len(ds) )
 # Whvs = alp * dsPol.dot(Whvs)                       #scaled radial HV matrix
 
-#Complex radial HV:
+# #Complex radial HV:
 # dr = ( rr[2:ns,:] - rr[0:ns-2,:] ) / 2.
 # alpDrPol = alp * dr**pol
 # alpDrPol = alp * ((outerRadius-innerRadius)/(ns-2)) ** pol
@@ -311,15 +312,16 @@ Whvlam = alpA * dth0**polA * Whvlam
 ###########################################################################
 
 #Weights for interpolation to boundary (I), extrapolation to
-#ghost-nodes (E), and d/ds at boundary (D):
+#ghost-nodes (E), d/ds at boundary (D), and extrapolation to boundary(H):
 
-wIinner = phs1.getWeights( innerRadius, s[0:stcB],   0, phs, pol+1 )
-wEinner = phs1.getWeights( s[0],        s[1:stcB+1], 0, phs, pol+1 )
-wDinner = phs1.getWeights( innerRadius, s[0:stcB],   1, phs, pol+1 )
+wIinner = phs1.getWeights( innerRadius, s[0:stcB],   0, phs, pol )
+wEinner = phs1.getWeights( s[0],        s[1:stcB+1], 0, phs, pol )
+wDinner = phs1.getWeights( innerRadius, s[0:stcB],   1, phs, pol )
+wHinner = phs1.getWeights( innerRadius, s[1:stcB+1], 0, phs, pol )
 
-wIouter = phs1.getWeights( outerRadius, s[-1:-(stcB+1):-1], 0, phs, pol+1 )
-wEouter = phs1.getWeights( s[-1],       s[-2:-(stcB+2):-1], 0, phs, pol+1 )
-wDouter = phs1.getWeights( outerRadius, s[-1:-(stcB+1):-1], 1, phs, pol+1 )
+wIouter = phs1.getWeights( outerRadius, s[-1:-(stcB+1):-1], 0, phs, pol )
+wEouter = phs1.getWeights( s[-1],       s[-2:-(stcB+2):-1], 0, phs, pol )
+wDouter = phs1.getWeights( outerRadius, s[-1:-(stcB+1):-1], 1, phs, pol )
 
 ###########################################################################
 
@@ -342,29 +344,29 @@ def Dlam(U) :
     return Wlam.dot(U[1:-1,:].T).T
 
 # def Dr(U) :
-    # return Ds(U) * dsdri
-
+#     return Ds(U) * dsdri
+# 
 # def Dth(U) :
-    # return Dlam(U) + Ds(U) * dsdthi
-
+#     return Dlam(U) + Ds(U) * dsdthi
+# 
 # def Dx(U) :
-    # return cosTh * Dr(U) - sinThOverR * Dth(U)
-
+#     return cosTh * Dr(U) - sinThOverR * Dth(U)
+# 
 # def Dy(U) :
-    # return sinTh * Dr(U) + cosThOverR * Dth(U)
+#     return sinTh * Dr(U) + cosThOverR * Dth(U)
 
 # def L(U) :
-    # # Us = Ws@U
-    # # return Ws@Us + ssInv*Us + ssInv2*((U@Wlam)@Wlam)
-    # Us = Ws@U
-    # Uth = (U@Wlam) + Us*dsdthAll
-    # return Ws@(Us*dsdrAll)*dsdrAll + rrInv*Us*dsdrAll \
-    # +rrInv2 * ( Uth@Wlam + (Ws@Uth)*dsdthAll )
-
+#     # Us = Ws@U
+#     # return Ws@Us + ssInv*Us + ssInv2*((U@Wlam)@Wlam)
+#     Us = Ws@U
+#     Uth = (U@Wlam) + Us*dsdthAll
+#     return Ws@(Us*dsdrAll)*dsdrAll + rrInv*Us*dsdrAll \
+#     +rrInv2 * ( Uth@Wlam + (Ws@Uth)*dsdthAll )
+# 
 # def HV(U) :
-    # for i in range(np.int(np.round((phs-1)/2))) :
-        # U = L(U)
-    # return alpDrPol * U[1:-1,:]
+#     for i in range(np.int(np.round((phs-1)/2))) :
+#         U = L(U)
+#     return alpDrPol * U[1:-1,:]
 
 def HV(U) :
     # #Angular HV:
@@ -382,8 +384,8 @@ if mlv == 1 :
         return waveEquation.setGhostNodesMidLevels( U \
         , NxBot, NyBot, NxTop, NyTop \
         , TxBot, TyBot, TxTop, TyTop \
-        , someFactor, stcB \
-        , Wlam, wIinner, wEinner, wDinner, wIouter, wEouter, wDouter )
+        , someFactor, stcB, Wlam \
+        , wIinner, wEinner, wDinner, wHinner, wIouter, wEouter, wDouter )
 else :
     def setGhostNodes( U ) :
         return waveEquation.setGhostNodesInterfaces( U \
@@ -413,20 +415,22 @@ else :
 
 if saveContours == 1 :
     fig = plt.figure( figsize = (18,14) )
-et = time.clock()
+et = time.time()
 
 for i in np.arange( 0, nTimesteps+1 ) :
     
     if np.mod( i, np.int(np.round(saveDel/dt)) ) == 0 :
         
-        print( "t =", np.int(np.round(t)), ",  et =", time.clock()-et )
-        et = time.clock()
+        print( "t =", np.int(np.round(t)), ",  et =", time.time()-et )
+        et = time.time()
         
         if plotFromSaved == 1 :
-            U = np.load( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy' )
+            U = np.load( saveString \
+            + '{0:04d}'.format(np.int(np.round(t))) + '.npy' )
         else :
             U = setGhostNodes( U )
-            np.save( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy', U )
+            np.save( saveString \
+            + '{0:04d}'.format(np.int(np.round(t))) + '.npy', U )
         
         if saveContours == 1 :
             tmp = Wradial.dot(U[0,:,:])               #radial interpolation
@@ -438,7 +442,8 @@ for i in np.arange( 0, nTimesteps+1 ) :
             tmp = outerRadius + .2
             plt.axis([-tmp,tmp,-tmp,tmp])
             plt.colorbar()
-            fig.savefig( '{0:04d}'.format(np.int(np.round(t)+1e-12))+'.png', bbox_inches = 'tight' )
+            fig.savefig( '{0:04d}'.format(np.int(np.round(t)+1e-12)) \
+            + '.png', bbox_inches = 'tight' )
             plt.clf()
         
         if np.max(np.abs(U)) > 5. :

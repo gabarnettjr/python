@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 import sys
 import numpy as np
 import matplotlib.pyplot as plt
@@ -12,8 +13,8 @@ from gab.annulus import common, waveEquation
 c           = .03                                     #wave speed (c**2=RT)
 innerRadius = 1.
 outerRadius = 2.
-tf          = 50.                                               #final time
-saveDel     = 5                            #time interval to save snapshots
+tf          = 20.                                               #final time
+saveDel     = 2                            #time interval to save snapshots
 exp         = 200.                 #controls steepness of initial condition
 amp         = .10                 #amplitude of trigonometric topo function
 frq         = 5                   #frequency of trigonometric topo function
@@ -23,18 +24,18 @@ ord = 2                                        #norm to use for error check
 contourErrors = 1
 
 mlvA      = 1
-phsA      = 5
-polA      = 3
-stcA      = 7
+phsA      = 7
+polA      = 5
+stcA      = 13
 ptbA      = .00
-rkStagesA = 3
+rkStagesA = 4
 
 mlvB      = 1
-phsB      = 5
-polB      = 3
-stcB      = 7
+phsB      = 7
+polB      = 5
+stcB      = 13
 ptbB      = .30
-rkStagesB = 3
+rkStagesB = 4
 
 mlv0      = 1
 phs0      = 7
@@ -43,7 +44,7 @@ stc0      = 13
 ptb0      = .00
 rkStages0 = 4
 
-t0 = 10                                                    #time to look at
+t0 = tf                                                    #time to look at
 
 ns0 = 384                                             #reference resolution
 ns1 = 12
@@ -68,7 +69,8 @@ def loadSingleResult( mlv, phs, pol, stc, ptb, rkStages, ns, dt, t0 ) :
     else :
         ns = ns + 3
     
-    saveString = waveEquation.getSavestring( c, innerRadius, outerRadius, tf, saveDel, exp, amp, frq \
+    saveString = waveEquation.getSavestring( c, innerRadius, outerRadius \
+    , tf, saveDel, exp, amp, frq \
     , mlv, phs, pol, stc, ptb, rkStages, ns, dt )
     
     U  = np.load( saveString + '{0:04d}'.format(np.int(np.round(t0))) + '.npy' )
@@ -104,11 +106,16 @@ def interpRadial( U0, U1, U2, U3, U4, U5, s0, s1, s2, s3, s4, s5 ) :
     polR = 5
     stcR = 13
     
-    W1 = phs1.getDM( x=s1, X=s0[1:-1], m=0, phsDegree=phsR, polyDegree=polR, stencilSize=stcR )
-    W2 = phs1.getDM( x=s2, X=s0[1:-1], m=0, phsDegree=phsR, polyDegree=polR, stencilSize=stcR )
-    W3 = phs1.getDM( x=s3, X=s0[1:-1], m=0, phsDegree=phsR, polyDegree=polR, stencilSize=stcR )
-    W4 = phs1.getDM( x=s4, X=s0[1:-1], m=0, phsDegree=phsR, polyDegree=polR, stencilSize=stcR )
-    W5 = phs1.getDM( x=s5, X=s0[1:-1], m=0, phsDegree=phsR, polyDegree=polR, stencilSize=stcR )
+    W1 = phs1.getDM( x=s1, X=s0[1:-1], m=0 \
+    , phsDegree=phsR, polyDegree=polR, stencilSize=stcR )
+    W2 = phs1.getDM( x=s2, X=s0[1:-1], m=0 \
+    , phsDegree=phsR, polyDegree=polR, stencilSize=stcR )
+    W3 = phs1.getDM( x=s3, X=s0[1:-1], m=0 \
+    , phsDegree=phsR, polyDegree=polR, stencilSize=stcR )
+    W4 = phs1.getDM( x=s4, X=s0[1:-1], m=0 \
+    , phsDegree=phsR, polyDegree=polR, stencilSize=stcR )
+    W5 = phs1.getDM( x=s5, X=s0[1:-1], m=0 \
+    , phsDegree=phsR, polyDegree=polR, stencilSize=stcR )
     
     U0 = U0[1:-1,:]
     U1 = W1.dot( U1 )
