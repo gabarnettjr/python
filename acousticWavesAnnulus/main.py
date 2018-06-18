@@ -16,13 +16,13 @@ from gab.annulus import common, waveEquation
 c           = .03                                     #wave speed (c**2=RT)
 innerRadius = 1.
 outerRadius = 2.
-tf          = 20.                                               #final time
-saveDel     = 2                            #time interval to save snapshots
+tf          = 500.                                              #final time
+saveDel     = 25                           #time interval to save snapshots
 exp         = 200.                 #controls steepness of initial condition
 amp         = .10                 #amplitude of trigonometric topo function
 frq         = 5                   #frequency of trigonometric topo function
 
-plotFromSaved = 1                            #if 1, load instead of compute
+plotFromSaved = 0                            #if 1, load instead of compute
 saveContours  = 1                       #switch for saving contours as pngs
 
 mlv      = np.int64(sys.argv[1])                #0:interfaces, 1:mid-levels
@@ -232,17 +232,20 @@ print()
 
 ###########################################################################
 
-#Hyperviscosity coefficient (alp) for radial and angular directions:
-
-if ( pol == 3 ) | ( pol == 4 ) :
+#Hyperviscosity coefficient (alp) for radial direction:
+if ( pol == 1 ) | ( pol == 2 ) :
+    alp = 2.**-1. * c
+elif ( pol == 3 ) | ( pol == 4 ) :
     alp = -2.**-5. * c
 elif ( pol == 5 ) | ( pol == 6 ) :
     alp = 2.**-9. * c
+elif ( pol == 7 ) | ( pol == 8 ) :
+    alp = -2.**-13. * c
 else :
-    sys.exit("\nError: pol should be 3, 4, 5, or 6.\n")
+    sys.exit("\nError: 1 <= pol <= 8\n")
 
-if stc == pol+1 :
-    alp = 0.                    #remove radial HV if using only polynomials
+# if stc == pol+1 :
+#     alp = 0.                    #remove radial HV if using only polynomials
 
 ###########################################################################
 

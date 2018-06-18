@@ -24,18 +24,18 @@ ord = 2                                        #norm to use for error check
 contourErrors = 1
 
 mlvA      = 1
-phsA      = 7
-polA      = 5
-stcA      = 13
-ptbA      = .00
+phsA      = 5
+polA      = 4
+stcA      = 5
+ptbA      = .30
 rkStagesA = 4
 
 mlvB      = 1
-phsB      = 7
-polB      = 5
-stcB      = 13
+phsB      = 5
+polB      = 4
+stcB      = 5
 ptbB      = .30
-rkStagesB = 4
+rkStagesB = 3
 
 mlv0      = 1
 phs0      = 7
