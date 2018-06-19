@@ -10,14 +10,14 @@ from gab.annulus import common, waveEquation
 
 ###########################################################################
 
-c           = .03                                     #wave speed (c**2=RT)
+c           = .01                                     #wave speed (c**2=RT)
 innerRadius = 1.
 outerRadius = 2.
-tf          = 20.                                               #final time
-saveDel     = 2                            #time interval to save snapshots
+tf          = 100.                                              #final time
+saveDel     = 10                           #time interval to save snapshots
 exp         = 200.                 #controls steepness of initial condition
 amp         = .10                 #amplitude of trigonometric topo function
-frq         = 5                   #frequency of trigonometric topo function
+frq         = 7                   #frequency of trigonometric topo function
 
 ord = 2                                        #norm to use for error check
 
@@ -25,17 +25,17 @@ contourErrors = 1
 
 mlvA      = 1
 phsA      = 5
-polA      = 4
-stcA      = 5
-ptbA      = .30
+polA      = 3
+stcA      = 7
+ptbA      = .00
 rkStagesA = 4
 
 mlvB      = 1
 phsB      = 5
 polB      = 4
 stcB      = 5
-ptbB      = .30
-rkStagesB = 3
+ptbB      = .00
+rkStagesB = 4
 
 mlv0      = 1
 phs0      = 7
@@ -46,19 +46,25 @@ rkStages0 = 4
 
 t0 = tf                                                    #time to look at
 
-ns0 = 384                                             #reference resolution
+ns0 = 192                                             #reference resolution
 ns1 = 12
 ns2 = 24
 ns3 = 48
 ns4 = 96
-ns5 = 192
+ns5 = 96
 
-dt0 = 1./32.
-dt1 = 1./1.
-dt2 = 1./2.
-dt3 = 1./4.
-dt4 = 1./8.
-dt5 = 1./16.
+dt0reg = 1./16.
+dt1reg = 1./1.
+dt2reg = 1./2.
+dt3reg = 1./4.
+dt4reg = 1./8.
+dt5reg = 1./8.
+
+dt1ptb = dt1reg / 1.
+dt2ptb = dt2reg / 1.
+dt3ptb = dt3reg / 1.
+dt4ptb = dt4reg / 1.
+dt5ptb = dt5reg / 1.
 
 ###########################################################################
 
@@ -85,13 +91,24 @@ def loadSingleResult( mlv, phs, pol, stc, ptb, rkStages, ns, dt, t0 ) :
 
 def loadManyResults( mlv, phs, pol, stc, ptb, rkStages ) :
     
-    U0, s0, th0 = loadSingleResult( mlv0, phs0, pol0, stc0, ptb0, rkStages0, ns0, dt0, t0 )
-    U1, s1, th1 = loadSingleResult( mlv,  phs,  pol,  stc,  ptb,  rkStages,  ns1, dt1, t0 )
-    U2, s2, th2 = loadSingleResult( mlv,  phs,  pol,  stc,  ptb,  rkStages,  ns2, dt2, t0 )
-    U3, s3, th3 = loadSingleResult( mlv,  phs,  pol,  stc,  ptb,  rkStages,  ns3, dt3, t0 )
-    U4, s4, th4 = loadSingleResult( mlv,  phs,  pol,  stc,  ptb,  rkStages,  ns4, dt4, t0 )
-    U5, s5, th5 = loadSingleResult( mlv,  phs,  pol,  stc,  ptb,  rkStages,  ns5, dt5, t0 )
-    
+    if ptb == .00 :
+        
+        U0, s0, th0 = loadSingleResult( mlv0, phs0, pol0, stc0, ptb0, rkStages0, ns0, dt0reg, t0 )
+        U1, s1, th1 = loadSingleResult( mlv,  phs,  pol,  stc,  ptb,  rkStages,  ns1, dt1reg, t0 )
+        U2, s2, th2 = loadSingleResult( mlv,  phs,  pol,  stc,  ptb,  rkStages,  ns2, dt2reg, t0 )
+        U3, s3, th3 = loadSingleResult( mlv,  phs,  pol,  stc,  ptb,  rkStages,  ns3, dt3reg, t0 )
+        U4, s4, th4 = loadSingleResult( mlv,  phs,  pol,  stc,  ptb,  rkStages,  ns4, dt4reg, t0 )
+        U5, s5, th5 = loadSingleResult( mlv,  phs,  pol,  stc,  ptb,  rkStages,  ns5, dt5reg, t0 )
+        
+    else :
+        
+        U0, s0, th0 = loadSingleResult( mlv0, phs0, pol0, stc0, ptb0, rkStages0, ns0, dt0reg, t0 )
+        U1, s1, th1 = loadSingleResult( mlv,  phs,  pol,  stc,  ptb,  rkStages,  ns1, dt1ptb, t0 )
+        U2, s2, th2 = loadSingleResult( mlv,  phs,  pol,  stc,  ptb,  rkStages,  ns2, dt2ptb, t0 )
+        U3, s3, th3 = loadSingleResult( mlv,  phs,  pol,  stc,  ptb,  rkStages,  ns3, dt3ptb, t0 )
+        U4, s4, th4 = loadSingleResult( mlv,  phs,  pol,  stc,  ptb,  rkStages,  ns4, dt4ptb, t0 )
+        U5, s5, th5 = loadSingleResult( mlv,  phs,  pol,  stc,  ptb,  rkStages,  ns5, dt5ptb, t0 )
+        
     return U0, U1, U2, U3, U4, U5 \
     , s0, s1, s2, s3, s4, s5 \
     , th0, th1, th2, th3, th4, th5

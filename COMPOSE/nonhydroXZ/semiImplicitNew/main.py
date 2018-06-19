@@ -14,7 +14,7 @@ from gab.nonhydro import common
 
 #"bubble", "igw", "densityCurrent", "doubleDensityCurrent",
 #or "movingDensityCurrent":
-testCase = "bubble"
+testCase = "igw"
 
 #"theta_pi" or "T_rho_P" or "theta_rho_P" or "HOMMEstyle":
 formulation  = "HOMMEstyle"
@@ -28,9 +28,9 @@ ds    = np.float64(sys.argv[3])                           #vertical spacing
 dtExp = 1./np.float64(sys.argv[4])                      #explicit time-step
 dtImp = 2                                               #implicit time-step
 
-phs = 3                  #exponent of polyharmonic spline RBF (odd integer)
-pol = 2                           #highest degree of polynomials to include
-stc = 3                                                    #1D stencil-size
+phs = 5                  #exponent of polyharmonic spline RBF (odd integer)
+pol = 3                           #highest degree of polynomials to include
+stc = 7                                                    #1D stencil-size
 
 rkStages  = 3                        #number of Runge-Kutta stages (3 or 4)
 plotNodes = 0                               #if 1, plot nodes and then exit
@@ -564,9 +564,9 @@ for i in range( 1, nTimesteps+1 ) :
         
         if plotFromSaved == 0 :
             if saveArrays == 1 :
-                # if ( formulation == "HOMMEstyle" ) & ( VL == 1 ) :
-                #     U1 = verticalRemap( U1, U1[4,:,:]/g, z )
-                #     U1, P1, tmp = setGhostNodes( U1 )
+                if ( formulation == "HOMMEstyle" ) & ( VL == 1 ) :
+                    U1 = verticalRemap( U1, U1[4,:,:]/g, z )
+                    U1, P1, tmp = setGhostNodes( U1 )
                 np.save( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy', U1 )
         elif plotFromSaved == 1 :
             U1 = np.load( saveString+'{0:04d}'.format(np.int(np.round(t)))+'.npy' )
@@ -575,7 +575,6 @@ for i in range( 1, nTimesteps+1 ) :
         
         if saveContours == 1 :
             # if ( formulation == "HOMMEstyle" ) & ( VL == 1 ) :
-            #     U1, P1, tmp = setGhostNodes( U1 )
             #     U1 = verticalRemap( U1, U1[4,:,:]/g, z )
             #     U1, P1, tmp = setGhostNodes( U1 )
             saveContourPlot( U1, t, U1[4,:,:]/g )
@@ -585,7 +584,6 @@ for i in range( 1, nTimesteps+1 ) :
     if plotFromSaved == 0 :
         if semiImplicit == 0 :
             # if ( np.mod(i,1) == 0 ) & ( formulation == "HOMMEstyle" ) & ( VL == 1 ) :
-            #     U1, P1, tmp = setGhostNodes( U1 )
             #     U1 = verticalRemap( U1, U1[4,:,:]/g, z )
             #     U1, P1, tmp = setGhostNodes( U1 )
             t, U2 = rk( t, U1, odefun, dtExp )

@@ -2,3 +2,5 @@ gameOfThrones/*.pyc
 gameOfThrones/__pycache__/*.pyc
 jupyter/.ipynb_checkpoints
 *.swp
+*.png
+/acousticWavesAnnulus/c0.*

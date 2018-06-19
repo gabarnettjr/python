@@ -13,14 +13,14 @@ from gab.annulus import common, waveEquation
 
 ###########################################################################
 
-c           = .03                                     #wave speed (c**2=RT)
+c           = .01                                     #wave speed (c**2=RT)
 innerRadius = 1.
 outerRadius = 2.
-tf          = 500.                                              #final time
-saveDel     = 25                           #time interval to save snapshots
+tf          = 2000.                                             #final time
+saveDel     = 200                          #time interval to save snapshots
 exp         = 200.                 #controls steepness of initial condition
 amp         = .10                 #amplitude of trigonometric topo function
-frq         = 5                   #frequency of trigonometric topo function
+frq         = 7                   #frequency of trigonometric topo function
 
 plotFromSaved = 0                            #if 1, load instead of compute
 saveContours  = 1                       #switch for saving contours as pngs
@@ -244,8 +244,7 @@ elif ( pol == 7 ) | ( pol == 8 ) :
 else :
     sys.exit("\nError: 1 <= pol <= 8\n")
 
-# if stc == pol+1 :
-#     alp = 0.                    #remove radial HV if using only polynomials
+# alp = 0.                                       #remove radial HV completely
 
 ###########################################################################
 
