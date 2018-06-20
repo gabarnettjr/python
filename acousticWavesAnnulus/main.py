@@ -16,14 +16,16 @@ from gab.annulus import common, waveEquation
 c           = .01                                     #wave speed (c**2=RT)
 innerRadius = 1.
 outerRadius = 2.
-tf          = 2000.                                             #final time
-saveDel     = 200                          #time interval to save snapshots
+tf          = 400.                                              #final time
+saveDel     = 20                           #time interval to save snapshots
 exp         = 200.                 #controls steepness of initial condition
 amp         = .10                 #amplitude of trigonometric topo function
-frq         = 7                   #frequency of trigonometric topo function
+frq         = 10                  #frequency of trigonometric topo function
 
 plotFromSaved = 0                            #if 1, load instead of compute
 saveContours  = 1                       #switch for saving contours as pngs
+
+useHV = 1                               #switch to turn radial HV on or off
 
 mlv      = np.int64(sys.argv[1])                #0:interfaces, 1:mid-levels
 phs      = np.int64(sys.argv[2])             #PHS RBF exponent (odd number)
@@ -128,10 +130,15 @@ yyi = yy[1:-1,:]                                    #y without ghost layers
 ththi = thth[1:-1,:]                               #th without ghost layers
 rri = rr[1:-1,:]                                    #r without ghost layers
 
-cosTh = np.cos(ththi)                                                #dr/dx
-sinTh = np.sin(ththi)                                                #dr/dy
-cosThOverR = cosTh/rri                                              #dth/dy
-sinThOverR = sinTh/rri                                             #-dth/dx
+cosTh = np.cos(thth)                                                 #dr/dx
+sinTh = np.sin(thth)                                                 #dr/dy
+cosThOverR = cosTh/rr                                               #dth/dy
+sinThOverR = sinTh/rr                                              #-dth/dx
+
+drdxAll  =  np.cos(thth)
+drdyAll  =  np.sin(thth)
+dthdyAll =  np.cos(thth)/rr
+dthdxAll = -np.sin(thth)/rr
 
 thth0, ss0 = np.meshgrid( th0, s0[1:-1] )        #regular mesh for plotting
 rr0 = common.getRadii( thth0, ss0 \
@@ -244,7 +251,8 @@ elif ( pol == 7 ) | ( pol == 8 ) :
 else :
     sys.exit("\nError: 1 <= pol <= 8\n")
 
-# alp = 0.                                       #remove radial HV completely
+if useHV != 1 :
+    alp = 0.                                   #remove radial HV completely
 
 ###########################################################################
 
@@ -340,22 +348,22 @@ Wangular = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th0, m=0 \
 #Functions to approximate differential operators and other things:
     
 def Ds(U) :
-    return Ws[1:-1,:].dot(U)
+    return Ws.dot(U)
 
 def Dlam(U) :
-    return Wlam.dot(U[1:-1,:].T).T
+    return Wlam.dot(U.T).T
 
-# def Dr(U) :
-#     return Ds(U) * dsdri
-# 
-# def Dth(U) :
-#     return Dlam(U) + Ds(U) * dsdthi
-# 
-# def Dx(U) :
-#     return cosTh * Dr(U) - sinThOverR * Dth(U)
-# 
-# def Dy(U) :
-#     return sinTh * Dr(U) + cosThOverR * Dth(U)
+def Dr(U) :                                        #du/dr = (du/ds)*(ds/dr)
+    return Ds(U) * dsdrAll
+
+def Dth(U) :                           #du/dth = du/dlam + (du/ds)*(ds/dth)
+    return Dlam(U) + Ds(U) * dsdthAll
+
+def Dx(U) :                    #du/dx = (du/dr)*(dr/dx) + (du/dth)*(dth/dx)
+    return Dr(U) * drdxAll + Dth(U) * dthdxAll
+
+def Dy(U) :                    #du/dy = (du/dr)*(dr/dy) + (du/dth)*(dth/dy)
+    return Dr(U) * drdyAll + Dth(U) * dthdyAll
 
 # def L(U) :
 #     # Us = Ws@U
@@ -398,7 +406,7 @@ else :
 def odefun( t, U ) :
     return waveEquation.odefun( t, U \
     , setGhostNodes, Ds, Dlam, HV \
-    , Po, rhoInv, dsdthi, dsdri \
+    , Po, rhoInv, dsdthAll, dsdrAll \
     , cosTh, sinTh, cosThOverR, sinThOverR )
     # return waveEquation.odefunCartesian( t, U \
     # , setGhostNodes, Dx, Dy, HV          \
@@ -435,9 +443,14 @@ for i in np.arange( 0, nTimesteps+1 ) :
             + '{0:04d}'.format(np.int(np.round(t))) + '.npy', U )
         
         if saveContours == 1 :
-            tmp = Wradial.dot(U[0,:,:])               #radial interpolation
+            tmp = U[0,:,:]
+            # tmp = Dx(U[2,:,:]) - Dy(U[1,:,:])
+            # tmp = np.sqrt( U[1,:,:]**2. + U[2,:,:]**2. )
+            tmp = Wradial.dot(tmp)                    #radial interpolation
             tmp = Wangular.dot(tmp.T).T              #angular interpolation
             # plt.contourf( xx0, yy0, tmp, 20 )
+            # plt.contourf( xx0, yy0, tmp, np.arange(-.00205,.00205+.0001,.0001) )
+            # plt.contourf( xx0, yy0, tmp, np.linspace(-c/10.,c/10.,20) )
             plt.contourf( xx0, yy0, tmp, np.arange(1.-.15,1.+.17,.02) )
             plt.plot( xB, yB, "k-", xT, yT, "k-" )
             plt.axis('equal')
