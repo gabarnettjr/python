@@ -3,8 +3,8 @@ import sys
 import os
 import time
 import numpy as np
-import matplotlib.pyplot as plt
 from scipy.sparse import spdiags
+import matplotlib.pyplot as plt
 
 sys.path.append( '../site-packages' )
 
@@ -13,17 +13,19 @@ from gab.annulus import common, waveEquation
 
 ###########################################################################
 
-c           = .01                                     #wave speed (c**2=RT)
+c           = .02                                     #wave speed (c**2=RT)
 innerRadius = 1.
 outerRadius = 2.
-tf          = 400.                                              #final time
-saveDel     = 20                           #time interval to save snapshots
-exp         = 200.                 #controls steepness of initial condition
+tf          = 200.                                              #final time
+saveDel     = 10                           #time interval to save snapshots
+exp         = 100.                 #controls steepness of initial condition
 amp         = .10                 #amplitude of trigonometric topo function
-frq         = 10                  #frequency of trigonometric topo function
+frq         = 6                   #frequency of trigonometric topo function
 
 plotFromSaved = 0                            #if 1, load instead of compute
 saveContours  = 1                       #switch for saving contours as pngs
+saveArrays    = 0                                 #switch for saving arrays
+whatToPlot    = "rho"
 
 useHV = 1                               #switch to turn radial HV on or off
 
@@ -42,17 +44,21 @@ rSurf, rSurfPrime \
 tmp = 17./18.*np.pi
 xc1 = (rSurf(tmp)+outerRadius)/2.*np.cos(tmp)                #x-coord of IC
 yc1 = (rSurf(tmp)+outerRadius)/2.*np.sin(tmp)                #y-coord of IC
+tmp = 5./18.*np.pi
+xc2 = (rSurf(tmp)+outerRadius)/2.*np.cos(tmp)                #x-coord of IC
+yc2 = (rSurf(tmp)+outerRadius)/2.*np.sin(tmp)                #y-coord of IC
 def initialCondition( x, y ) :
-    #Wendland function:
-    r = np.sqrt( 6 * ( (x-xc1)**2. + (y-yc1)**2. ) )
-    ind = r<1.
-    z = np.zeros( np.shape(x) )
-    z[ind] = ( 1. - r[ind] ) ** 10. * ( 429.*r[ind]**4. + 450.*r[ind]**3. \
-    + 210.*r[ind]**2. + 50.*r[ind] + 5.  )
-    z = 1. + z/5.
-    return z
-    # #Gaussian:
-    # return 1. + np.exp( -exp*( (x-xc1)**2. + (y-yc1)**2. ) )
+    # #Wendland function:
+    # r = np.sqrt( 6 * ( (x-xc1)**2. + (y-yc1)**2. ) )
+    # ind = r<1.
+    # z = np.zeros( np.shape(x) )
+    # z[ind] = ( 1. - r[ind] ) ** 10. * ( 429.*r[ind]**4. + 450.*r[ind]**3. \
+    # + 210.*r[ind]**2. + 50.*r[ind] + 5.  )
+    # z = 1. + z/5.
+    # return z
+    #Gaussian:
+    return 1. + np.exp( -exp*( (x-xc1)**2. + (y-yc1)**2. ) ) \
+              + np.exp( -exp*( (x-xc2)**2. + (y-yc2)**2. ) )
 
 ###########################################################################
 
@@ -62,11 +68,11 @@ saveString = waveEquation.getSavestring( c, innerRadius, outerRadius \
 , tf, saveDel, exp, amp, frq \
 , mlv, phs, pol, stc, ptb, rkStages, ns, dt )
 
-if os.path.exists( saveString + '*.npy' ) :
-    os.remove( saveString + '*.npy' )                     #remove old files
-
-if not os.path.exists( saveString ) :
-    os.makedirs( saveString )                         #make new directories
+if ( saveArrays == 1 ) & ( plotFromSaved != 1 ) :
+    if os.path.exists( saveString + '*.npy' ) :
+        os.remove( saveString + '*.npy' )                 #remove old files
+    if not os.path.exists( saveString ) :
+        os.makedirs( saveString )                     #make new directories
 
 ###########################################################################
 
@@ -109,8 +115,9 @@ if plotFromSaved == 1 :
     th = np.load( saveString + 'th' + '.npy' )    #load vector of th values
     s  = np.load( saveString + 's'  + '.npy' )     #load vector of s values
 else :
-    np.save( saveString + 'th' + '.npy', th )     #save vector of th values
-    np.save( saveString + 's'  + '.npy', s )       #save vector of s values
+    if saveArrays == 1 :
+        np.save( saveString + 'th' + '.npy', th ) #save vector of th values
+        np.save( saveString + 's'  + '.npy', s )   #save vector of s values
 
 tmp = np.hstack(( th[-1]-2.*np.pi, th, th[0]+2.*np.pi ))
 dth = ( tmp[2:nth+2] - tmp[0:nth] ) / 2.             #non-constant delta th
@@ -269,10 +276,6 @@ alpA = -2.**-13. * c
 
 stcB = stc
 # stcB = min( ns-1, 2*(pol+2)+1 )
-# if ( pol==5 | pol==6 ) & ( ns == 14 ) :
-#     stcB = 13
-# else :
-#     stcB = 2*(pol+2)+1
 
 NxBot, NyBot, NxTop, NyTop \
 , TxBot, TyBot, TxTop, TyTop \
@@ -438,28 +441,15 @@ for i in np.arange( 0, nTimesteps+1 ) :
             U = np.load( saveString \
             + '{0:04d}'.format(np.int(np.round(t))) + '.npy' )
         else :
-            U = setGhostNodes( U )
-            np.save( saveString \
-            + '{0:04d}'.format(np.int(np.round(t))) + '.npy', U )
+            if saveArrays == 1 :
+                U = setGhostNodes( U )
+                np.save( saveString \
+                + '{0:04d}'.format(np.int(np.round(t))) + '.npy', U )
         
         if saveContours == 1 :
-            tmp = U[0,:,:]
-            # tmp = Dx(U[2,:,:]) - Dy(U[1,:,:])
-            # tmp = np.sqrt( U[1,:,:]**2. + U[2,:,:]**2. )
-            tmp = Wradial.dot(tmp)                    #radial interpolation
-            tmp = Wangular.dot(tmp.T).T              #angular interpolation
-            # plt.contourf( xx0, yy0, tmp, 20 )
-            # plt.contourf( xx0, yy0, tmp, np.arange(-.00205,.00205+.0001,.0001) )
-            # plt.contourf( xx0, yy0, tmp, np.linspace(-c/10.,c/10.,20) )
-            plt.contourf( xx0, yy0, tmp, np.arange(1.-.15,1.+.17,.02) )
-            plt.plot( xB, yB, "k-", xT, yT, "k-" )
-            plt.axis('equal')
-            tmp = outerRadius + .2
-            plt.axis([-tmp,tmp,-tmp,tmp])
-            plt.colorbar()
-            fig.savefig( '{0:04d}'.format(np.int(np.round(t)+1e-12)) \
-            + '.png', bbox_inches = 'tight' )
-            plt.clf()
+            waveEquation.plotSomething( U, t \
+            , whatToPlot, xx0, yy0, Wradial, Wangular \
+            , c, xB, yB, xT, yT, outerRadius, fig )
         
         if np.max(np.abs(U)) > 5. :
             sys.exit("\nUnstable in time.\n")

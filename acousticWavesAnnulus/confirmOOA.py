@@ -10,16 +10,16 @@ from gab.annulus import common, waveEquation
 
 ###########################################################################
 
-c           = .01                                     #wave speed (c**2=RT)
+c           = .02                                     #wave speed (c**2=RT)
 innerRadius = 1.
 outerRadius = 2.
-tf          = 100.                                              #final time
-saveDel     = 10                           #time interval to save snapshots
-exp         = 200.                 #controls steepness of initial condition
+tf          = 20.                                               #final time
+saveDel     = 2                            #time interval to save snapshots
+exp         = 100.                 #controls steepness of initial condition
 amp         = .10                 #amplitude of trigonometric topo function
-frq         = 7                   #frequency of trigonometric topo function
+frq         = 6                   #frequency of trigonometric topo function
 
-ord = 2                                        #norm to use for error check
+errNorm = np.inf                               #norm to use for error check
 
 contourErrors = 1
 
@@ -28,12 +28,12 @@ phsA      = 5
 polA      = 3
 stcA      = 7
 ptbA      = .00
-rkStagesA = 4
+rkStagesA = 3
 
 mlvB      = 1
-phsB      = 5
-polB      = 4
-stcB      = 5
+phsB      = 7
+polB      = 5
+stcB      = 13
 ptbB      = .00
 rkStagesB = 4
 
@@ -46,19 +46,19 @@ rkStages0 = 4
 
 t0 = tf                                                    #time to look at
 
-ns0 = 192                                             #reference resolution
+ns0 = 384                                             #reference resolution
 ns1 = 12
 ns2 = 24
 ns3 = 48
 ns4 = 96
-ns5 = 96
+ns5 = 192
 
-dt0reg = 1./16.
+dt0reg = 1./32.
 dt1reg = 1./1.
 dt2reg = 1./2.
 dt3reg = 1./4.
 dt4reg = 1./8.
-dt5reg = 1./8.
+dt5reg = 1./16.
 
 dt1ptb = dt1reg / 1.
 dt2ptb = dt2reg / 1.
@@ -176,21 +176,21 @@ def interpAngular( U0, U1, U2, U3, U4, U5, th0, th1, th2, th3, th4, th5 ) :
 
 def gatherErrors( U0, U1, U2, U3, U4, U5 ) :
     
-    # err1 = np.linalg.norm( U1-U2, ord )
-    # err2 = np.linalg.norm( U2-U3, ord )
-    # err3 = np.linalg.norm( U3-U4, ord )
-    # err4 = np.linalg.norm( U4-U5, ord )
-    # err5 = np.linalg.norm( U5-U0, ord )
+    # err1 = np.linalg.norm( U1-U2, errNorm )
+    # err2 = np.linalg.norm( U2-U3, errNorm )
+    # err3 = np.linalg.norm( U3-U4, errNorm )
+    # err4 = np.linalg.norm( U4-U5, errNorm )
+    # err5 = np.linalg.norm( U5-U0, errNorm )
     
-    err1 = np.linalg.norm( U1-U0, ord )
-    err2 = np.linalg.norm( U2-U0, ord )
-    err3 = np.linalg.norm( U3-U0, ord )
-    err4 = np.linalg.norm( U4-U0, ord )
-    err5 = np.linalg.norm( U5-U0, ord )
+    err1 = np.linalg.norm( U1-U0, errNorm )
+    err2 = np.linalg.norm( U2-U0, errNorm )
+    err3 = np.linalg.norm( U3-U0, errNorm )
+    err4 = np.linalg.norm( U4-U0, errNorm )
+    err5 = np.linalg.norm( U5-U0, errNorm )
     
     err = np.hstack(( err1, err2, err3, err4, err5 ))
     
-    # err = err / np.linalg.norm(U0,ord)
+    # err = err / np.linalg.norm(U0,errNorm)
     
     return err
 
