@@ -4,3 +4,4 @@ jupyter/.ipynb_checkpoints
 *.swp
 *.png
 /acousticWavesAnnulus/c0.*
+*.pyc
