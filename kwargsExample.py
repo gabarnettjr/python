@@ -1,18 +1,18 @@
 #!/usr/bin/python3
+import sys
+
+#Example of how you can use kwargs
 
 ###########################################################################
 
-#Example of how you can use kwargs:
-
-#This function takes in either
+#This function takes in some combination of
 #(1) a slope and a y-intercept, or
-#(2) the x and y coordinates of two points (x0,y0) and (x1,y1),
+#(2) the x and y coordinates of two points (x0,y0) and (x1,y1), or
+#(3) the first point p0=(x0,y0) and the second point p1=(x1,y1),
 
 #and it gives back either
 #(1) the equation of the line in slope-intercept form, or
 #(2) the equation of the line in point-slope form.
-
-import sys
 
 def getEquationOfLine( formatString="2.5f", **kwargs ) :
     #Parse input:
@@ -51,20 +51,23 @@ def getEquationOfLine( formatString="2.5f", **kwargs ) :
             m = ( y1 - y0 ) / ( x1 - x0 )
             tmp = "y - {0:%s} = {1:%s} * ( x - {2:%s} )" \
             % ( formatString, formatString, formatString )
-            # print( tmp . format(y1,m,x1) )
             equationString = tmp.format(y1,m,x1)
     else:
         tmp = "y = {0:%s}*x + {1:%s}" % ( formatString, formatString )
-        # print( tmp . format(m,b) )
         equationString = tmp.format(m,b)
     return equationString
-    
+
+###########################################################################
+
+#Use the function with various styles of input, and print the result:
 fs = "1.2f"
 eq1 = getEquationOfLine( fs, slope=2, yIntercept=1 )
 eq2 = getEquationOfLine( fs, p0=(0,1), p1=(1,3) )
 eq3 = getEquationOfLine( fs, x0=0, y0=1, p1=(1,3) )
+print()
 print(eq1)
 print(eq2)
 print(eq3)
+print()
 
 ###########################################################################
