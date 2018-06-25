@@ -1,9 +1,11 @@
 @echo off
 
+echo The zeroth input is %0, the first is %1, and the second is %2.
+
 setlocal enableextensions enabledelayedexpansion
 
-set /a "x = 5"
-set /a "y = 7"
+set /a "x = %1"
+set /a "y = %2"
 set /a "z = %x% + %y%"
 set /a "w = %x% * %y%"
 echo.
