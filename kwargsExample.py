@@ -63,11 +63,10 @@ def getEquationOfLine( formatString="2.5f", **kwargs ) :
 fs = "1.2f"
 eq1 = getEquationOfLine( fs, slope=2, yIntercept=1 )
 eq2 = getEquationOfLine( fs, p0=(0,1), p1=(1,3) )
-eq3 = getEquationOfLine( fs, x0=0, y0=1, p1=(1,3) )
+eq3 = getEquationOfLine( x0=0, y0=1, p1=(1,3) )
 print()
 print(eq1)
 print(eq2)
 print(eq3)
-print()
 
 ###########################################################################

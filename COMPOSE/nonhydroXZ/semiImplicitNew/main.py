@@ -14,14 +14,14 @@ from gab.nonhydro import common
 
 #"bubble", "igw", "densityCurrent", "doubleDensityCurrent",
 #or "movingDensityCurrent":
-testCase = "igw"
+testCase = "bubble"
 
 #"theta_pi" or "T_rho_P" or "theta_rho_P" or "HOMMEstyle":
 formulation  = "HOMMEstyle"
 
 VL = np.int64(sys.argv[1])              #if 1 then do vertically lagrangian
 semiImplicit = 0                  #if 1 then do semi-implicit time-stepping
-gmresTol     = 1e-9         #only matters if semiImplicit=1.  Default: 1e-5
+gmresTol     = 1e-6         #only matters if semiImplicit=1.  Default: 1e-5
 
 dx    = np.float64(sys.argv[2])                         #horizontal spacing
 ds    = np.float64(sys.argv[3])                           #vertical spacing
@@ -34,9 +34,9 @@ stc = 7                                                    #1D stencil-size
 
 rkStages  = 3                        #number of Runge-Kutta stages (3 or 4)
 plotNodes = 0                               #if 1, plot nodes and then exit
-saveDel   = 1                             #print/save every saveDel seconds
+saveDel   = 100                           #print/save every saveDel seconds
 
-var           = 3                        #determines what to plot (0,1,2,3)
+var           = 2                        #determines what to plot (0,1,2,3)
 saveArrays    = 0                   #if 1 then save arrays, if 0 then don't
 saveContours  = 1                 #if 1 then save contours, if 0 then don't
 plotFromSaved = 0           #if 1 then load results, if 0 then compute them
@@ -72,8 +72,8 @@ if not os.path.exists( saveString ) :
 
 Cp, Cv, Rd, g, Po = common.getConstants()
 
-# tf = common.getTfinal( testCase )
-tf = 20.
+tf = common.getTfinal( testCase )
+# tf = 20.
 nTimesteps = np.int( np.round(tf/dtImp) + 1e-12 )
 
 xLeft, xRight, nLev, nCol, zTop, zSurf, zSurfPrime, x, z \
