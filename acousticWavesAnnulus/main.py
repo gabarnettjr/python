@@ -13,30 +13,18 @@ from gab.annulus import common, waveEquation
 
 ###########################################################################
 
-c           = .02                                     #wave speed (c**2=RT)
-innerRadius = 1.
-outerRadius = 2.
-tf          = 200.                                              #final time
-saveDel     = 10                           #time interval to save snapshots
-exp         = 100.                 #controls steepness of initial condition
-amp         = .10                 #amplitude of trigonometric topo function
-frq         = 6                   #frequency of trigonometric topo function
+args = waveEquation.parseInput()
+#get rid of the args prefix on all the variable names:
+d = vars(args)
+for k in d.keys() :
+    exec("{} = args.{}".format(k,k))
 
-plotFromSaved = 0                            #if 1, load instead of compute
-saveContours  = 1                       #switch for saving contours as pngs
-saveArrays    = 0                                 #switch for saving arrays
-whatToPlot    = "rho"
+dt = 1./dti
 
-useHV = 1                               #switch to turn radial HV on or off
+if plotFromSaved :
+    saveContours = True
 
-mlv      = np.int64(sys.argv[1])                #0:interfaces, 1:mid-levels
-phs      = np.int64(sys.argv[2])             #PHS RBF exponent (odd number)
-pol      = np.int64(sys.argv[3])                         #polynomial degree
-stc      = np.int64(sys.argv[4])                              #stencil size
-ptb      = np.float64(sys.argv[5])   #random radial perturbation percentage
-rkStages = np.int64(sys.argv[6])     #number of Runge-Kutta stages (3 or 4)
-ns       = np.int64(sys.argv[7])                  #total number of s levels
-dt       = 1./np.float64(sys.argv[8])                              #delta t
+###########################################################################
 
 rSurf, rSurfPrime \
 = common.getTopoFunc( innerRadius, outerRadius, amp, frq )
@@ -66,9 +54,9 @@ def initialCondition( x, y ) :
 
 saveString = waveEquation.getSavestring( c, innerRadius, outerRadius \
 , tf, saveDel, exp, amp, frq \
-, mlv, phs, pol, stc, ptb, rkStages, ns, dt )
+, mlv, phs, pol, stc, ptb, rks, nlv, dti )
 
-if ( saveArrays == 1 ) & ( plotFromSaved != 1 ) :
+if ( saveArrays ) & ( not plotFromSaved ) :
     if os.path.exists( saveString + '*.npy' ) :
         os.remove( saveString + '*.npy' )                 #remove old files
     if not os.path.exists( saveString ) :
@@ -81,28 +69,28 @@ if ( saveArrays == 1 ) & ( plotFromSaved != 1 ) :
 t = 0.                                                       #starting time
 nTimesteps = np.int(np.round( tf / dt ))         #total number of timesteps
 
-nth = common.getNth( innerRadius, outerRadius, ns ) #nmbr of angular levels
+nth = common.getNth( innerRadius, outerRadius, nlv ) #nmbr of angular levels
 dth0 = 2.*np.pi / nth                                 #constant delta theta
 th0  = np.linspace( 0., 2.*np.pi, nth+1 )             #vector of all angles
 th0  = th0[0:-1]                         #remove last angle (same as first)
-tmp = ptb * dth0                              #relative perturbation factor
+tmp = (ptb/100.) * dth0                       #relative perturbation factor
 ran = -tmp + 2.*tmp*np.random.rand(nth)         #random perturbation vector
 th = th0.copy()                                     #copy regular th vector
 th = th + ran                                 #th vector after perturbation
 
 if mlv == 1 :
-    ds0 = ( outerRadius - innerRadius ) / (ns-2)          #constant delta s
-    s0  = np.linspace( innerRadius-ds0/2, outerRadius+ds0/2, ns ) #s vector
-    tmp = ptb * ds0                           #relative perturbation factor
-    ran = -tmp + 2.*tmp*np.random.rand(ns)      #random perturbation vector
+    ds0 = ( outerRadius - innerRadius ) / (nlv-2)          #constant delta s
+    s0  = np.linspace( innerRadius-ds0/2, outerRadius+ds0/2, nlv ) #s vector
+    tmp = (ptb/100.) * ds0                     #relative perturbation factor
+    ran = -tmp + 2.*tmp*np.random.rand(nlv)      #random perturbation vector
     s   = s0.copy()                                  #copy regular s vector
     s   = s + ran                              #s vector after perturbation
 elif mlv == 0 :
-    ds0 = ( outerRadius - innerRadius ) / (ns-3)          #constant delta s
-    s0  = np.linspace( innerRadius-ds0, outerRadius+ds0, ns )     #s vector
-    tmp = ptb * ds0                           #relative perturbation factor
+    ds0 = ( outerRadius - innerRadius ) / (nlv-3)          #constant delta s
+    s0  = np.linspace( innerRadius-ds0, outerRadius+ds0, nlv )     #s vector
+    tmp = (ptb/100.) * ds0                     #relative perturbation factor
     ranBot = -tmp + 2.*tmp*np.random.rand(1)
-    ranMid = -tmp + 2.*tmp*np.random.rand(ns-4)
+    ranMid = -tmp + 2.*tmp*np.random.rand(nlv-4)
     ranTop = -tmp + 2.*tmp*np.random.rand(1)
     s = s0.copy()                                    #copy regular s vector
     s[0] = s[0] + ranBot                         #perturb bottom ghost node
@@ -111,17 +99,17 @@ elif mlv == 0 :
 else :
     sys.exit("\nError: mlv should be 0 or 1.\n")
 
-if plotFromSaved == 1 :
+if plotFromSaved :
     th = np.load( saveString + 'th' + '.npy' )    #load vector of th values
     s  = np.load( saveString + 's'  + '.npy' )     #load vector of s values
 else :
-    if saveArrays == 1 :
+    if saveArrays :
         np.save( saveString + 'th' + '.npy', th ) #save vector of th values
         np.save( saveString + 's'  + '.npy', s )   #save vector of s values
 
 tmp = np.hstack(( th[-1]-2.*np.pi, th, th[0]+2.*np.pi ))
 dth = ( tmp[2:nth+2] - tmp[0:nth] ) / 2.             #non-constant delta th
-ds  = ( s[2:ns] - s[0:ns-2] ) / 2.                    #non-constant delta s
+ds  = ( s[2:nlv] - s[0:nlv-2] ) / 2.                    #non-constant delta s
 
 ###########################################################################
 
@@ -209,7 +197,7 @@ dsdrAll  = dsdr( rr, thth )                   #dsdr values over entire mesh
 
 #Set initial condition for U[0,:,:] (P):
 
-U = np.zeros(( 3, ns, nth ))
+U = np.zeros(( 3, nlv, nth ))
 U[0,:,:] = initialCondition(xx,yy)
 Po = U[0,1:-1,:]
 rhoInv = c**2. / Po
@@ -258,7 +246,7 @@ elif ( pol == 7 ) | ( pol == 8 ) :
 else :
     sys.exit("\nError: 1 <= pol <= 8\n")
 
-if useHV != 1 :
+if uhv != 1 :
     alp = 0.                                   #remove radial HV completely
 
 ###########################################################################
@@ -275,7 +263,7 @@ alpA = -2.**-13. * c
 #Extra things needed to enforce the Neumann boundary condition for P:
 
 stcB = stc
-# stcB = min( ns-1, 2*(pol+2)+1 )
+# stcB = min( nlv-1, 2*(pol+2)+1 )
 
 NxBot, NyBot, NxTop, NyTop \
 , TxBot, TyBot, TxTop, TyTop \
@@ -297,12 +285,12 @@ Whvs = alp * ds0**pol * Whvs
 # Whvs = alp * dsPol.dot(Whvs)                       #scaled radial HV matrix
 
 # #Complex radial HV:
-# dr = ( rr[2:ns,:] - rr[0:ns-2,:] ) / 2.
+# dr = ( rr[2:nlv,:] - rr[0:nlv-2,:] ) / 2.
 # alpDrPol = alp * dr**pol
-# alpDrPol = alp * ((outerRadius-innerRadius)/(ns-2)) ** pol
-# alpDxPol = alp * ( ( dr + ss[1:-1,:]*np.tile(dth,(ns-2,1)) ) / 2. ) ** pol
-# alpDxPol = alp * ( ( (outerRadius-innerRadius)/(ns-2) + ss[1:-1,:]*2.*np.pi/nth ) / 2. ) ** pol
-# alpDsPol = alp * ( ( ss[1:-1,:]*np.tile(dth,(ns-2,1)) + np.transpose(np.tile(ds,(nth,1))) ) / 2. ) ** pol
+# alpDrPol = alp * ((outerRadius-innerRadius)/(nlv-2)) ** pol
+# alpDxPol = alp * ( ( dr + ss[1:-1,:]*np.tile(dth,(nlv-2,1)) ) / 2. ) ** pol
+# alpDxPol = alp * ( ( (outerRadius-innerRadius)/(nlv-2) + ss[1:-1,:]*2.*np.pi/nth ) / 2. ) ** pol
+# alpDsPol = alp * ( ( ss[1:-1,:]*np.tile(dth,(nlv-2,1)) + np.transpose(np.tile(ds,(nth,1))) ) / 2. ) ** pol
 
 ###########################################################################
 
@@ -320,7 +308,7 @@ Whvlam = alpA * dth0**polA * Whvlam
 
 # #Complex angular HV:
 # alpDthPol = alpA * dth0**polA
-# # alpDthPol = alpA * ( np.tile(dth,(ns-2,1)) ) ** polA
+# # alpDthPol = alpA * ( np.tile(dth,(nlv-2,1)) ) ** polA
 
 ###########################################################################
 
@@ -415,18 +403,18 @@ def odefun( t, U ) :
     # , setGhostNodes, Dx, Dy, HV          \
     # , Po, rhoInv )
 
-if rkStages == 3 :
+if rks == 3 :
     rk = rk.rk3
-elif rkStages == 4 :
+elif rks == 4 :
     rk = rk.rk4
 else :
-    sys.exit("\nError: rkStages should be 3 or 4 in this problem.\n")
+    sys.exit("\nError: rks should be 3 or 4 in this problem.\n")
 
 ###########################################################################
 
 #Main time-stepping loop:
 
-if saveContours == 1 :
+if saveContours :
     fig = plt.figure( figsize = (18,14) )
 et = time.time()
 
@@ -437,24 +425,25 @@ for i in np.arange( 0, nTimesteps+1 ) :
         print( "t =", np.int(np.round(t)), ",  et =", time.time()-et )
         et = time.time()
         
-        if plotFromSaved == 1 :
+        if plotFromSaved :
             U = np.load( saveString \
             + '{0:04d}'.format(np.int(np.round(t))) + '.npy' )
         else :
-            if saveArrays == 1 :
+            if saveArrays :
                 U = setGhostNodes( U )
                 np.save( saveString \
                 + '{0:04d}'.format(np.int(np.round(t))) + '.npy', U )
         
-        if saveContours == 1 :
+        if saveContours :
             waveEquation.plotSomething( U, t \
+            , Dx, Dy \
             , whatToPlot, xx0, yy0, Wradial, Wangular \
             , c, xB, yB, xT, yT, outerRadius, fig )
         
         if np.max(np.abs(U)) > 5. :
             sys.exit("\nUnstable in time.\n")
         
-    if plotFromSaved == 1 :
+    if plotFromSaved :
         t = t + dt
     else :
         [ t, U ] = rk( t, U, odefun, dt )

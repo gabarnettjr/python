@@ -1,32 +1,42 @@
 #!usr/bin/python3
 import os
 
+tf = "20"
+saveDel = "2"
+
 for i in range( 5 ) :
     
-    ns = '{0:1d}'.format( 12*2**i + 2 )
-    dtinvReg = '{0:1d}'.format( 1*2**i )
-    dtinvPtb = '{0:1d}'.format( 1*2**i )
+    nlv = '{0:1d}'.format( 12*2**i + 2 )
+    dti = '{0:1d}'.format( 1*2**i )
     
     #################################
     
     #p5:
     
-    str = "1 7 5 13 .40 3 " + ns + " " + dtinvPtb
+    str = "--tf " + tf + " --saveDel " + saveDel \
+    + " --phs 7 --pol 5 --stc 13 --ptb 40 --rks 3" \
+    + " --nlv " + nlv + " --dti " + dti + " --saveArrays"
     print( str + " :" )
     os.system( "python main.py " + str )
     print()
     
-    str = "1 7 5 13 .40 4 " + ns + " " + dtinvPtb
+    str = "--tf " + tf + " --saveDel " + saveDel \
+    + " --phs 7 --pol 5 --stc 13 --ptb 40 --rks 4" \
+    + " --nlv " + nlv + " --dti " + dti + " --saveArrays"
     print( str + " :" )
     os.system( "python main.py " + str )
     print()
     
-    str = "1 7 5 13 .00 3 " + ns + " " + dtinvReg
+    str = "--tf " + tf + " --saveDel " + saveDel \
+    + " --phs 7 --pol 5 --stc 13 --ptb  0 --rks 3" \
+    + " --nlv " + nlv + " --dti " + dti + " --saveArrays"
     print( str + " :" )
     os.system( "python main.py " + str )
     print()
     
-    str = "1 7 5 13 .00 4 " + ns + " " + dtinvReg
+    str = "--tf " + tf + " --saveDel " + saveDel \
+    + " --phs 7 --pol 5 --stc 13 --ptb  0 --rks 4" \
+    + " --nlv " + nlv + " --dti " + dti + " --saveArrays"
     print( str + " :" )
     os.system( "python main.py " + str )
     print()
@@ -35,88 +45,45 @@ for i in range( 5 ) :
     
     #p3:
     
-    str = "1 5 3 7 .40 3 " + ns + " " + dtinvPtb
+    str = "--tf " + tf + " --saveDel " + saveDel \
+    + " --phs 5 --pol 3 --stc 7 --ptb 40 --rks 3" \
+    + " --nlv " + nlv + " --dti " + dti + " --saveArrays"
     print( str + " :" )
     os.system( "python main.py " + str )
     print()
     
-    str = "1 5 3 7 .40 4 " + ns + " " + dtinvPtb
+    str = "--tf " + tf + " --saveDel " + saveDel \
+    + " --phs 5 --pol 3 --stc 7 --ptb 40 --rks 4" \
+    + " --nlv " + nlv + " --dti " + dti + " --saveArrays"
     print( str + " :" )
     os.system( "python main.py " + str )
     print()
     
-    str = "1 5 3 7 .00 3 " + ns + " " + dtinvReg
+    str = "--tf " + tf + " --saveDel " + saveDel \
+    + " --phs 5 --pol 3 --stc 7 --ptb  0 --rks 3" \
+    + " --nlv " + nlv + " --dti " + dti + " --saveArrays"
     print( str + " :" )
     os.system( "python main.py " + str )
     print()
     
-    str = "1 5 3 7 .00 4 " + ns + " " + dtinvReg
+    str = "--tf " + tf + " --saveDel " + saveDel \
+    + " --phs 5 --pol 3 --stc 7 --ptb  0 --rks 4" \
+    + " --nlv " + nlv + " --dti " + dti + " --saveArrays"
     print( str + " :" )
     os.system( "python main.py " + str )
     print()
-    
-    #################################
-    
-    # #FD4:
-    # 
-    # str = "1 5 4 5 .40 3 " + ns + " " + dtinvPtb
-    # print( str + " :" )
-    # os.system( "python main.py " + str )
-    # print()
-    # 
-    # str = "1 5 4 5 .40 4 " + ns + " " + dtinvPtb
-    # print( str + " :" )
-    # os.system( "python main.py " + str )
-    # print()
-    # 
-    # str = "1 5 4 5 .00 3 " + ns + " " + dtinvReg
-    # print( str + " :" )
-    # os.system( "python main.py " + str )
-    # print()
-    # 
-    # str = "1 5 4 5 .00 4 " + ns + " " + dtinvReg
-    # print( str + " :" )
-    # os.system( "python main.py " + str )
-    # print()
-
-    #####################################
-
-    # #FD2:
-    # 
-    # str = "1 3 1 5 .40 3 " + ns + " " + dtinvPtb
-    # print( str + " :" )
-    # os.system( "python main.py " + str )
-    # print()
-    # 
-    # str = "1 3 1 5 .40 4 " + ns + " " + dtinvPtb
-    # print( str + " :" )
-    # os.system( "python main.py " + str )
-    # print()
-    # 
-    # str = "1 3 1 5 .00 3 " + ns + " " + dtinvReg
-    # print( str + " :" )
-    # os.system( "python main.py " + str )
-    # print()
-    # 
-    # str = "1 3 1 5 .00 4 " + ns + " " + dtinvReg
-    # print( str + " :" )
-    # os.system( "python main.py " + str )
-    # print()
 
 ###########################################################################
 
 #reference solution:
 
 i = 5
-ns = '{0:1d}'.format( 12*2**i + 2 )
-dtinvReg = '{0:1d}'.format( 1*2**i )
+nlv = '{0:1d}'.format( 12*2**i + 2 )
+dti = '{0:1d}'.format( 1*2**i )
 
-# str = "1 5 3 7 .00 4 " + ns + " " + dtinvReg
-# print( str + " :" )
-# os.system( "python main.py " + str )
-# print()
-
-str = "1 7 5 13 .00 4 " + ns + " " + dtinvReg
+str = "--tf " + tf + " --saveDel " + saveDel \
++ " --phs 7 --pol 5 --stc 13 --ptb 0 --rks 4" \
++ " --nlv " + nlv + " --dti " + dti + " --saveArrays"
 print( str + " :" )
 os.system( "python main.py " + str )
 print()
