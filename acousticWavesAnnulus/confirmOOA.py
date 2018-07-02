@@ -11,6 +11,7 @@ from gab.annulus import common, waveEquation
 ###########################################################################
 
 args = waveEquation.parseInput()
+
 #get rid of the args prefix on all the variable names:
 d = vars(args)
 for k in d.keys() :
@@ -18,7 +19,7 @@ for k in d.keys() :
 
 ###########################################################################
 
-errNorm = np.inf                               #norm to use for error check
+errNorm = 2                                    #norm to use for error check
 
 contourErrors = 1
 
@@ -26,15 +27,15 @@ mlvA = 1
 phsA = 5
 polA = 3
 stcA = 7
-ptbA = 0
+ptbA = 40
 rksA = 3
 
 mlvB = 1
 phsB = 7
 polB = 5
 stcB = 13
-ptbB = 0
-rks  = 4
+ptbB = 40
+rksB = 4
 
 mlv0 = 1
 phs0 = 7
@@ -52,18 +53,12 @@ nlv3 = 48
 nlv4 = 96
 nlv5 = 192
 
-dti0reg = 32
-dti1reg = 1
-dti2reg = 2
-dti3reg = 4
-dti4reg = 8
-dti5reg = 16
-
-dti1ptb = dti1reg * 1
-dti2ptb = dti2reg * 1
-dti3ptb = dti3reg * 1
-dti4ptb = dti4reg * 1
-dti5ptb = dti5reg * 1
+dti0 = 32
+dti1 = 1
+dti2 = 2
+dti3 = 4
+dti4 = 8
+dti5 = 16
 
 ###########################################################################
 
@@ -90,24 +85,13 @@ def loadSingleResult( mlv, phs, pol, stc, ptb, rks, nlv, dti, t0 ) :
 
 def loadManyResults( mlv, phs, pol, stc, ptb, rks ) :
     
-    if ptb == .00 :
-        
-        U0, s0, th0 = loadSingleResult( mlv0, phs0, pol0, stc0, ptb0, rks0, nlv0, dt0reg, t0 )
-        U1, s1, th1 = loadSingleResult( mlv,  phs,  pol,  stc,  ptb,  rks,  nlv1, dt1reg, t0 )
-        U2, s2, th2 = loadSingleResult( mlv,  phs,  pol,  stc,  ptb,  rks,  nlv2, dt2reg, t0 )
-        U3, s3, th3 = loadSingleResult( mlv,  phs,  pol,  stc,  ptb,  rks,  nlv3, dt3reg, t0 )
-        U4, s4, th4 = loadSingleResult( mlv,  phs,  pol,  stc,  ptb,  rks,  nlv4, dt4reg, t0 )
-        U5, s5, th5 = loadSingleResult( mlv,  phs,  pol,  stc,  ptb,  rks,  nlv5, dt5reg, t0 )
-        
-    else :
-        
-        U0, s0, th0 = loadSingleResult( mlv0, phs0, pol0, stc0, ptb0, rks0, nlv0, dti0reg, t0 )
-        U1, s1, th1 = loadSingleResult( mlv,  phs,  pol,  stc,  ptb,  rks,  nlv1, dti1ptb, t0 )
-        U2, s2, th2 = loadSingleResult( mlv,  phs,  pol,  stc,  ptb,  rks,  nlv2, dti2ptb, t0 )
-        U3, s3, th3 = loadSingleResult( mlv,  phs,  pol,  stc,  ptb,  rks,  nlv3, dti3ptb, t0 )
-        U4, s4, th4 = loadSingleResult( mlv,  phs,  pol,  stc,  ptb,  rks,  nlv4, dti4ptb, t0 )
-        U5, s5, th5 = loadSingleResult( mlv,  phs,  pol,  stc,  ptb,  rks,  nlv5, dti5ptb, t0 )
-        
+    U0, s0, th0 = loadSingleResult( mlv0, phs0, pol0, stc0, ptb0, rks0, nlv0, dti0, t0 )
+    U1, s1, th1 = loadSingleResult( mlv,  phs,  pol,  stc,  ptb,  rks,  nlv1, dti1, t0 )
+    U2, s2, th2 = loadSingleResult( mlv,  phs,  pol,  stc,  ptb,  rks,  nlv2, dti2, t0 )
+    U3, s3, th3 = loadSingleResult( mlv,  phs,  pol,  stc,  ptb,  rks,  nlv3, dti3, t0 )
+    U4, s4, th4 = loadSingleResult( mlv,  phs,  pol,  stc,  ptb,  rks,  nlv4, dti4, t0 )
+    U5, s5, th5 = loadSingleResult( mlv,  phs,  pol,  stc,  ptb,  rks,  nlv5, dti5, t0 )
+    
     return U0, U1, U2, U3, U4, U5 \
     , s0, s1, s2, s3, s4, s5 \
     , th0, th1, th2, th3, th4, th5

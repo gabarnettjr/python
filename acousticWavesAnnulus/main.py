@@ -14,6 +14,7 @@ from gab.annulus import common, waveEquation
 ###########################################################################
 
 args = waveEquation.parseInput()
+
 #get rid of the args prefix on all the variable names:
 d = vars(args)
 for k in d.keys() :
@@ -36,17 +37,17 @@ tmp = 5./18.*np.pi
 xc2 = (rSurf(tmp)+outerRadius)/2.*np.cos(tmp)                #x-coord of IC
 yc2 = (rSurf(tmp)+outerRadius)/2.*np.sin(tmp)                #y-coord of IC
 def initialCondition( x, y ) :
-    # #Wendland function:
-    # r = np.sqrt( 6 * ( (x-xc1)**2. + (y-yc1)**2. ) )
-    # ind = r<1.
-    # z = np.zeros( np.shape(x) )
-    # z[ind] = ( 1. - r[ind] ) ** 10. * ( 429.*r[ind]**4. + 450.*r[ind]**3. \
-    # + 210.*r[ind]**2. + 50.*r[ind] + 5.  )
-    # z = 1. + z/5.
-    # return z
-    #Gaussian:
-    return 1. + np.exp( -exp*( (x-xc1)**2. + (y-yc1)**2. ) ) \
-              + np.exp( -exp*( (x-xc2)**2. + (y-yc2)**2. ) )
+    #Wendland function:
+    r = np.sqrt( 6 * ( (x-xc1)**2. + (y-yc1)**2. ) )
+    ind = r<1.
+    z = np.zeros( np.shape(x) )
+    z[ind] = ( 1. - r[ind] ) ** 10. * ( 429.*r[ind]**4. + 450.*r[ind]**3. \
+    + 210.*r[ind]**2. + 50.*r[ind] + 5.  )
+    z = 1. + z/5.
+    return z
+    # #Gaussian:
+    # return 1. + np.exp( -exp*( (x-xc1)**2. + (y-yc1)**2. ) ) \
+              # + np.exp( -exp*( (x-xc2)**2. + (y-yc2)**2. ) )
 
 ###########################################################################
 
@@ -69,7 +70,7 @@ if ( saveArrays ) & ( not plotFromSaved ) :
 t = 0.                                                       #starting time
 nTimesteps = np.int(np.round( tf / dt ))         #total number of timesteps
 
-nth = common.getNth( innerRadius, outerRadius, nlv ) #nmbr of angular levels
+nth = common.getNth( innerRadius, outerRadius, nlv )#nmbr of angular levels
 dth0 = 2.*np.pi / nth                                 #constant delta theta
 th0  = np.linspace( 0., 2.*np.pi, nth+1 )             #vector of all angles
 th0  = th0[0:-1]                         #remove last angle (same as first)
@@ -79,16 +80,16 @@ th = th0.copy()                                     #copy regular th vector
 th = th + ran                                 #th vector after perturbation
 
 if mlv == 1 :
-    ds0 = ( outerRadius - innerRadius ) / (nlv-2)          #constant delta s
-    s0  = np.linspace( innerRadius-ds0/2, outerRadius+ds0/2, nlv ) #s vector
-    tmp = (ptb/100.) * ds0                     #relative perturbation factor
-    ran = -tmp + 2.*tmp*np.random.rand(nlv)      #random perturbation vector
+    ds0 = ( outerRadius - innerRadius ) / (nlv-2)         #constant delta s
+    s0  = np.linspace( innerRadius-ds0/2, outerRadius+ds0/2, nlv )#s vector
+    tmp = (ptb/100.) * ds0                    #relative perturbation factor
+    ran = -tmp + 2.*tmp*np.random.rand(nlv)     #random perturbation vector
     s   = s0.copy()                                  #copy regular s vector
     s   = s + ran                              #s vector after perturbation
 elif mlv == 0 :
-    ds0 = ( outerRadius - innerRadius ) / (nlv-3)          #constant delta s
-    s0  = np.linspace( innerRadius-ds0, outerRadius+ds0, nlv )     #s vector
-    tmp = (ptb/100.) * ds0                     #relative perturbation factor
+    ds0 = ( outerRadius - innerRadius ) / (nlv-3)         #constant delta s
+    s0  = np.linspace( innerRadius-ds0, outerRadius+ds0, nlv )    #s vector
+    tmp = (ptb/100.) * ds0                    #relative perturbation factor
     ranBot = -tmp + 2.*tmp*np.random.rand(1)
     ranMid = -tmp + 2.*tmp*np.random.rand(nlv-4)
     ranTop = -tmp + 2.*tmp*np.random.rand(1)
@@ -109,7 +110,7 @@ else :
 
 tmp = np.hstack(( th[-1]-2.*np.pi, th, th[0]+2.*np.pi ))
 dth = ( tmp[2:nth+2] - tmp[0:nth] ) / 2.             #non-constant delta th
-ds  = ( s[2:nlv] - s[0:nlv-2] ) / 2.                    #non-constant delta s
+ds  = ( s[2:nlv] - s[0:nlv-2] ) / 2.                  #non-constant delta s
 
 ###########################################################################
 

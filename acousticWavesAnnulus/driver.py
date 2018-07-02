@@ -1,7 +1,7 @@
 #!usr/bin/python3
 import os
 
-tf = "20"
+tf = "20.0"
 saveDel = "2"
 
 for i in range( 5 ) :
