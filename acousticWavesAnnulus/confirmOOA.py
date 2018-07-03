@@ -15,26 +15,26 @@ args = waveEquation.parseInput()
 #get rid of the args prefix on all the variable names:
 d = vars(args)
 for k in d.keys() :
-    exec("{} = args.{}".format(k,k))
+    exec( "{} = args.{}" . format(k,k) )
 
 ###########################################################################
 
-errNorm = 2                                    #norm to use for error check
+errNorm = np.inf                               #norm to use for error check
 
 contourErrors = 1
 
 mlvA = 1
-phsA = 5
-polA = 3
-stcA = 7
-ptbA = 40
+phsA = 7
+polA = 5
+stcA = 13
+ptbA = 0
 rksA = 3
 
 mlvB = 1
 phsB = 7
 polB = 5
 stcB = 13
-ptbB = 40
+ptbB = 0
 rksB = 4
 
 mlv0 = 1
@@ -159,12 +159,6 @@ def interpAngular( U0, U1, U2, U3, U4, U5, th0, th1, th2, th3, th4, th5 ) :
 
 def gatherErrors( U0, U1, U2, U3, U4, U5 ) :
     
-    # err1 = np.linalg.norm( U1-U2, errNorm )
-    # err2 = np.linalg.norm( U2-U3, errNorm )
-    # err3 = np.linalg.norm( U3-U4, errNorm )
-    # err4 = np.linalg.norm( U4-U5, errNorm )
-    # err5 = np.linalg.norm( U5-U0, errNorm )
-    
     err1 = np.linalg.norm( U1-U0, errNorm )
     err2 = np.linalg.norm( U2-U0, errNorm )
     err3 = np.linalg.norm( U3-U0, errNorm )
@@ -179,7 +173,7 @@ def gatherErrors( U0, U1, U2, U3, U4, U5 ) :
 
 ###########################################################################
 
-def getErrorVector( mlv, phs, pol, stc, ptb, rkStages ) :
+def getErrorVector( mlv, phs, pol, stc, ptb, rks ) :
     
     U0, U1, U2, U3, U4, U5, s0, s1, s2, s3, s4, s5, th0, th1, th2, th3, th4, th5  \
     = loadManyResults( mlv, phs, pol, stc, ptb, rks )
@@ -205,7 +199,10 @@ errB, U0, U1, U2, U3, U4, U5, th0, s0 \
 = getErrorVector( mlvB, phsB, polB, stcB, ptbB, rksB )
 
 nlv= np.hstack(( nlv1, nlv2, nlv3, nlv4, nlv5 ))
-nlv = nlv - 2
+if mlv == 1 :
+    nlv = nlv - 2
+else :
+    nlv = nlv - 3
 
 dom = np.array( [ 1.4, 2.4 ] )
 width = dom[1] - dom[0]
@@ -239,43 +236,37 @@ if contourErrors == 1 :
     xx0 = rr0 * np.cos(thth0)
     yy0 = rr0 * np.sin(thth0)
     
-    # e1 = np.abs( U1 - U2 )
-    # e2 = np.abs( U2 - U3 )
-    # e3 = np.abs( U3 - U4 )
-    # e4 = np.abs( U4 - U5 )
-    # e5 = np.abs( U5 - U0 )
-    
     e1 = np.abs( U1 - U0 )
     e2 = np.abs( U2 - U0 )
     e3 = np.abs( U3 - U0 )
     e4 = np.abs( U4 - U0 )
     e5 = np.abs( U5 - U0 )
     
-    e1 = e1.flatten()
-    e2 = e2.flatten()
-    e3 = e3.flatten()
-    e4 = e4.flatten()
-    e5 = e5.flatten()
-    
+    # e1 = e1.flatten()
+    # e2 = e2.flatten()
+    # e3 = e3.flatten()
+    # e4 = e4.flatten()
+    # e5 = e5.flatten()
+    # 
     # ep = 10.**-20.
-    
+    # 
     # e1[e1<=ep] = ep
     # e2[e2<=ep] = ep
     # e3[e3<=ep] = ep
     # e4[e4<=ep] = ep
     # e5[e5<=ep] = ep
-    
+    # 
     # e1 = np.log10(e1)
     # e2 = np.log10(e2)
     # e3 = np.log10(e3)
     # e4 = np.log10(e4)
     # e5 = np.log10(e5)
-    
-    e1 = np.reshape( e1, np.shape(xx0) )
-    e2 = np.reshape( e2, np.shape(xx0) )
-    e3 = np.reshape( e3, np.shape(xx0) )
-    e4 = np.reshape( e4, np.shape(xx0) )
-    e5 = np.reshape( e5, np.shape(xx0) )
+    # 
+    # e1 = np.reshape( e1, np.shape(xx0) )
+    # e2 = np.reshape( e2, np.shape(xx0) )
+    # e3 = np.reshape( e3, np.shape(xx0) )
+    # e4 = np.reshape( e4, np.shape(xx0) )
+    # e5 = np.reshape( e5, np.shape(xx0) )
     
     # cvec = np.arange(-20,1,1)
     cvec = 20

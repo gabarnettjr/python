@@ -31,23 +31,23 @@ rSurf, rSurfPrime \
 = common.getTopoFunc( innerRadius, outerRadius, amp, frq )
 
 tmp = 17./18.*np.pi
-xc1 = (rSurf(tmp)+outerRadius)/2.*np.cos(tmp)                #x-coord of IC
-yc1 = (rSurf(tmp)+outerRadius)/2.*np.sin(tmp)                #y-coord of IC
+xc1 = (rSurf(tmp)+outerRadius)/2.*np.cos(tmp)           #x-coord of GA bell
+yc1 = (rSurf(tmp)+outerRadius)/2.*np.sin(tmp)           #y-coord of GA bell
 tmp = 5./18.*np.pi
-xc2 = (rSurf(tmp)+outerRadius)/2.*np.cos(tmp)                #x-coord of IC
-yc2 = (rSurf(tmp)+outerRadius)/2.*np.sin(tmp)                #y-coord of IC
+xc2 = (rSurf(tmp)+outerRadius)/2.*np.cos(tmp)           #x-coord of GA bell
+yc2 = (rSurf(tmp)+outerRadius)/2.*np.sin(tmp)           #y-coord of GA bell
 def initialCondition( x, y ) :
-    #Wendland function:
-    r = np.sqrt( 6 * ( (x-xc1)**2. + (y-yc1)**2. ) )
-    ind = r<1.
-    z = np.zeros( np.shape(x) )
-    z[ind] = ( 1. - r[ind] ) ** 10. * ( 429.*r[ind]**4. + 450.*r[ind]**3. \
-    + 210.*r[ind]**2. + 50.*r[ind] + 5.  )
-    z = 1. + z/5.
-    return z
-    # #Gaussian:
-    # return 1. + np.exp( -exp*( (x-xc1)**2. + (y-yc1)**2. ) ) \
-              # + np.exp( -exp*( (x-xc2)**2. + (y-yc2)**2. ) )
+    # #Wendland function:
+    # r = np.sqrt( 6 * ( (x-xc1)**2. + (y-yc1)**2. ) )
+    # ind = r<1.
+    # z = np.zeros( np.shape(x) )
+    # z[ind] = ( 1. - r[ind] ) ** 10. * ( 429.*r[ind]**4. + 450.*r[ind]**3. \
+    # + 210.*r[ind]**2. + 50.*r[ind] + 5.  )
+    # z = 1. + z/5.
+    # return z
+    #Gaussian:
+    return 1. + np.exp( -exp*( (x-xc1)**2. + (y-yc1)**2. ) ) \
+              + np.exp( -exp*( (x-xc2)**2. + (y-yc2)**2. ) )
 
 ###########################################################################
 
@@ -219,45 +219,56 @@ print()
 
 ###########################################################################
 
-# #Plot the nodes and then exit:
-# 
-# plt.plot( xx.flatten(), yy.flatten(), "." \
-# , xB, yB, "-" \
-# , xT, yT, "-" )
-# plt.axis('equal')
-# tmp = outerRadius + .2
-# plt.axis([-tmp,tmp,-tmp,tmp])
-# plt.xlabel( 'x' )
-# plt.ylabel( 'y' )
-# plt.show()
-# 
-# sys.exit("\nStop here for now.\n")
+if plotNodes :
+    
+    #Plot the nodes and then exit:
+    
+    plt.plot( xx.flatten(), yy.flatten(), "." \
+    , xB, yB, "-" \
+    , xT, yT, "-" )
+    plt.axis('equal')
+    tmp = outerRadius + .2
+    plt.axis([-tmp,tmp,-tmp,tmp])
+    plt.xlabel( 'x' )
+    plt.ylabel( 'y' )
+    plt.show()
+    
+    sys.exit("\nStop here for now.\n")
 
 ###########################################################################
 
 #Hyperviscosity coefficient (alp) for radial direction:
-if ( pol == 1 ) | ( pol == 2 ) :
-    alp = 2.**-1. * c
-elif ( pol == 3 ) | ( pol == 4 ) :
-    alp = -2.**-5. * c
-elif ( pol == 5 ) | ( pol == 6 ) :
-    alp = 2.**-9. * c
-elif ( pol == 7 ) | ( pol == 8 ) :
-    alp = -2.**-13. * c
-else :
-    sys.exit("\nError: 1 <= pol <= 8\n")
-
-if uhv != 1 :
+if rhv != 1 :
     alp = 0.                                   #remove radial HV completely
+else :
+    if ( pol == 1 ) | ( pol == 2 ) :
+        alp = 2.**-1. * c
+    elif ( pol == 3 ) | ( pol == 4 ) :
+        alp = -2.**-5. * c
+    elif ( pol == 5 ) | ( pol == 6 ) :
+        alp = 2.**-9. * c
+    elif ( pol == 7 ) | ( pol == 8 ) :
+        alp = -2.**-13. * c
+    else :
+        sys.exit("\nError: 1 <= pol <= 8\n")
 
 ###########################################################################
 
 #Parameters for angular approximations:
 
-phsA = 9
-polA = 7
-stcA = 17
-alpA = -2.**-13. * c
+if afd :
+    phsA = 9
+    polA = 8
+    stcA = 9
+else :
+    phsA = 9
+    polA = 7
+    stcA = 17
+
+if ahv != 1 :
+    alpA = 0.                                 #remove angular HV completely
+else :
+    alpA = -2.**-13. * c
 
 ###########################################################################
 
@@ -281,17 +292,17 @@ Ws = phs1.getDM( x=s, X=s, m=1     \
 #Simple (but still correct with dsdr multiplier) radial HV:
 Whvs = phs1.getDM( x=s, X=s[1:-1], m=phs-1 \
 , phsDegree=phs, polyDegree=pol, stencilSize=stc )
-Whvs = alp * ds0**pol * Whvs
-# dsPol = spdiags( ds**pol, np.array([0]), len(ds), len(ds) )
+Whvs = alp * ds0**(phs-2) * Whvs
+# dsPol = spdiags( ds**(phs-2), np.array([0]), len(ds), len(ds) )
 # Whvs = alp * dsPol.dot(Whvs)                       #scaled radial HV matrix
 
 # #Complex radial HV:
 # dr = ( rr[2:nlv,:] - rr[0:nlv-2,:] ) / 2.
-# alpDrPol = alp * dr**pol
-# alpDrPol = alp * ((outerRadius-innerRadius)/(nlv-2)) ** pol
-# alpDxPol = alp * ( ( dr + ss[1:-1,:]*np.tile(dth,(nlv-2,1)) ) / 2. ) ** pol
-# alpDxPol = alp * ( ( (outerRadius-innerRadius)/(nlv-2) + ss[1:-1,:]*2.*np.pi/nth ) / 2. ) ** pol
-# alpDsPol = alp * ( ( ss[1:-1,:]*np.tile(dth,(nlv-2,1)) + np.transpose(np.tile(ds,(nth,1))) ) / 2. ) ** pol
+# alpDrPol = alp * dr**(phs-2)
+# alpDrPol = alp * ((outerRadius-innerRadius)/(nlv-2)) ** (phs-2)
+# alpDxPol = alp * ( ( dr + ss[1:-1,:]*np.tile(dth,(nlv-2,1)) ) / 2. ) ** (phs-2)
+# alpDxPol = alp * ( ( (outerRadius-innerRadius)/(nlv-2) + ss[1:-1,:]*2.*np.pi/nth ) / 2. ) ** (phs-2)
+# alpDsPol = alp * ( ( ss[1:-1,:]*np.tile(dth,(nlv-2,1)) + np.transpose(np.tile(ds,(nth,1))) ) / 2. ) ** (phs-2)
 
 ###########################################################################
 
@@ -300,10 +311,10 @@ Whvs = alp * ds0**pol * Whvs
 Wlam = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th, m=1 \
 , phsDegree=phsA, polyDegree=polA, stencilSize=stcA )
 
-#Simple (and incorrect) angular HV:
+#Simple (and technically incorrect) angular HV:
 Whvlam = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th, m=phsA-1 \
 , phsDegree=phsA, polyDegree=polA, stencilSize=stcA )
-Whvlam = alpA * dth0**polA * Whvlam
+Whvlam = alpA * dth0**(phsA-2) * Whvlam
 # dthPol = spdiags( dth**polA, np.array([0]), len(dth), len(dth) )
 # Whvlam = alpA * dthPol.dot(Whvlam)                #scaled angular HV matrix
 
@@ -429,11 +440,10 @@ for i in np.arange( 0, nTimesteps+1 ) :
         if plotFromSaved :
             U = np.load( saveString \
             + '{0:04d}'.format(np.int(np.round(t))) + '.npy' )
-        else :
-            if saveArrays :
-                U = setGhostNodes( U )
-                np.save( saveString \
-                + '{0:04d}'.format(np.int(np.round(t))) + '.npy', U )
+        elif saveArrays :
+            U = setGhostNodes( U )
+            np.save( saveString \
+            + '{0:04d}'.format(np.int(np.round(t))) + '.npy', U )
         
         if saveContours :
             waveEquation.plotSomething( U, t \
