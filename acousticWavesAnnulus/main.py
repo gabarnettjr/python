@@ -30,13 +30,19 @@ if plotFromSaved :
 rSurf, rSurfPrime \
 = common.getTopoFunc( innerRadius, outerRadius, amp, frq )
 
-tmp = 17./18.*np.pi
-xc1 = (rSurf(tmp)+outerRadius)/2.*np.cos(tmp)           #x-coord of GA bell
-yc1 = (rSurf(tmp)+outerRadius)/2.*np.sin(tmp)           #y-coord of GA bell
-tmp = 5./18.*np.pi
-xc2 = (rSurf(tmp)+outerRadius)/2.*np.cos(tmp)           #x-coord of GA bell
-yc2 = (rSurf(tmp)+outerRadius)/2.*np.sin(tmp)           #y-coord of GA bell
+ang1 = eval(ang1)
+xc1 = (rSurf(ang1)+outerRadius)/2.*np.cos(ang1)         #x-coord of GA bell
+yc1 = (rSurf(ang1)+outerRadius)/2.*np.sin(ang1)         #y-coord of GA bell
+if ang2 :
+    ang2 = eval(ang2)
+    xc2 = (rSurf(ang2)+outerRadius)/2.*np.cos(ang2)     #x-coord of GA bell
+    yc2 = (rSurf(ang2)+outerRadius)/2.*np.sin(ang2)     #y-coord of GA bell
 def initialCondition( x, y ) :
+    #Gaussian:
+    z = 1. + np.exp( -exp*( (x-xc1)**2. + (y-yc1)**2. ) )
+    if ang2 :
+        z = z + np.exp( -exp*( (x-xc2)**2. + (y-yc2)**2. ) )
+    return z
     # #Wendland function:
     # r = np.sqrt( 6 * ( (x-xc1)**2. + (y-yc1)**2. ) )
     # ind = r<1.
@@ -45,9 +51,6 @@ def initialCondition( x, y ) :
     # + 210.*r[ind]**2. + 50.*r[ind] + 5.  )
     # z = 1. + z/5.
     # return z
-    #Gaussian:
-    return 1. + np.exp( -exp*( (x-xc1)**2. + (y-yc1)**2. ) ) \
-              + np.exp( -exp*( (x-xc2)**2. + (y-yc2)**2. ) )
 
 ###########################################################################
 
@@ -98,7 +101,7 @@ elif mlv == 0 :
     s[2:-2] = s[2:-2] + ranMid           #perturb interior nodes (no bndry)
     s[-1] = s[-1] + ranTop                          #perturb top ghost node
 else :
-    sys.exit("\nError: mlv should be 0 or 1.\n")
+    raise ValueError("mlv should be 0 or 1")
 
 if plotFromSaved :
     th = np.load( saveString + 'th' + '.npy' )    #load vector of th values
@@ -157,65 +160,55 @@ dsdrAll  = dsdr( rr, thth )                   #dsdr values over entire mesh
 
 ###########################################################################
 
-# #Plot the coordinate transformation functions and then exit:
-# 
-# plt.contourf( xxi, yyi, sFunc(rri,ththi), 20 )
-# plt.axis( 'equal' )
-# plt.colorbar()
-# plt.title( 's' )
-# plt.show()
-# 
-# plt.contourf( xxi, yyi, dsdthi, 20 )
-# plt.axis( 'equal' )
-# plt.colorbar()
-# plt.title( 'ds/dth' )
-# plt.show()
-# 
-# plt.contourf( xxi, yyi, dsdri, 20 )
-# plt.axis( 'equal' )
-# plt.colorbar()
-# plt.title( 'ds/dr' )
-# plt.show()
-# 
-# sys.exit("\nStop here for now.\n")
+if plotHeightCoord :
+    
+    #Plot the coordinate transformation functions and then exit:
+    
+    plt.contourf( xxi, yyi, sFunc(rri,ththi), 20 )
+    plt.axis( 'equal' )
+    plt.colorbar()
+    plt.title( 's' )
+    plt.show()
+    
+    plt.contourf( xxi, yyi, dsdthi, 20 )
+    plt.axis( 'equal' )
+    plt.colorbar()
+    plt.title( 'ds/dth' )
+    plt.show()
+    
+    plt.contourf( xxi, yyi, dsdri, 20 )
+    plt.axis( 'equal' )
+    plt.colorbar()
+    plt.title( 'ds/dr' )
+    plt.show()
+    
+    sys.exit("\nFinished plotting the coordinate transformation functions.")
 
 ###########################################################################
 
-# #Plot the perturbed radii and then exit:
-# 
-# fig, ax = plt.subplots( 1, 2, figsize=(8,4) )
-# ax[0].plot( s0, s0, '-', s0, s, '.' )       #plot of initial vs perturbed s
-# ax[0].set_xlabel('s0')
-# ax[0].set_ylabel('s')
-# ax[1].plot( s[1:-1], ds, '-' )                #plot of s vs non-constant ds
-# ax[1].set_xlabel('s')
-# ax[1].set_ylabel('ds')
-# plt.show()
-# 
-# sys.exit("\nStop here for now.\n")
+if plotRadii :
+    
+    #Plot the perturbed radii and then exit:
+    
+    fig, ax = plt.subplots( 1, 2, figsize=(8,4) )
+    ax[0].plot( s0, s0, '-', s0, s, '.' )       #plot of initial vs perturbed s
+    ax[0].set_xlabel('s0')
+    ax[0].set_ylabel('s')
+    ax[1].plot( s[1:-1], ds, '-' )                #plot of s vs non-constant ds
+    ax[1].set_xlabel('s')
+    ax[1].set_ylabel('ds')
+    plt.show()
+    
+    sys.exit("\nFinished plotting the radii.")
 
 ###########################################################################
 
-#Set initial condition for U[0,:,:] (P):
-
-U = np.zeros(( 3, nlv, nth ))
-U[0,:,:] = initialCondition(xx,yy)
-Po = U[0,1:-1,:]
-rhoInv = c**2. / Po
-
-###########################################################################
-
-#Check the value of the initial condition on boundaries:
+#Set (x,y) on the bottom boundary (B) and top boundary (T):
 
 xB = rSurf(th0) * np.cos(th0)
 yB = rSurf(th0) * np.sin(th0)
 xT = outerRadius * np.cos(th0)
 yT = outerRadius * np.sin(th0)
-print()
-print( 'max value on boundaries =', np.max(np.hstack(( \
-initialCondition(xB,yB),                             \
-initialCondition(xT,yT) ))) )
-print()
 
 ###########################################################################
 
@@ -233,7 +226,26 @@ if plotNodes :
     plt.ylabel( 'y' )
     plt.show()
     
-    sys.exit("\nStop here for now.\n")
+    sys.exit("\nFinished plotting the nodes.")
+
+###########################################################################
+
+#Set initial condition for U[0,:,:] (P):
+
+U = np.zeros(( 3, nlv, nth ))
+U[0,:,:] = initialCondition(xx,yy)
+Po = U[0,1:-1,:]
+rhoInv = c**2. / Po
+
+###########################################################################
+
+#Check the max value of the initial condition on the boundaries:
+
+print()
+print( 'max value on boundaries =', np.max(np.hstack(( \
+initialCondition(xB,yB),                             \
+initialCondition(xT,yT) ))) )
+print()
 
 ###########################################################################
 
@@ -250,7 +262,7 @@ else :
     elif ( pol == 7 ) | ( pol == 8 ) :
         alp = -2.**-13. * c
     else :
-        sys.exit("\nError: 1 <= pol <= 8\n")
+        raise ValueError("1 <= pol <= 8")
 
 ###########################################################################
 
@@ -332,9 +344,9 @@ wEinner = phs1.getWeights( s[0],        s[1:stcB+1], 0, phs, pol )
 wDinner = phs1.getWeights( innerRadius, s[0:stcB],   1, phs, pol )
 wHinner = phs1.getWeights( innerRadius, s[1:stcB+1], 0, phs, pol )
 
-wIouter = phs1.getWeights( outerRadius, s[-1:-(stcB+1):-1], 0, phs, pol )
-wEouter = phs1.getWeights( s[-1],       s[-2:-(stcB+2):-1], 0, phs, pol )
-wDouter = phs1.getWeights( outerRadius, s[-1:-(stcB+1):-1], 1, phs, pol )
+wIouter = phs1.getWeights( outerRadius, s[-1:-stcB-1:-1], 0, phs, pol )
+wEouter = phs1.getWeights( s[-1],       s[-2:-stcB-2:-1], 0, phs, pol )
+wDouter = phs1.getWeights( outerRadius, s[-1:-stcB-1:-1], 1, phs, pol )
 
 ###########################################################################
 
@@ -403,8 +415,8 @@ else :
     def setGhostNodes( U ) :
         return waveEquation.setGhostNodesInterfaces( U \
         , TxBot[0,:], TyBot[0,:], TxTop[0,:], TyTop[0,:] \
-        , someFactor, stcB \
-        , Wlam, wEinner, wDinner, wEouter, wDouter )
+        , someFactor, stcB, Wlam \
+        , wEinner, wDinner, wEouter, wDouter )
 
 def odefun( t, U ) :
     return waveEquation.odefun( t, U \
@@ -420,14 +432,23 @@ if rks == 3 :
 elif rks == 4 :
     rk = rk.rk4
 else :
-    sys.exit("\nError: rks should be 3 or 4 in this problem.\n")
+    raise ValueError("rks should be 3 or 4 in this problem.")
+
+if saveContours :
+    fig = plt.figure( figsize = (18,14) )
+
+def plotSomething( U, t ) :
+    waveEquation.plotSomething( U, t \
+    , Dx, Dy \
+    , whatToPlot, xx0, yy0, Wradial, Wangular \
+    , c, xB, yB, xT, yT, outerRadius, fig \
+    , dynamicColorbar )
+
 
 ###########################################################################
 
 #Main time-stepping loop:
 
-if saveContours :
-    fig = plt.figure( figsize = (18,14) )
 et = time.time()
 
 for i in np.arange( 0, nTimesteps+1 ) :
@@ -446,13 +467,14 @@ for i in np.arange( 0, nTimesteps+1 ) :
             + '{0:04d}'.format(np.int(np.round(t))) + '.npy', U )
         
         if saveContours :
-            waveEquation.plotSomething( U, t \
-            , Dx, Dy \
-            , whatToPlot, xx0, yy0, Wradial, Wangular \
-            , c, xB, yB, xT, yT, outerRadius, fig )
+            plotSomething( U, t )
+            # waveEquation.plotSomething( U, t \
+            # , Dx, Dy \
+            # , whatToPlot, xx0, yy0, Wradial, Wangular \
+            # , c, xB, yB, xT, yT, outerRadius, fig )
         
         if np.max(np.abs(U)) > 5. :
-            sys.exit("\nUnstable in time.\n")
+            raise ValueError("Solution greater than 5 in magnitude.  Unstable in time.")
         
     if plotFromSaved :
         t = t + dt
