@@ -37,11 +37,18 @@ if ang2 :
     ang2 = eval(ang2)
     xc2 = (rSurf(ang2)+outerRadius)/2.*np.cos(ang2)     #x-coord of GA bell
     yc2 = (rSurf(ang2)+outerRadius)/2.*np.sin(ang2)     #y-coord of GA bell
+    if ang3 :
+        ang3 = eval(ang3)
+        xc3 = (rSurf(ang3)+outerRadius)/2.*np.cos(ang3) #x-coord of GA bell
+        yc3 = (rSurf(ang3)+outerRadius)/2.*np.sin(ang3) #y-coord of GA bell
+
 def initialCondition( x, y ) :
     #Gaussian:
     z = 1. + np.exp( -exp*( (x-xc1)**2. + (y-yc1)**2. ) )
     if ang2 :
         z = z + np.exp( -exp*( (x-xc2)**2. + (y-yc2)**2. ) )
+        if ang3 :
+            z = z + np.exp( -exp*( (x-xc3)**2. + (y-yc3)**2. ) )
     return z
     # #Wendland function:
     # r = np.sqrt( 6 * ( (x-xc1)**2. + (y-yc1)**2. ) )
@@ -160,49 +167,6 @@ dsdrAll  = dsdr( rr, thth )                   #dsdr values over entire mesh
 
 ###########################################################################
 
-if plotHeightCoord :
-    
-    #Plot the coordinate transformation functions and then exit:
-    
-    plt.contourf( xxi, yyi, sFunc(rri,ththi), 20 )
-    plt.axis( 'equal' )
-    plt.colorbar()
-    plt.title( 's' )
-    plt.show()
-    
-    plt.contourf( xxi, yyi, dsdthi, 20 )
-    plt.axis( 'equal' )
-    plt.colorbar()
-    plt.title( 'ds/dth' )
-    plt.show()
-    
-    plt.contourf( xxi, yyi, dsdri, 20 )
-    plt.axis( 'equal' )
-    plt.colorbar()
-    plt.title( 'ds/dr' )
-    plt.show()
-    
-    sys.exit("\nFinished plotting the coordinate transformation functions.")
-
-###########################################################################
-
-if plotRadii :
-    
-    #Plot the perturbed radii and then exit:
-    
-    fig, ax = plt.subplots( 1, 2, figsize=(8,4) )
-    ax[0].plot( s0, s0, '-', s0, s, '.' )       #plot of initial vs perturbed s
-    ax[0].set_xlabel('s0')
-    ax[0].set_ylabel('s')
-    ax[1].plot( s[1:-1], ds, '-' )                #plot of s vs non-constant ds
-    ax[1].set_xlabel('s')
-    ax[1].set_ylabel('ds')
-    plt.show()
-    
-    sys.exit("\nFinished plotting the radii.")
-
-###########################################################################
-
 #Set (x,y) on the bottom boundary (B) and top boundary (T):
 
 xB = rSurf(th0) * np.cos(th0)
@@ -214,7 +178,7 @@ yT = outerRadius * np.sin(th0)
 
 if plotNodes :
     
-    #Plot the nodes and then exit:
+    #Plot the nodes:
     
     plt.plot( xx.flatten(), yy.flatten(), "." \
     , xB, yB, "-" \
@@ -225,8 +189,54 @@ if plotNodes :
     plt.xlabel( 'x' )
     plt.ylabel( 'y' )
     plt.show()
+
+###########################################################################
+
+if plotHeightCoord :
     
-    sys.exit("\nFinished plotting the nodes.")
+    #Plot the coordinate transformation functions:
+    
+    plt.contourf( xxi, yyi, sFunc(rri,ththi), 20 )
+    plt.plot( xB, yB, "k-", xT, yT, "k-" )
+    plt.axis( 'equal' )
+    plt.colorbar()
+    plt.title( 's' )
+    plt.show()
+    
+    plt.contourf( xxi, yyi, dsdthi, 20 )
+    plt.plot( xB, yB, "k-", xT, yT, "k-" )
+    plt.axis( 'equal' )
+    plt.colorbar()
+    plt.title( 'ds/dth' )
+    plt.show()
+    
+    plt.contourf( xxi, yyi, dsdri, 20 )
+    plt.plot( xB, yB, "k-", xT, yT, "k-" )
+    plt.axis( 'equal' )
+    plt.colorbar()
+    plt.title( 'ds/dr' )
+    plt.show()
+
+###########################################################################
+
+if plotRadii :
+    
+    #Plot the perturbed radii:
+    
+    fig, ax = plt.subplots( 1, 2, figsize=(8,4) )
+    ax[0].plot( s0, s0, '-', s0, s, '.' )       #plot of initial vs perturbed s
+    ax[0].set_xlabel('s0')
+    ax[0].set_ylabel('s')
+    ax[1].plot( s[1:-1], ds, '-' )                #plot of s vs non-constant ds
+    ax[1].set_xlabel('s')
+    ax[1].set_ylabel('ds')
+    plt.show()
+
+###########################################################################
+
+if plotNodes or plotHeightCoord or plotRadii :
+    
+    sys.exit("\nFinished plotting.")
 
 ###########################################################################
 
@@ -250,7 +260,7 @@ print()
 ###########################################################################
 
 #Hyperviscosity coefficient (alp) for radial direction:
-if rhv != 1 :
+if noRadialHV :
     alp = 0.                                   #remove radial HV completely
 else :
     if ( pol == 1 ) | ( pol == 2 ) :
@@ -268,7 +278,7 @@ else :
 
 #Parameters for angular approximations:
 
-if afd :
+if angularFD :
     phsA = 9
     polA = 8
     stcA = 9
@@ -277,7 +287,7 @@ else :
     polA = 7
     stcA = 17
 
-if ahv != 1 :
+if noAngularHV :
     alpA = 0.                                 #remove angular HV completely
 else :
     alpA = -2.**-13. * c
@@ -440,9 +450,9 @@ if saveContours :
 def plotSomething( U, t ) :
     waveEquation.plotSomething( U, t \
     , Dx, Dy \
-    , whatToPlot, xx0, yy0, Wradial, Wangular \
+    , whatToPlot, xx, yy, xx0, yy0, Wradial, Wangular \
     , c, xB, yB, xT, yT, outerRadius, fig \
-    , dynamicColorbar )
+    , dynamicColorbar, noInterp )
 
 
 ###########################################################################
@@ -468,14 +478,10 @@ for i in np.arange( 0, nTimesteps+1 ) :
         
         if saveContours :
             plotSomething( U, t )
-            # waveEquation.plotSomething( U, t \
-            # , Dx, Dy \
-            # , whatToPlot, xx0, yy0, Wradial, Wangular \
-            # , c, xB, yB, xT, yT, outerRadius, fig )
         
         if np.max(np.abs(U)) > 5. :
             raise ValueError("Solution greater than 5 in magnitude.  Unstable in time.")
-        
+    
     if plotFromSaved :
         t = t + dt
     else :

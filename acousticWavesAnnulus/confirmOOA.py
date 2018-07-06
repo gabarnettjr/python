@@ -19,14 +19,14 @@ for k in d.keys() :
 
 ###########################################################################
 
-errNorm = np.inf                               #norm to use for error check
+errNorm = 2                                    #norm to use for error check
 
-contourErrors = 1
+contourErrors = 0
 
 mlvA = 1
-phsA = 7
-polA = 5
-stcA = 13
+phsA = 5
+polA = 3
+stcA = 7
 ptbA = 0
 rksA = 3
 
