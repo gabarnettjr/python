@@ -196,21 +196,21 @@ if plotHeightCoord :
     
     #Plot the coordinate transformation functions:
     
-    plt.contourf( xxi, yyi, sFunc(rri,ththi), 20 )
+    plt.contourf( xx, yy, sFunc(rr,thth), 20 )
     plt.plot( xB, yB, "k-", xT, yT, "k-" )
     plt.axis( 'equal' )
     plt.colorbar()
     plt.title( 's' )
     plt.show()
     
-    plt.contourf( xxi, yyi, dsdthi, 20 )
+    plt.contourf( xx, yy, dsdthAll, 20 )
     plt.plot( xB, yB, "k-", xT, yT, "k-" )
     plt.axis( 'equal' )
     plt.colorbar()
     plt.title( 'ds/dth' )
     plt.show()
     
-    plt.contourf( xxi, yyi, dsdri, 20 )
+    plt.contourf( xx, yy, dsdrAll, 20 )
     plt.plot( xB, yB, "k-", xT, yT, "k-" )
     plt.axis( 'equal' )
     plt.colorbar()
@@ -279,10 +279,12 @@ else :
 #Parameters for angular approximations:
 
 if angularFD :
+    #parameters for conventional FD8 approximation:
     phsA = 9
     polA = 8
     stcA = 9
 else :
+    #parameters for PHSFD7 approximation:
     phsA = 9
     polA = 7
     stcA = 17
@@ -296,7 +298,7 @@ else :
 
 #Extra things needed to enforce the Neumann boundary condition for P:
 
-stcB = stc
+stcB = stc                  #stencil-size for enforcing boundary conditions
 # stcB = min( nlv-1, 2*(pol+2)+1 )
 
 NxBot, NyBot, NxTop, NyTop \
@@ -415,14 +417,14 @@ def HV(U) :
     return Whvs.dot(U) + Whvlam.dot(U[1:-1,:].T).T
 
 if mlv == 1 :
-    def setGhostNodes( U ) :
+    def setGhostNodes(U) :
         return waveEquation.setGhostNodesMidLevels( U \
         , NxBot, NyBot, NxTop, NyTop \
         , TxBot, TyBot, TxTop, TyTop \
         , someFactor, stcB, Wlam \
         , wIinner, wEinner, wDinner, wHinner, wIouter, wEouter, wDouter )
 else :
-    def setGhostNodes( U ) :
+    def setGhostNodes(U) :
         return waveEquation.setGhostNodesInterfaces( U \
         , TxBot[0,:], TyBot[0,:], TxTop[0,:], TyTop[0,:] \
         , someFactor, stcB, Wlam \
@@ -454,7 +456,6 @@ def plotSomething( U, t ) :
     , c, xB, yB, xT, yT, outerRadius, fig \
     , dynamicColorbar, noInterp )
 
-
 ###########################################################################
 
 #Main time-stepping loop:
@@ -472,7 +473,7 @@ for i in np.arange( 0, nTimesteps+1 ) :
             U = np.load( saveString \
             + '{0:04d}'.format(np.int(np.round(t))) + '.npy' )
         elif saveArrays :
-            U = setGhostNodes( U )
+            U = setGhostNodes(U)
             np.save( saveString \
             + '{0:04d}'.format(np.int(np.round(t))) + '.npy', U )
         
