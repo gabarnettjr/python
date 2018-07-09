@@ -253,7 +253,7 @@ rhoInv = c**2. / Po
 
 print()
 print( 'max value on boundaries =', np.max(np.hstack(( \
-initialCondition(xB,yB),                             \
+initialCondition(xB,yB),                               \
 initialCondition(xT,yT) ))) )
 print()
 
