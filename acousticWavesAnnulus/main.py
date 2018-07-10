@@ -194,27 +194,36 @@ if plotNodes :
 
 if plotHeightCoord :
     
+    # fig, ax = plt.subplots( 1, 1 )
+    fst = 40
+    fsc = 30
+    fsa = 30
+    plt.rc( 'font', size=fsa )
+    
     #Plot the coordinate transformation functions:
     
     plt.contourf( xx, yy, sFunc(rr,thth), 20 )
-    plt.plot( xB, yB, "k-", xT, yT, "k-" )
+    plt.plot( xB, yB, "r-", xT, yT, "r-" )
     plt.axis( 'equal' )
-    plt.colorbar()
-    plt.title( 's' )
+    tmp = plt.colorbar()
+    tmp.ax.tick_params( labelsize=fsc )
+    plt.title( 's(r,th)', fontsize=fst )
     plt.show()
     
     plt.contourf( xx, yy, dsdthAll, 20 )
-    plt.plot( xB, yB, "k-", xT, yT, "k-" )
+    plt.plot( xB, yB, "r-", xT, yT, "r-" )
     plt.axis( 'equal' )
-    plt.colorbar()
-    plt.title( 'ds/dth' )
+    tmp = plt.colorbar()
+    tmp.ax.tick_params( labelsize=fsc )
+    plt.title( 'ds/dth', fontsize=fst )
     plt.show()
     
     plt.contourf( xx, yy, dsdrAll, 20 )
-    plt.plot( xB, yB, "k-", xT, yT, "k-" )
+    plt.plot( xB, yB, "r-", xT, yT, "r-" )
     plt.axis( 'equal' )
-    plt.colorbar()
-    plt.title( 'ds/dr' )
+    tmp = plt.colorbar()
+    tmp.ax.tick_params( labelsize=fsc )
+    plt.title( 'ds/dr', fontsize=fst )
     plt.show()
 
 ###########################################################################
