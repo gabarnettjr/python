@@ -72,6 +72,10 @@ if ( saveArrays ) & ( not plotFromSaved ) :
         os.remove( saveString + '*.npy' )                 #remove old files
     if not os.path.exists( saveString ) :
         os.makedirs( saveString )                     #make new directories
+# if saveContours :
+#     mydir = os.path.dirname(__file__)
+#     if os.path.exists( os.path.join( mydir, "*.png" ) ) :
+#         os.remove( os.path.join( mydir, "*.png" ) )
 
 ###########################################################################
 
@@ -176,28 +180,38 @@ yT = outerRadius * np.sin(th0)
 
 ###########################################################################
 
+#Set font sizes for any plots that might be requested below:
+
+fst = 40                                               #font-size for title
+fsc = 30                                            #font-size for colorbar
+fsa = 30                                                #font-size for axes
+
+###########################################################################
+
 if plotNodes :
+    
+    plt.rc( 'font', size=fsa )
+    fig = plt.figure( figsize=(13,12) )
     
     #Plot the nodes:
     
-    plt.plot( xx.flatten(), yy.flatten(), "." \
-    , xB, yB, "-" \
-    , xT, yT, "-" )
-    plt.axis('equal')
+    plt.plot( xx.flatten(), yy.flatten(), ".", markersize=10 )
+    plt.plot( np.hstack((xB,xB[0])), np.hstack((yB,yB[0])), "k-" \
+    , np.hstack((xT,xT[0])), np.hstack((yT,yT[0])), "k-" \
+    , linewidth=3 )
     tmp = outerRadius + .2
     plt.axis([-tmp,tmp,-tmp,tmp])
-    plt.xlabel( 'x' )
-    plt.ylabel( 'y' )
+    plt.axis('image')
+    # plt.xlabel( 'x' )
+    # plt.ylabel( 'y' )
+    # plt.title( "ptb = {0:1d}".format(ptb) \
+    # , fontsize=fst )
     plt.show()
 
 ###########################################################################
 
 if plotHeightCoord :
     
-    # fig, ax = plt.subplots( 1, 1 )
-    fst = 40
-    fsc = 30
-    fsa = 30
     plt.rc( 'font', size=fsa )
     
     #Plot the coordinate transformation functions:
@@ -230,13 +244,15 @@ if plotHeightCoord :
 
 if plotRadii :
     
+    plt.rc( 'font', size=fsa )
+    
     #Plot the perturbed radii:
     
     fig, ax = plt.subplots( 1, 2, figsize=(8,4) )
-    ax[0].plot( s0, s0, '-', s0, s, '.' )       #plot of initial vs perturbed s
+    ax[0].plot( s0, s0, '-', s0, s, '.' )   #plot of initial vs perturbed s
     ax[0].set_xlabel('s0')
     ax[0].set_ylabel('s')
-    ax[1].plot( s[1:-1], ds, '-' )                #plot of s vs non-constant ds
+    ax[1].plot( s[1:-1], ds, '-' )            #plot of s vs non-constant ds
     ax[1].set_xlabel('s')
     ax[1].set_ylabel('ds')
     plt.show()

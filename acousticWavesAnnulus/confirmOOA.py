@@ -208,6 +208,8 @@ dom = np.array( [ 1.4, 2.4 ] )
 width = dom[1] - dom[0]
 shift = -0.
 
+plt.rc( 'font', size=20 )
+
 plt.plot( np.log10(nlv), np.log10(errA), '-' )
 plt.plot( np.log10(nlv), np.log10(errB), '-' )
 plt.plot( dom, np.array([shift,shift-1.*width]), '--' )
