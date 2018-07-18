@@ -61,7 +61,7 @@ def initialCondition( x, y ) :
 
 ###########################################################################
 
-#Set things up for saving:
+#Delete old stuff, and set things up for saving:
 
 saveString = waveEquation.getSavestring( c, innerRadius, outerRadius \
 , tf, saveDel, exp, amp, frq \
@@ -72,10 +72,12 @@ if ( saveArrays ) & ( not plotFromSaved ) :
         os.remove( saveString + '*.npy' )                 #remove old files
     if not os.path.exists( saveString ) :
         os.makedirs( saveString )                     #make new directories
-# if saveContours :
-#     mydir = os.path.dirname(__file__)
-#     if os.path.exists( os.path.join( mydir, "*.png" ) ) :
-#         os.remove( os.path.join( mydir, "*.png" ) )
+
+if saveContours :
+    tmp = os.listdir(os.getcwd())
+    for item in tmp :
+        if item.endswith(".png") :
+            os.remove( os.path.join( os.getcwd(), item ) )
 
 ###########################################################################
 
