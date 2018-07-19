@@ -173,6 +173,13 @@ dsdrAll  = dsdr( rr, thth )                   #dsdr values over entire mesh
 
 ###########################################################################
 
+#Metric terms that will be used in Dx() and Dy() functions:
+
+mtx = dsdrAll * drdxAll + dsdthAll * dthdxAll             #Dx() metric term
+mty = dsdrAll * drdyAll + dsdthAll * dthdyAll             #Dy() metric term
+
+###########################################################################
+
 #Set (x,y) on the bottom boundary (B) and top boundary (T):
 
 xB = rSurf(th0) * np.cos(th0)
@@ -407,17 +414,19 @@ def Ds(U) :
 def Dlam(U) :
     return Wlam.dot(U.T).T
 
-def Dr(U) :                                        #du/dr = (du/ds)*(ds/dr)
-    return Ds(U) * dsdrAll
-
-def Dth(U) :                           #du/dth = du/dlam + (du/ds)*(ds/dth)
-    return Dlam(U) + Ds(U) * dsdthAll
+# def Dr(U) :                                        #du/dr = (du/ds)*(ds/dr)
+#     return Ds(U) * dsdrAll
+# 
+# def Dth(U) :                           #du/dth = du/dlam + (du/ds)*(ds/dth)
+#     return Dlam(U) + Ds(U) * dsdthAll
 
 def Dx(U) :                    #du/dx = (du/dr)*(dr/dx) + (du/dth)*(dth/dx)
-    return Dr(U) * drdxAll + Dth(U) * dthdxAll
+    return mtx * Ds(U) + dthdxAll * Dlam(U)
+    # return Dr(U) * drdxAll + Dth(U) * dthdxAll
 
 def Dy(U) :                    #du/dy = (du/dr)*(dr/dy) + (du/dth)*(dth/dy)
-    return Dr(U) * drdyAll + Dth(U) * dthdyAll
+    return mty * Ds(U) + dthdyAll * Dlam(U)
+    # return Dr(U) * drdyAll + Dth(U) * dthdyAll
 
 # def L(U) :
 #     # Us = Ws@U
@@ -450,21 +459,24 @@ if mlv == 1 :
         , TxBot, TyBot, TxTop, TyTop \
         , someFactor, stcB, Wlam \
         , wIinner, wEinner, wDinner, wHinner, wIouter, wEouter, wDouter )
-else :
+elif mlv == 0 :
     def setGhostNodes(U) :
         return waveEquation.setGhostNodesInterfaces( U \
         , TxBot[0,:], TyBot[0,:], TxTop[0,:], TyTop[0,:] \
         , someFactor, stcB, Wlam \
         , wEinner, wDinner, wEouter, wDouter )
+else :
+    raise ValueError("Only mlv=0 and mlv=1 are currently supported.")
 
+V = np.zeros((3, nlv, nth))
 def odefun( t, U ) :
-    return waveEquation.odefun( t, U \
-    , setGhostNodes, Ds, Dlam, HV \
-    , Po, rhoInv, dsdthAll, dsdrAll \
-    , cosTh, sinTh, cosThOverR, sinThOverR )
-    # return waveEquation.odefunCartesian( t, U \
-    # , setGhostNodes, Dx, Dy, HV          \
-    # , Po, rhoInv )
+    # return waveEquation.odefun( t, U \
+    # , setGhostNodes, Ds, Dlam, HV \
+    # , Po, rhoInv, dsdthAll, dsdrAll \
+    # , cosTh, sinTh, cosThOverR, sinThOverR )
+    return waveEquation.odefunCartesian( t, U \
+    , setGhostNodes, Dx, Dy, HV          \
+    , Po, rhoInv, V.copy() )
 
 if rks == 3 :
     rk = rk.rk3
@@ -479,7 +491,7 @@ if saveContours :
 def plotSomething( U, t ) :
     waveEquation.plotSomething( U, t \
     , Dx, Dy \
-    , whatToPlot, xx, yy, xx0, yy0, Wradial, Wangular \
+    , whatToPlot, xx, yy, xx0, yy0, Wradial, Wangular, V \
     , c, xB, yB, xT, yT, outerRadius, fig \
     , dynamicColorbar, noInterp )
 
@@ -493,19 +505,21 @@ for i in np.arange( 0, nTimesteps+1 ) :
     
     if np.mod( i, np.int(np.round(saveDel/dt)) ) == 0 :
         
-        print( "t =", np.int(np.round(t)), ",  et =", time.time()-et )
+        print( "t =", np.int(np.round(t)) \
+        , ",  et =", time.time()-et \
+        , "max1 = ", np.max(np.abs(V[:,0,:])) \
+        , "max2 = ", np.max(np.abs(V[:,-1,:])) )
         et = time.time()
         
         if plotFromSaved :
             U = np.load( saveString \
             + '{0:04d}'.format(np.int(np.round(t))) + '.npy' )
         elif saveArrays :
-            U = setGhostNodes(U)
             np.save( saveString \
-            + '{0:04d}'.format(np.int(np.round(t))) + '.npy', U )
+            + '{0:04d}'.format(np.int(np.round(t))) + '.npy', setGhostNodes(U) )
         
         if saveContours :
-            plotSomething( U, t )
+            plotSomething( setGhostNodes(U), t )
         
         if np.max(np.abs(U)) > 5. :
             raise ValueError("Solution greater than 5 in magnitude.  Unstable in time.")
@@ -513,6 +527,6 @@ for i in np.arange( 0, nTimesteps+1 ) :
     if plotFromSaved :
         t = t + dt
     else :
-        [ t, U ] = rk( t, U, odefun, dt )
+        t, U = rk( t, U, odefun, dt )
 
 ###########################################################################
