@@ -16,8 +16,8 @@ from gab.annulus import common, waveEquation
 args = waveEquation.parseInput()
 
 #get rid of the args prefix on all the variable names:
-d = vars(args)
-for k in d.keys() :
+temporaryDictionary = vars(args)
+for k in temporaryDictionary.keys() :
     exec("{} = args.{}".format(k,k))
 
 dt = 1./dti
@@ -278,8 +278,8 @@ if plotNodes or plotHeightCoord or plotRadii :
 
 U = np.zeros(( 3, nlv, nth ))
 U[0,:,:] = initialCondition(xx,yy)
-Po = U[0,1:-1,:]
-rhoInv = c**2. / Po
+Po = U[0,1:-1,:].copy()
+rhoInv = c**2. / Po.copy()
 
 ###########################################################################
 
@@ -468,20 +468,30 @@ elif mlv == 0 :
 else :
     raise ValueError("Only mlv=0 and mlv=1 are currently supported.")
 
-V = np.zeros((3, nlv, nth))
-def odefun( t, U ) :
+dUdt = np.zeros( np.shape(U) )
+def odefun( t, U, dUdt ) :
     # return waveEquation.odefun( t, U \
     # , setGhostNodes, Ds, Dlam, HV \
     # , Po, rhoInv, dsdthAll, dsdrAll \
     # , cosTh, sinTh, cosThOverR, sinThOverR )
-    return waveEquation.odefunCartesian( t, U \
-    , setGhostNodes, Dx, Dy, HV          \
-    , Po, rhoInv, V.copy() )
+    dUdt = waveEquation.odefunCartesian( t, U, dUdt \
+    , setGhostNodes, Dx, Dy, HV \
+    , Po, rhoInv )
+    return dUdt
 
+q1 = dUdt               #let q1 be another reference to the same array dUdt
 if rks == 3 :
-    rk = rk.rk3
+    q2 = np.zeros( np.shape(U) )
+    def RK( t, U, odefun, dt ) :
+        t, U = rk.rk3( t, U, odefun, dt, q1, q2 )
+        return t, U
 elif rks == 4 :
-    rk = rk.rk4
+    q2 = np.zeros( np.shape(U) )
+    q3 = np.zeros( np.shape(U) )
+    q4 = np.zeros( np.shape(U) )
+    def RK( t, U, odefun, dt ) :
+        t, U = rk.rk4( t, U, odefun, dt, q1, q2, q3, q4 )
+        return t, U
 else :
     raise ValueError("rks should be 3 or 4 in this problem.")
 
@@ -491,7 +501,7 @@ if saveContours :
 def plotSomething( U, t ) :
     waveEquation.plotSomething( U, t \
     , Dx, Dy \
-    , whatToPlot, xx, yy, xx0, yy0, Wradial, Wangular, V \
+    , whatToPlot, xx, yy, xx0, yy0, Wradial, Wangular, dUdt \
     , c, xB, yB, xT, yT, outerRadius, fig \
     , dynamicColorbar, noInterp )
 
@@ -507,8 +517,8 @@ for i in np.arange( 0, nTimesteps+1 ) :
         
         print( "t =", np.int(np.round(t)) \
         , ",  et =", time.time()-et \
-        , "max1 = ", np.max(np.abs(V[:,0,:])) \
-        , "max2 = ", np.max(np.abs(V[:,-1,:])) )
+        , ",  max1 =", np.max(np.abs(q1)) \
+        , ",  max2 =", np.max(np.abs(q2)) )
         et = time.time()
         
         if plotFromSaved :
@@ -527,6 +537,6 @@ for i in np.arange( 0, nTimesteps+1 ) :
     if plotFromSaved :
         t = t + dt
     else :
-        t, U = rk( t, U, odefun, dt )
+        t, U = RK( t, U, odefun, dt )
 
 ###########################################################################

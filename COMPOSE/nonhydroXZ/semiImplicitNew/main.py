@@ -37,7 +37,7 @@ plotNodes = 0                               #if 1, plot nodes and then exit
 saveDel   = 100                           #print/save every saveDel seconds
 
 var           = 2                        #determines what to plot (0,1,2,3)
-saveArrays    = 0                   #if 1 then save arrays, if 0 then don't
+saveArrays    = 1                   #if 1 then save arrays, if 0 then don't
 saveContours  = 1                 #if 1 then save contours, if 0 then don't
 plotFromSaved = 0           #if 1 then load results, if 0 then compute them
 
