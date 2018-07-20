@@ -9,34 +9,53 @@ for i in range( 5 ) :
     nlv = '{0:1d}'.format( 12*2**i + 2 )
     dti = '{0:1d}'.format( 1*2**i )
     
+    tmp = "--tf " + tf + " --saveDel " + saveDel \
+    + " --nlv " + nlv + " --dti " + dti + " --saveArrays"
+    
     #################################
     
     #p5:
     
-    st = "--tf " + tf + " --saveDel " + saveDel \
-    + " --phs 7 --pol 5 --stc 13 --ptb 35 --rks 3" \
-    + " --nlv " + nlv + " --dti " + dti + " --saveArrays"
+    st = tmp + " --phs 7 --pol 5 --stc 13 --ptb 35 --rks 3"
     print( st + " :" )
     os.system( "python main.py " + st )
     print()
     
-    st = "--tf " + tf + " --saveDel " + saveDel \
-    + " --phs 7 --pol 5 --stc 13 --ptb 35 --rks 4" \
-    + " --nlv " + nlv + " --dti " + dti + " --saveArrays"
+    st = tmp + " --phs 7 --pol 5 --stc 13 --ptb 35 --rks 4"
     print( st + " :" )
     os.system( "python main.py " + st )
     print()
     
-    st = "--tf " + tf + " --saveDel " + saveDel \
-    + " --phs 7 --pol 5 --stc 13 --ptb  0 --rks 3" \
-    + " --nlv " + nlv + " --dti " + dti + " --saveArrays"
+    st = tmp + " --phs 7 --pol 5 --stc 13 --ptb  0 --rks 3"
     print( st + " :" )
     os.system( "python main.py " + st )
     print()
     
-    st = "--tf " + tf + " --saveDel " + saveDel \
-    + " --phs 7 --pol 5 --stc 13 --ptb  0 --rks 4" \
-    + " --nlv " + nlv + " --dti " + dti + " --saveArrays"
+    st = tmp + " --phs 7 --pol 5 --stc 13 --ptb  0 --rks 4"
+    print( st + " :" )
+    os.system( "python main.py " + st )
+    print()
+    
+    #################################
+    
+    #p4:
+    
+    st = tmp + " --phs 5 --pol 4 --stc 9 --ptb 35 --rks 3"
+    print( st + " :" )
+    os.system( "python main.py " + st )
+    print()
+    
+    st = tmp + " --phs 5 --pol 4 --stc 9 --ptb 35 --rks 4"
+    print( st + " :" )
+    os.system( "python main.py " + st )
+    print()
+    
+    st = tmp + " --phs 5 --pol 4 --stc 9 --ptb  0 --rks 3"
+    print( st + " :" )
+    os.system( "python main.py " + st )
+    print()
+    
+    st = tmp + " --phs 5 --pol 4 --stc 9 --ptb  0 --rks 4"
     print( st + " :" )
     os.system( "python main.py " + st )
     print()
@@ -45,30 +64,22 @@ for i in range( 5 ) :
     
     #p3:
     
-    st = "--tf " + tf + " --saveDel " + saveDel \
-    + " --phs 5 --pol 3 --stc 7 --ptb 35 --rks 3" \
-    + " --nlv " + nlv + " --dti " + dti + " --saveArrays"
+    st = tmp + " --phs 5 --pol 3 --stc 7 --ptb 35 --rks 3"
     print( st + " :" )
     os.system( "python main.py " + st )
     print()
     
-    st = "--tf " + tf + " --saveDel " + saveDel \
-    + " --phs 5 --pol 3 --stc 7 --ptb 35 --rks 4" \
-    + " --nlv " + nlv + " --dti " + dti + " --saveArrays"
+    st = tmp + " --phs 5 --pol 3 --stc 7 --ptb 35 --rks 4"
     print( st + " :" )
     os.system( "python main.py " + st )
     print()
     
-    st = "--tf " + tf + " --saveDel " + saveDel \
-    + " --phs 5 --pol 3 --stc 7 --ptb  0 --rks 3" \
-    + " --nlv " + nlv + " --dti " + dti + " --saveArrays"
+    st = tmp + " --phs 5 --pol 3 --stc 7 --ptb  0 --rks 3"
     print( st + " :" )
     os.system( "python main.py " + st )
     print()
     
-    st = "--tf " + tf + " --saveDel " + saveDel \
-    + " --phs 5 --pol 3 --stc 7 --ptb  0 --rks 4" \
-    + " --nlv " + nlv + " --dti " + dti + " --saveArrays"
+    st = tmp + " --phs 5 --pol 3 --stc 7 --ptb  0 --rks 4"
     print( st + " :" )
     os.system( "python main.py " + st )
     print()
@@ -81,7 +92,7 @@ i = 5
 nlv = '{0:1d}'.format( 12*2**i + 2 )
 dti = '{0:1d}'.format( 1*2**i )
 
-st = "--tf " + tf + " --saveDel " + saveDel \
+st = "--tf " + tf + " --saveDel " + saveDel   \
 + " --phs 7 --pol 5 --stc 13 --ptb 0 --rks 4" \
 + " --nlv " + nlv + " --dti " + dti + " --saveArrays"
 print( st + " :" )

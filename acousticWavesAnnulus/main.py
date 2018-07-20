@@ -213,8 +213,7 @@ if plotNodes :
     plt.axis('image')
     # plt.xlabel( 'x' )
     # plt.ylabel( 'y' )
-    # plt.title( "ptb = {0:1d}".format(ptb) \
-    # , fontsize=fst )
+    plt.title( "ptb = {0:1d}".format(ptb), fontsize=fst )
     plt.show()
 
 ###########################################################################
@@ -279,7 +278,7 @@ if plotNodes or plotHeightCoord or plotRadii :
 U = np.zeros(( 3, nlv, nth ))
 U[0,:,:] = initialCondition(xx,yy)
 Po = U[0,1:-1,:].copy()
-rhoInv = c**2. / Po.copy()
+rhoInv = c**2. / Po
 
 ###########################################################################
 
@@ -294,17 +293,27 @@ print()
 ###########################################################################
 
 #Hyperviscosity coefficient (alp) for radial direction:
+
 if noRadialHV :
     alp = 0.                                   #remove radial HV completely
 else :
-    if ( pol == 1 ) | ( pol == 2 ) :
-        alp = 2.**-1. * c
-    elif ( pol == 3 ) | ( pol == 4 ) :
-        alp = -2.**-5. * c
-    elif ( pol == 5 ) | ( pol == 6 ) :
-        alp = 2.**-9. * c
-    elif ( pol == 7 ) | ( pol == 8 ) :
+    if pol == 1 :
+        alp =  2.**-1.  * c
+    elif pol == 3 :
+        alp = -2.**-5.  * c
+    elif pol == 5 :
+        alp =  2.**-9.  * c
+    elif pol == 7 :
         alp = -2.**-13. * c
+    #######################
+    elif pol == 2 :
+        alp =  2.**-5.  * c
+    elif pol == 4 :
+        alp = -2.**-9.  * c
+    elif pol == 6 :
+        alp =  2.**-13. * c
+    elif pol == 8 :
+        alp = -2.**-17. * c
     else :
         raise ValueError("1 <= pol <= 8")
 
@@ -318,15 +327,20 @@ if angularFD :
     polA = 8
     stcA = 9
 else :
-    #parameters for PHSFD7 approximation:
+    #parameters for PHSFD approximation (polA=7 or polA=8):
     phsA = 9
     polA = 7
     stcA = 17
 
 if noAngularHV :
     alpA = 0.                                 #remove angular HV completely
-else :
+elif polA == 8 :
+    alpA = -2.**-17. * c
+elif polA == 7 :
     alpA = -2.**-13. * c
+else :
+    raise ValueError("polA should be 7 or 8 to achieve a high order \
+    angular approximation (no boundaries in this direction).")
 
 ###########################################################################
 
@@ -344,7 +358,7 @@ NxBot, NyBot, NxTop, NyTop \
 
 #Radial PHS-FD weights arranged in a differentiation matrix:
 
-Ws = phs1.getDM( x=s, X=s, m=1     \
+Ws = phs1.getDM( x=s, X=s, m=1 \
 , phsDegree=phs, polyDegree=pol, stencilSize=stc )
 
 #Simple (but still correct with dsdr multiplier) radial HV:
@@ -396,7 +410,7 @@ wDouter = phs1.getWeights( outerRadius, s[-1:-stcB-1:-1], 1, phs, pol )
 
 ###########################################################################
 
-#Interpolation from perturbed mesh to regular mesh for plotting:
+#Weights to interpolate from perturbed mesh to regular mesh for plotting:
 
 Wradial = phs1.getDM( x=s, X=s0[1:-1], m=0 \
 , phsDegree=phs, polyDegree=pol, stencilSize=stc )
@@ -470,30 +484,30 @@ else :
 
 dUdt = np.zeros( np.shape(U) )
 def odefun( t, U, dUdt ) :
-    # return waveEquation.odefun( t, U \
-    # , setGhostNodes, Ds, Dlam, HV \
-    # , Po, rhoInv, dsdthAll, dsdrAll \
-    # , cosTh, sinTh, cosThOverR, sinThOverR )
-    dUdt = waveEquation.odefunCartesian( t, U, dUdt \
-    , setGhostNodes, Dx, Dy, HV \
-    , Po, rhoInv )
+    dUdt = waveEquation.odefun( t, U, dUdt \
+    , setGhostNodes, Ds, Dlam, HV \
+    , Po, rhoInv, dsdthAll, dsdrAll \
+    , cosTh, sinTh, cosThOverR, sinThOverR, mtx, mty )
+    # dUdt = waveEquation.odefunCartesian( t, U, dUdt \
+    # , setGhostNodes, Dx, Dy, HV \
+    # , Po, rhoInv )
     return dUdt
 
 q1 = dUdt               #let q1 be another reference to the same array dUdt
+q2 = np.zeros( np.shape(U) )          #rk3 and rk4 both need a second array
 if rks == 3 :
-    q2 = np.zeros( np.shape(U) )
     def RK( t, U, odefun, dt ) :
         t, U = rk.rk3( t, U, odefun, dt, q1, q2 )
         return t, U
 elif rks == 4 :
-    q2 = np.zeros( np.shape(U) )
     q3 = np.zeros( np.shape(U) )
     q4 = np.zeros( np.shape(U) )
     def RK( t, U, odefun, dt ) :
         t, U = rk.rk4( t, U, odefun, dt, q1, q2, q3, q4 )
         return t, U
 else :
-    raise ValueError("rks should be 3 or 4 in this problem.")
+    raise ValueError("rks should be 3 or 4 in this problem.  \
+    rks=1 and rks=2 are unstable.")
 
 if saveContours :
     fig = plt.figure( figsize = (18,14) )
@@ -501,7 +515,7 @@ if saveContours :
 def plotSomething( U, t ) :
     waveEquation.plotSomething( U, t \
     , Dx, Dy \
-    , whatToPlot, xx, yy, xx0, yy0, Wradial, Wangular, dUdt \
+    , whatToPlot, xx, yy, xx0, yy0, Wradial, Wangular \
     , c, xB, yB, xT, yT, outerRadius, fig \
     , dynamicColorbar, noInterp )
 
@@ -515,10 +529,7 @@ for i in np.arange( 0, nTimesteps+1 ) :
     
     if np.mod( i, np.int(np.round(saveDel/dt)) ) == 0 :
         
-        print( "t =", np.int(np.round(t)) \
-        , ",  et =", time.time()-et \
-        , ",  max1 =", np.max(np.abs(q1)) \
-        , ",  max2 =", np.max(np.abs(q2)) )
+        print( "t =", np.int(np.round(t)), ",  et =", time.time()-et )
         et = time.time()
         
         if plotFromSaved :

@@ -21,20 +21,20 @@ for k in d.keys() :
 
 errNorm = 2                                    #norm to use for error check
 
-contourErrors = 0
+contourErrors = 1
 
 mlvA = 1
 phsA = 5
-polA = 3
-stcA = 7
-ptbA = 0
-rksA = 3
+polA = 4
+stcA = 9
+ptbA = 35
+rksA = 4
 
 mlvB = 1
-phsB = 7
-polB = 5
-stcB = 13
-ptbB = 0
+phsB = 5
+polB = 3
+stcB = 7
+ptbB = 35
 rksB = 4
 
 mlv0 = 1
@@ -192,11 +192,11 @@ def getErrorVector( mlv, phs, pol, stc, ptb, rks ) :
 
 #Plot the error to check convergence:
 
-errA, U0, U1, U2, U3, U4, U5, th0, s0 \
-= getErrorVector( mlvA, phsA, polA, stcA, ptbA, rksA )
-
 errB, U0, U1, U2, U3, U4, U5, th0, s0 \
 = getErrorVector( mlvB, phsB, polB, stcB, ptbB, rksB )
+
+errA, U0, U1, U2, U3, U4, U5, th0, s0 \
+= getErrorVector( mlvA, phsA, polA, stcA, ptbA, rksA )
 
 nlv= np.hstack(( nlv1, nlv2, nlv3, nlv4, nlv5 ))
 if mlv == 1 :
