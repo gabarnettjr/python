@@ -16,22 +16,22 @@ for i in range( 5 ) :
     
     #p5:
     
-    st = tmp + " --phs 7 --pol 5 --stc 13 --ptb 35 --rks 3"
+    st = tmp + " --phs 7 --pol 5 --stc 13 --pta 35 --ptr 35 --rks 3"
     print( st + " :" )
     os.system( "python main.py " + st )
     print()
     
-    st = tmp + " --phs 7 --pol 5 --stc 13 --ptb 35 --rks 4"
+    st = tmp + " --phs 7 --pol 5 --stc 13 --pta 35 --ptr 35 --rks 4"
     print( st + " :" )
     os.system( "python main.py " + st )
     print()
     
-    st = tmp + " --phs 7 --pol 5 --stc 13 --ptb  0 --rks 3"
+    st = tmp + " --phs 7 --pol 5 --stc 13 --pta  0 --ptr  0 --rks 3"
     print( st + " :" )
     os.system( "python main.py " + st )
     print()
     
-    st = tmp + " --phs 7 --pol 5 --stc 13 --ptb  0 --rks 4"
+    st = tmp + " --phs 7 --pol 5 --stc 13 --pta  0 --ptr  0 --rks 4"
     print( st + " :" )
     os.system( "python main.py " + st )
     print()
@@ -40,22 +40,22 @@ for i in range( 5 ) :
     
     #p4:
     
-    st = tmp + " --phs 5 --pol 4 --stc 9 --ptb 35 --rks 3"
+    st = tmp + " --phs 5 --pol 4 --stc 9 --pta 35 --ptr 35 --rks 3"
     print( st + " :" )
     os.system( "python main.py " + st )
     print()
     
-    st = tmp + " --phs 5 --pol 4 --stc 9 --ptb 35 --rks 4"
+    st = tmp + " --phs 5 --pol 4 --stc 9 --pta 35 --ptr 35 --rks 4"
     print( st + " :" )
     os.system( "python main.py " + st )
     print()
     
-    st = tmp + " --phs 5 --pol 4 --stc 9 --ptb  0 --rks 3"
+    st = tmp + " --phs 5 --pol 4 --stc 9 --pta  0 --ptr  0 --rks 3"
     print( st + " :" )
     os.system( "python main.py " + st )
     print()
     
-    st = tmp + " --phs 5 --pol 4 --stc 9 --ptb  0 --rks 4"
+    st = tmp + " --phs 5 --pol 4 --stc 9 --pta  0 --ptr  0 --rks 4"
     print( st + " :" )
     os.system( "python main.py " + st )
     print()
@@ -64,22 +64,22 @@ for i in range( 5 ) :
     
     #p3:
     
-    st = tmp + " --phs 5 --pol 3 --stc 7 --ptb 35 --rks 3"
+    st = tmp + " --phs 5 --pol 3 --stc 7 --pta 35 --ptr 35 --rks 3"
     print( st + " :" )
     os.system( "python main.py " + st )
     print()
     
-    st = tmp + " --phs 5 --pol 3 --stc 7 --ptb 35 --rks 4"
+    st = tmp + " --phs 5 --pol 3 --stc 7 --pta 35 --ptr 35 --rks 4"
     print( st + " :" )
     os.system( "python main.py " + st )
     print()
     
-    st = tmp + " --phs 5 --pol 3 --stc 7 --ptb  0 --rks 3"
+    st = tmp + " --phs 5 --pol 3 --stc 7 --pta  0 --ptr  0 --rks 3"
     print( st + " :" )
     os.system( "python main.py " + st )
     print()
     
-    st = tmp + " --phs 5 --pol 3 --stc 7 --ptb  0 --rks 4"
+    st = tmp + " --phs 5 --pol 3 --stc 7 --pta  0 --ptr  0 --rks 4"
     print( st + " :" )
     os.system( "python main.py " + st )
     print()
@@ -93,7 +93,7 @@ nlv = '{0:1d}'.format( 12*2**i + 2 )
 dti = '{0:1d}'.format( 1*2**i )
 
 st = "--tf " + tf + " --saveDel " + saveDel   \
-+ " --phs 7 --pol 5 --stc 13 --ptb 0 --rks 4" \
++ " --phs 7 --pol 5 --stc 13 --pta 0 --ptr 0 --rks 4" \
 + " --nlv " + nlv + " --dti " + dti + " --saveArrays"
 print( st + " :" )
 os.system( "python main.py " + st )

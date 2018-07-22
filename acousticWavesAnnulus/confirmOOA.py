@@ -71,7 +71,7 @@ def loadSingleResult( mlv, phs, pol, stc, ptb, rks, nlv, dti, t0 ) :
     
     saveString = waveEquation.getSavestring( c, innerRadius, outerRadius \
     , tf, saveDel, exp, amp, frq \
-    , mlv, phs, pol, stc, ptb, rks, nlv, dti )
+    , mlv, phs, pol, stc, pta, ptr, rks, nlv, dti )
     
     U  = np.load( saveString + '{0:04d}'.format(np.int(np.round(t0))) + '.npy' )
     s  = np.load( saveString + 's' + '.npy' )

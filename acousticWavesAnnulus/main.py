@@ -65,7 +65,7 @@ def initialCondition( x, y ) :
 
 saveString = waveEquation.getSavestring( c, innerRadius, outerRadius \
 , tf, saveDel, exp, amp, frq \
-, mlv, phs, pol, stc, ptb, rks, nlv, dti )
+, mlv, phs, pol, stc, pta, ptr, rks, nlv, dti )
 
 if ( saveArrays ) & ( not plotFromSaved ) :
     if os.path.exists( saveString + '*.npy' ) :
@@ -90,7 +90,7 @@ nth = common.getNth( innerRadius, outerRadius, nlv )#nmbr of angular levels
 dth0 = 2.*np.pi / nth                                 #constant delta theta
 th0  = np.linspace( 0., 2.*np.pi, nth+1 )             #vector of all angles
 th0  = th0[0:-1]                         #remove last angle (same as first)
-tmp = (ptb/100.) * dth0                       #relative perturbation factor
+tmp = (pta/100.) * dth0                       #relative perturbation factor
 ran = -tmp + 2.*tmp*np.random.rand(nth)         #random perturbation vector
 th = th0.copy()                                     #copy regular th vector
 th = th + ran                                 #th vector after perturbation
@@ -98,14 +98,14 @@ th = th + ran                                 #th vector after perturbation
 if mlv == 1 :
     ds0 = ( outerRadius - innerRadius ) / (nlv-2)         #constant delta s
     s0  = np.linspace( innerRadius-ds0/2, outerRadius+ds0/2, nlv )#s vector
-    tmp = (ptb/100.) * ds0                    #relative perturbation factor
+    tmp = (ptr/100.) * ds0                    #relative perturbation factor
     ran = -tmp + 2.*tmp*np.random.rand(nlv)     #random perturbation vector
     s   = s0.copy()                                  #copy regular s vector
     s   = s + ran                              #s vector after perturbation
 elif mlv == 0 :
     ds0 = ( outerRadius - innerRadius ) / (nlv-3)         #constant delta s
     s0  = np.linspace( innerRadius-ds0, outerRadius+ds0, nlv )    #s vector
-    tmp = (ptb/100.) * ds0                    #relative perturbation factor
+    tmp = (ptr/100.) * ds0                    #relative perturbation factor
     ranBot = -tmp + 2.*tmp*np.random.rand(1)
     ranMid = -tmp + 2.*tmp*np.random.rand(nlv-4)
     ranTop = -tmp + 2.*tmp*np.random.rand(1)
@@ -214,7 +214,7 @@ if plotNodes :
     plt.axis('image')
     # plt.xlabel( 'x' )
     # plt.ylabel( 'y' )
-    plt.title( "ptb = {0:1d}".format(ptb), fontsize=fst )
+    plt.title( "pta = {0:1d}, ptr = {1:1d}".format(pta,ptr), fontsize=fst )
     plt.show()
 
 ###########################################################################
@@ -359,15 +359,16 @@ NxBot, NyBot, NxTop, NyTop \
 
 #Radial PHS-FD weights arranged in a differentiation matrix:
 
+#Matrix for approximating first derivative in radial direction:
 Ws = phs1.getDM( x=s, X=s, m=1 \
 , phsDegree=phs, polyDegree=pol, stencilSize=stc )
 
 #Simple (but still correct with dsdr multiplier) radial HV:
 Whvs = phs1.getDM( x=s, X=s[1:-1], m=phs-1 \
 , phsDegree=phs, polyDegree=pol, stencilSize=stc )
-Whvs = alp * ds0**(phs-2) * Whvs
+Whvs = alp * ds0**(phs-2) * Whvs                   #scaled radial HV matrix
 # dsPol = spdiags( ds**(phs-2), np.array([0]), len(ds), len(ds) )
-# Whvs = alp * dsPol.dot(Whvs)                       #scaled radial HV matrix
+# Whvs = alp * dsPol.dot(Whvs)
 
 # #Complex radial HV:
 # dr = ( rr[2:nlv,:] - rr[0:nlv-2,:] ) / 2.
@@ -381,15 +382,16 @@ Whvs = alp * ds0**(phs-2) * Whvs
 
 #Angular PHS-FD weights arranged in a differentiation matrix:
 
+#Matrix for approximating first derivative in angular direction:
 Wlam = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th, m=1 \
 , phsDegree=phsA, polyDegree=polA, stencilSize=stcA )
 
 #Simple (and technically incorrect) angular HV:
 Whvlam = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th, m=phsA-1 \
 , phsDegree=phsA, polyDegree=polA, stencilSize=stcA )
-Whvlam = alpA * dth0**(phsA-2) * Whvlam
+Whvlam = alpA * dth0**(phsA-2) * Whvlam           #scaled angular HV matrix
 # dthPol = spdiags( dth**polA, np.array([0]), len(dth), len(dth) )
-# Whvlam = alpA * dthPol.dot(Whvlam)                #scaled angular HV matrix
+# Whvlam = alpA * dthPol.dot(Whvlam)
 
 # #Complex angular HV:
 # alpDthPol = alpA * dth0**polA
@@ -497,13 +499,13 @@ def odefun( t, U, dUdt ) :
 q1 = dUdt               #let q1 be another reference to the same array dUdt
 q2 = np.zeros( np.shape(U) )          #rk3 and rk4 both need a second array
 if rks == 3 :
-    def RK( t, U, odefun, dt ) :
+    def RK( t, U ) :
         t, U = rk.rk3( t, U, odefun, dt, q1, q2 )
         return t, U
 elif rks == 4 :
     q3 = np.zeros( np.shape(U) )
     q4 = np.zeros( np.shape(U) )
-    def RK( t, U, odefun, dt ) :
+    def RK( t, U ) :
         t, U = rk.rk4( t, U, odefun, dt, q1, q2, q3, q4 )
         return t, U
 else :
@@ -549,6 +551,6 @@ for i in np.arange( 0, nTimesteps+1 ) :
     if plotFromSaved :
         t = t + dt
     else :
-        t, U = RK( t, U, odefun, dt )
+        t, U = RK( t, U )
 
 ###########################################################################
