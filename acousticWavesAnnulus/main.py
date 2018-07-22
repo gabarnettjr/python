@@ -200,7 +200,8 @@ fsa = 30                                                #font-size for axes
 if plotNodes :
     
     plt.rc( 'font', size=fsa )
-    fig = plt.figure( figsize=(13,12) )
+    fig = plt.figure()
+    # fig = plt.figure( figsize=(13,12) )
     
     #Plot the nodes:
     
@@ -307,13 +308,13 @@ else :
         alp = -2.**-13. * c
     #######################
     elif pol == 2 :
-        alp =  2.**-5.  * c
+        alp =  2.**-3.  * c
     elif pol == 4 :
-        alp = -2.**-9.  * c
+        alp = -2.**-7.  * c
     elif pol == 6 :
-        alp =  2.**-13. * c
+        alp =  2.**-11. * c
     elif pol == 8 :
-        alp = -2.**-17. * c
+        alp = -2.**-15. * c
     else :
         raise ValueError("1 <= pol <= 8")
 
@@ -329,13 +330,13 @@ if angularFD :
 else :
     #parameters for PHSFD approximation (polA=7 or polA=8):
     phsA = 9
-    polA = 7
+    polA = 8
     stcA = 17
 
 if noAngularHV :
     alpA = 0.                                 #remove angular HV completely
 elif polA == 8 :
-    alpA = -2.**-17. * c
+    alpA = -2.**-15. * c
 elif polA == 7 :
     alpA = -2.**-13. * c
 else :
