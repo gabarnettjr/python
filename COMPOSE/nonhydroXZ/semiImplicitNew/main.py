@@ -26,7 +26,7 @@ gmresTol     = 1e-6         #only matters if semiImplicit=1.  Default: 1e-5
 dx    = np.float64(sys.argv[2])                         #horizontal spacing
 ds    = np.float64(sys.argv[3])                           #vertical spacing
 dtExp = 1./np.float64(sys.argv[4])                      #explicit time-step
-dtImp = 2                                               #implicit time-step
+dtImp = 1./2.                                           #implicit time-step
 
 phs = 5                  #exponent of polyharmonic spline RBF (odd integer)
 pol = 3                           #highest degree of polynomials to include
@@ -42,6 +42,9 @@ saveContours  = 1                 #if 1 then save contours, if 0 then don't
 plotFromSaved = 0           #if 1 then load results, if 0 then compute them
 
 ###########################################################################
+
+if plotFromSaved == 1 :
+    saveContours = 1
 
 t = 0.
 
@@ -62,11 +65,18 @@ saveString = saveString + '/' + formulation + '/' + testCase + '/' \
 + 'dti' + '{0:1d}'.format(np.int(np.round(1./dtExp)+1e-12))        \
 + '/'
 
-if os.path.exists( saveString + '*.npy' ) :
-    os.remove( saveString + '*.npy' )
+if ( saveArrays == 1 ) & ( plotFromSaved == 0 ) :
+    if os.path.exists( saveString + '*.npy' ) :
+        os.remove( saveString + '*.npy' )
+    if not os.path.exists( saveString ) :
+        os.makedirs( saveString )
 
-if not os.path.exists( saveString ) :
-    os.makedirs( saveString )
+#Remove old *.png files:
+if saveContours :
+    tmp = os.listdir( os.getcwd() )
+    for item in tmp :
+        if item.endswith(".png") :
+            os.remove( os.path.join( os.getcwd(), item ) )
 
 ###########################################################################
 
@@ -342,6 +352,9 @@ def verticalDerivative( U, z ) :
 # plt.show()
 # sys.exit("\nStop here for now.\n")
 
+dUdt  = np.zeros(( np.shape(U0)[0], nLev+2, nCol ))         #used in odefun
+dUdti = np.zeros(( np.shape(U0)[0], nLev,   nCol ))     #not being used yet
+
 if formulation == "theta_pi" :
     
     from gab.nonhydro import theta_pi
@@ -370,11 +383,10 @@ if formulation == "theta_pi" :
         , nLev, nCol, Cp, Cv, Rd \
         , dsdxInt, dsdzInt )
     
-    def odefun( t, U ) :
+    def odefun( t, U, dUdt ) :
         U, P, tmp = setGhostNodes( U )
-        V = np.zeros(( np.shape(U)[0], nLev+2, nCol ))
-        V[:,1:-1,:] = implicitPart(U,P) + explicitPart(U,P)
-        return V
+        dUdt[:,1:-1,:] = implicitPart(U,P) + explicitPart(U,P)
+        return dUdt
     
 elif formulation == "T_rho_P" :
     
@@ -403,11 +415,10 @@ elif formulation == "T_rho_P" :
         , nLev, nCol, Cv, Rd, g \
         , dsdxInt, dsdzInt, rhoBarInt )
     
-    def odefun( t, U ) :
+    def odefun( t, U, dUdt ) :
         U, P, tmp = setGhostNodes( U )
-        V = np.zeros(( np.shape(U)[0], nLev+2, nCol ))
-        V[:,1:-1,:] = implicitPart(U,P) + explicitPart(U,P)
-        return V
+        dUdt[:,1:-1,:] = implicitPart(U,P) + explicitPart(U,P)
+        return dUdt
     
 elif formulation == "theta_rho_P" :
     
@@ -436,11 +447,10 @@ elif formulation == "theta_rho_P" :
         , nLev, nCol, Cv, Rd, g \
         , dsdxInt, dsdzInt, rhoBarInt )
     
-    def odefun( t, U ) :
+    def odefun( t, U, dUdt ) :
         U, P, tmp = setGhostNodes( U )
-        V = np.zeros(( np.shape(U)[0], nLev+2, nCol ))
-        V[:,1:-1,:] = implicitPart(U,P) + explicitPart(U,P)
-        return V
+        dUdt[:,1:-1,:] = implicitPart(U,P) + explicitPart(U,P)
+        return dUdt
 
 elif formulation == "HOMMEstyle" :
     
@@ -468,13 +478,14 @@ elif formulation == "HOMMEstyle" :
         , Da, Ds, HV, verticalRemap \
         , nLev, nCol, g, wIbot, wItop, stc, z, VL )
     
-    def odefun( t, U ) :
+    
+    def odefun( t, U, dUdt ) :
         U, P, backgroundStatesTmp = setGhostNodes( U )
-        V = np.zeros(( np.shape(U)[0], nLev+2, nCol ))
-        V[:,1:-1,:] = implicitPart(U,P) + explicitPart(U,P,backgroundStatesTmp)
-        # V[4,0,:]  = -U[0,0,:]  * ( U[4,0,:] @ Wa ) + g*U[1,0,:]
-        # V[4,-1,:] = -U[0,-1,:] * ( U[4,-1,:] @ Wa ) + g*U[1,-1,:]
-        return V
+        dUdt[:,1:-1,:] = implicitPart( U, P ) \
+        + explicitPart( U, P, backgroundStatesTmp )
+        # dUdt[4,0,:]  = -U[0,0,:]  * ( U[4,0,:] @ Wa ) + g*U[1,0,:]
+        # dUdt[4,-1,:] = -U[0,-1,:] * ( U[4,-1,:] @ Wa ) + g*U[1,-1,:]
+        return dUdt
     
 else :
     
@@ -506,10 +517,18 @@ if semiImplicit == 1 :
 
 #Other functions:
 
+q1 = dUdt
+q2 = np.zeros( np.shape(U0) )
 if rkStages == 3 :
-    rk = rk.rk3
+    def RK( t, U ):
+        t, U = rk.rk3( t, U, odefun, dtExp, q1, q2 )
+        return t, U
 elif rkStages == 4 :
-    rk = rk.rk4
+    q3 = np.zeros( np.shape(U0) )
+    q4 = np.zeros( np.shape(U0) )
+    def RK( t, U ) :
+        t, U = rk.rk4( t, U, odefun, dtExp, q1, q2, q3, q4 )
+        return t, U
 else :
     sys.exit( "\nError: rkStages should be 3 or 4.  rk2 is not stable for this problem.\n" )
 
@@ -550,7 +569,7 @@ if saveContours == 1 :
 
 #The actual Eulerian time-stepping from t=0 to t=dtImp:
 for i in range( np.int( np.round(dtImp/dtExp) + 1e-12 ) ) :
-    t, U1 = rk( t, U1, odefun, dtExp )
+    t, U1 = RK( t, U1 )
 
 U1, P1, tmp = setGhostNodes( U1 )
 
@@ -574,19 +593,19 @@ for i in range( 1, nTimesteps+1 ) :
             sys.exit( "\nError: plotFromSaved should be 0 or 1.\n" )
         
         if saveContours == 1 :
-            # if ( formulation == "HOMMEstyle" ) & ( VL == 1 ) :
-            #     U1 = verticalRemap( U1, U1[4,:,:]/g, z )
-            #     U1, P1, tmp = setGhostNodes( U1 )
-            saveContourPlot( U1, t, U1[4,:,:]/g )
+            if ( formulation == "HOMMEstyle" ) & ( VL == 1 ) :
+                U1 = verticalRemap( U1, U1[4,:,:]/g, z )
+                U1, P1, tmp = setGhostNodes( U1 )
+            saveContourPlot( U1, t, z )
         
         et = printInfo( U1, P1, et, t )
 
     if plotFromSaved == 0 :
         if semiImplicit == 0 :
-            # if ( np.mod(i,1) == 0 ) & ( formulation == "HOMMEstyle" ) & ( VL == 1 ) :
-            #     U1 = verticalRemap( U1, U1[4,:,:]/g, z )
-            #     U1, P1, tmp = setGhostNodes( U1 )
-            t, U2 = rk( t, U1, odefun, dtExp )
+            if ( np.mod(i,1) == 0 ) & ( formulation == "HOMMEstyle" ) & ( VL == 1 ) :
+                U1 = verticalRemap( U1, U1[4,:,:]/g, z )
+                U1, P1, tmp = setGhostNodes( U1 )
+            t, U2 = RK( t, U1 )
         elif semiImplicit == 1 :
             t, U2 = leapfrogTimestep( t, U0, P0, U1, P1, dtImp )
         else :

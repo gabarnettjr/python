@@ -3,17 +3,16 @@ import sys
 import os
 import time
 import numpy as np
-# from scipy.sparse import spdiags
 import matplotlib.pyplot as plt
 
 sys.path.append( '../site-packages' )
 
 from gab import rk, phs1
-from gab.annulus import common, waveEquation
+from gab.annulus import common, eulerEquations
 
 ###########################################################################
 
-args = waveEquation.parseInput()
+args = eulerEquations.parseInput()
 
 #get rid of the args prefix on all the variable names:
 temporaryDictionary = vars(args)
@@ -63,7 +62,7 @@ def initialCondition( x, y ) :
 
 #Delete old stuff, and set things up for saving:
 
-saveString = waveEquation.getSavestring( c, innerRadius, outerRadius \
+saveString = eulerEquations.getSavestring( Rd, innerRadius, outerRadius \
 , tf, saveDel, exp, amp, frq \
 , mlv, phs, pol, stc, pta, ptr, rks, nlv, dti )
 
@@ -274,12 +273,12 @@ if plotNodes or plotHeightCoord or plotRadii :
 
 ###########################################################################
 
-#Set initial condition for U[0,:,:] (P):
+#Set initial condition for U[2,:,:] (T), U[3,:,:] (rho), and U[4,:,:] (P):
 
-U = np.zeros(( 3, nlv, nth ))
-U[0,:,:] = initialCondition(xx,yy)
-Po = U[0,1:-1,:].copy()
-rhoInv = c**2. / Po
+U = np.zeros(( 5, nlv, nth ))
+U[2,:,:] = 300.
+U[3,:,:] = initialCondition(xx,yy)
+U[4,:,:] = U[3,:,:] * Rd * U[2,:,:]
 
 ###########################################################################
 
@@ -294,6 +293,8 @@ print()
 ###########################################################################
 
 #Hyperviscosity coefficient (alp) for radial direction:
+
+c = np.sqrt( Rd * 300. )
 
 if noRadialHV :
     alp = 0.                                   #remove radial HV completely
@@ -330,7 +331,7 @@ if angularFD :
 else :
     #parameters for PHSFD approximation (polA=7 or polA=8):
     phsA = 9
-    polA = 8
+    polA = 7
     stcA = 17
 
 if noAngularHV :
@@ -370,14 +371,6 @@ Whvs = alp * ds0**(phs-2) * Whvs                   #scaled radial HV matrix
 # dsPol = spdiags( ds**(phs-2), np.array([0]), len(ds), len(ds) )
 # Whvs = alp * dsPol.dot(Whvs)
 
-# #Complex radial HV:
-# dr = ( rr[2:nlv,:] - rr[0:nlv-2,:] ) / 2.
-# alpDrPol = alp * dr**(phs-2)
-# alpDrPol = alp * ((outerRadius-innerRadius)/(nlv-2)) ** (phs-2)
-# alpDxPol = alp * ( ( dr + ss[1:-1,:]*np.tile(dth,(nlv-2,1)) ) / 2. ) ** (phs-2)
-# alpDxPol = alp * ( ( (outerRadius-innerRadius)/(nlv-2) + ss[1:-1,:]*2.*np.pi/nth ) / 2. ) ** (phs-2)
-# alpDsPol = alp * ( ( ss[1:-1,:]*np.tile(dth,(nlv-2,1)) + np.transpose(np.tile(ds,(nth,1))) ) / 2. ) ** (phs-2)
-
 ###########################################################################
 
 #Angular PHS-FD weights arranged in a differentiation matrix:
@@ -392,10 +385,6 @@ Whvlam = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th, m=phsA-1 \
 Whvlam = alpA * dth0**(phsA-2) * Whvlam           #scaled angular HV matrix
 # dthPol = spdiags( dth**polA, np.array([0]), len(dth), len(dth) )
 # Whvlam = alpA * dthPol.dot(Whvlam)
-
-# #Complex angular HV:
-# alpDthPol = alpA * dth0**polA
-# # alpDthPol = alpA * ( np.tile(dth,(nlv-2,1)) ) ** polA
 
 ###########################################################################
 
@@ -431,69 +420,37 @@ def Ds(U) :
 def Dlam(U) :
     return Wlam.dot(U.T).T
 
-# def Dr(U) :                                        #du/dr = (du/ds)*(ds/dr)
-#     return Ds(U) * dsdrAll
-# 
-# def Dth(U) :                           #du/dth = du/dlam + (du/ds)*(ds/dth)
-#     return Dlam(U) + Ds(U) * dsdthAll
-
 def Dx(U) :                    #du/dx = (du/dr)*(dr/dx) + (du/dth)*(dth/dx)
     return mtx * Ds(U) + dthdxAll * Dlam(U)
-    # return Dr(U) * drdxAll + Dth(U) * dthdxAll
 
 def Dy(U) :                    #du/dy = (du/dr)*(dr/dy) + (du/dth)*(dth/dy)
     return mty * Ds(U) + dthdyAll * Dlam(U)
-    # return Dr(U) * drdyAll + Dth(U) * dthdyAll
-
-# def L(U) :
-#     # Us = Ws@U
-#     # return Ws@Us + ssInv*Us + ssInv2*((U@Wlam)@Wlam)
-#     Us = Ws@U
-#     Uth = (U@Wlam) + Us*dsdthAll
-#     return Ws@(Us*dsdrAll)*dsdrAll + rrInv*Us*dsdrAll \
-#     +rrInv2 * ( Uth@Wlam + (Ws@Uth)*dsdthAll )
-# 
-# def HV(U) :
-#     for i in range(np.int(np.round((phs-1)/2))) :
-#         U = L(U)
-#     return alpDrPol * U[1:-1,:]
 
 def HV(U) :
-    # #Angular HV:
-    # HVth = ( U @ Wlam ) + dsdthAll * ( Ws @ U )
-    # for i in range( polA ) :
-        # HVth = ( HVth @ Wlam ) + dsdthAll * ( Ws @ HVth )
-    # HVth = alpDthPol * HVth[1:-1,:]
-    # #Total HV:
-    # return dsdri*(Whvs@U) + HVth
-    #Simple (incorrect) method:
     return Whvs.dot(U) + Whvlam.dot(U[1:-1,:].T).T
 
 if mlv == 1 :
-    def setGhostNodes(U) :
-        return waveEquation.setGhostNodesMidLevels( U \
+    def setGhostNodes( U ) :
+        U = eulerEquations.setGhostNodesMidLevels( U \
         , NxBot, NyBot, NxTop, NyTop \
         , TxBot, TyBot, TxTop, TyTop \
-        , someFactor, stcB, Wlam \
+        , someFactor, stcB, Wlam, Rd \
         , wIinner, wEinner, wDinner, wHinner, wIouter, wEouter, wDouter )
+        return U
 elif mlv == 0 :
-    def setGhostNodes(U) :
-        return waveEquation.setGhostNodesInterfaces( U \
-        , TxBot[0,:], TyBot[0,:], TxTop[0,:], TyTop[0,:] \
-        , someFactor, stcB, Wlam \
-        , wEinner, wDinner, wEouter, wDouter )
+    raise ValueError("This isn't working for Euler equations yet.")
+    # def setGhostNodes(U) :
+    #     return eulerEquations.setGhostNodesInterfaces( U \
+    #     , TxBot[0,:], TyBot[0,:], TxTop[0,:], TyTop[0,:] \
+    #     , someFactor, stcB, Wlam \
+    #     , wEinner, wDinner, wEouter, wDouter )
 else :
     raise ValueError("Only mlv=0 and mlv=1 are currently supported.")
 
 dUdt = np.zeros( np.shape(U) )
 def odefun( t, U, dUdt ) :
-    dUdt = waveEquation.odefun( t, U, dUdt \
-    , setGhostNodes, Ds, Dlam, HV \
-    , Po, rhoInv, dsdthAll, dsdrAll \
-    , cosTh, sinTh, cosThOverR, sinThOverR, mtx, mty )
-    # dUdt = waveEquation.odefunCartesian( t, U, dUdt \
-    # , setGhostNodes, Dx, Dy, HV \
-    # , Po, rhoInv )
+    dUdt = eulerEquations.odefunCartesian( t, U, dUdt \
+    , setGhostNodes, Dx, Dy, HV )
     return dUdt
 
 q1 = dUdt               #let q1 be another reference to the same array dUdt
@@ -516,10 +473,10 @@ if saveContours :
     fig = plt.figure( figsize = (18,14) )
 
 def plotSomething( U, t ) :
-    waveEquation.plotSomething( U, t \
+    eulerEquations.plotSomething( U, t \
     , Dx, Dy \
     , whatToPlot, xx, yy, xx0, yy0, Wradial, Wangular \
-    , c, xB, yB, xT, yT, outerRadius, fig \
+    , Rd, xB, yB, xT, yT, outerRadius, fig \
     , dynamicColorbar, noInterp )
 
 ###########################################################################
@@ -536,17 +493,19 @@ for i in np.arange( 0, nTimesteps+1 ) :
         et = time.time()
         
         if plotFromSaved :
-            U = np.load( saveString \
+            U[0:4,:,:] = np.load( saveString \
             + '{0:04d}'.format(np.int(np.round(t))) + '.npy' )
-        elif saveArrays :
+        
+        if saveArrays or saveContours :
+            tmpU = setGhostNodes(U)
+        if saveArrays :
             np.save( saveString \
-            + '{0:04d}'.format(np.int(np.round(t))) + '.npy', setGhostNodes(U) )
-        
+            + '{0:04d}'.format(np.int(np.round(t))) + '.npy', tmpU[0:4,:,:] )
         if saveContours :
-            plotSomething( setGhostNodes(U), t )
+            plotSomething( tmpU, t )
         
-        if np.max(np.abs(U)) > 5. :
-            raise ValueError("Solution greater than 5 in magnitude.  Unstable in time.")
+        # if np.max(np.abs(U)) > 5. :
+        #     raise ValueError("Solution greater than 5 in magnitude.  Unstable in time.")
     
     if plotFromSaved :
         t = t + dt
