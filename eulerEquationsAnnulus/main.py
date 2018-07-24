@@ -4,6 +4,7 @@ import os
 import time
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.sparse import spdiags
 
 sys.path.append( '../site-packages' )
 
@@ -50,13 +51,19 @@ def initialCondition( x, y ) :
             z = z + np.exp( -exp*( (x-xc3)**2. + (y-yc3)**2. ) )
     return z
     # #Wendland function:
-    # r = np.sqrt( 6 * ( (x-xc1)**2. + (y-yc1)**2. ) )
-    # ind = r<1.
-    # z = np.zeros( np.shape(x) )
-    # z[ind] = ( 1. - r[ind] ) ** 10. * ( 429.*r[ind]**4. + 450.*r[ind]**3. \
-    # + 210.*r[ind]**2. + 50.*r[ind] + 5.  )
-    # z = 1. + z/5.
-    # return z
+    # def wf( xc, yc ) :
+    #     r = np.sqrt( 6 * ( (x-xc)**2. + (y-yc)**2. ) )
+    #     ind = r<1.
+    #     w = np.zeros( np.shape(x) )
+    #     w[ind] = ( 1. - r[ind] ) ** 10. * ( 429.*r[ind]**4. + 450.*r[ind]**3. \
+    #     + 210.*r[ind]**2. + 50.*r[ind] + 5.  )
+    #     return w
+    # z = wf(xc1,yc1)
+    # if ang2 :
+    #     z = z + wf(xc2,yc2)
+    #     if ang3 :
+    #         z = z + wf(xc3,yc3)
+    # return 1. + z/5.
 
 ###########################################################################
 
@@ -85,14 +92,17 @@ if saveContours :
 t = 0.                                                       #starting time
 nTimesteps = np.int(np.round( tf / dt ))         #total number of timesteps
 
-nth = common.getNth( innerRadius, outerRadius, nlv )#nmbr of angular levels
-dth0 = 2.*np.pi / nth                                 #constant delta theta
-th0  = np.linspace( 0., 2.*np.pi, nth+1 )             #vector of all angles
+th = common.getClusteredAngles( numSlices=36, style="linear" )
+nth = len(th)
+
+# nth = common.getNth( innerRadius, outerRadius, nlv )#nmbr of angular levels
+# dth0 = 2.*np.pi / nth                                 #constant delta theta
+th0  = np.linspace( th[0], th[0]+2.*np.pi, nth+1 )    #vector of all angles
 th0  = th0[0:-1]                         #remove last angle (same as first)
-tmp = (pta/100.) * dth0                       #relative perturbation factor
-ran = -tmp + 2.*tmp*np.random.rand(nth)         #random perturbation vector
-th = th0.copy()                                     #copy regular th vector
-th = th + ran                                 #th vector after perturbation
+# tmp = (pta/100.) * dth0                       #relative perturbation factor
+# ran = -tmp + 2.*tmp*np.random.rand(nth)         #random perturbation vector
+# th = th0.copy()                                     #copy regular th vector
+# th = th + ran                                 #th vector after perturbation
 
 if mlv == 1 :
     ds0 = ( outerRadius - innerRadius ) / (nlv-2)         #constant delta s
@@ -156,6 +166,53 @@ rr0 = common.getRadii( thth0, ss0 \
 , innerRadius, outerRadius, rSurf )                  #mesh of regular radii
 xx0 = rr0 * np.cos(thth0)                         #mesh of regular x-coords
 yy0 = rr0 * np.sin(thth0)                         #mesh of regular x-coords
+
+###########################################################################
+
+#Set initial condition for U[2,:,:] (T), U[3,:,:] (rho), and U[4,:,:] (P):
+
+U = np.zeros(( 5, nlv, nth ))
+
+if useGravity :
+    
+    Cp = 1004.
+    Cv = 717.
+    Rd = Cp - Cv
+    g  = 9.81
+    Po = 10.**5.
+    
+    thetaBar = 300.
+    theta = thetaBar + ( initialCondition(xx,yy) - 1. )
+    pi = 1. - g / Cp / thetaBar * ( rr - innerRadius )
+    U[2,:,:] = pi * theta
+    U[4,:,:] = Po * pi**(Rd/Cp)
+    U[3,:,:] = U[4,:,:] / Rd / U[2,:,:]
+    
+    tmp = np.sqrt( xB**2. + yB**2. )
+    gx = g * xB / tmp
+    gy = g * yB / tmp
+    Gbot = gx * NxBot[0,:] + gy * NyBot[0,:]         #gdotN on bottom bndry
+    
+    tmp = np.sqrt( xT**2. + yT**2. )
+    gx = g * xT / tmp
+    gy = g * yT / tmp
+    Gtop = gx * NxTop[0,:] + gy * NyTop[0,:]            #gdotN on top bndry
+
+    tmp = np.sqrt( xx**2. + yy**2. )
+    gx = g * xx / tmp               #horizontal component of gravity vector
+    gy = g * yy / tmp                 #vertical component of gravity vector
+
+else :
+    
+    U[2,:,:] = 300.
+    U[3,:,:] = initialCondition(xx,yy)
+    U[4,:,:] = U[3,:,:] * Rd * U[2,:,:]
+
+    Gbot = 0.
+    Gtop = 0.
+    
+    gx = 0.
+    gy = 0.
 
 ###########################################################################
 
@@ -273,15 +330,6 @@ if plotNodes or plotHeightCoord or plotRadii :
 
 ###########################################################################
 
-#Set initial condition for U[2,:,:] (T), U[3,:,:] (rho), and U[4,:,:] (P):
-
-U = np.zeros(( 5, nlv, nth ))
-U[2,:,:] = 300.
-U[3,:,:] = initialCondition(xx,yy)
-U[4,:,:] = U[3,:,:] * Rd * U[2,:,:]
-
-###########################################################################
-
 #Check the max value of the initial condition on the boundaries:
 
 print()
@@ -300,13 +348,13 @@ if noRadialHV :
     alp = 0.                                   #remove radial HV completely
 else :
     if pol == 1 :
-        alp =  2.**-1.  * c
+        alp =  2.**-2.  * c
     elif pol == 3 :
-        alp = -2.**-5.  * c
+        alp = -2.**-6.  * c
     elif pol == 5 :
-        alp =  2.**-9.  * c
+        alp =  2.**-10.  * c
     elif pol == 7 :
-        alp = -2.**-13. * c
+        alp = -2.**-14. * c
     #######################
     elif pol == 2 :
         alp =  2.**-3.  * c
@@ -339,7 +387,7 @@ if noAngularHV :
 elif polA == 8 :
     alpA = -2.**-15. * c
 elif polA == 7 :
-    alpA = -2.**-13. * c
+    alpA = -2.**-14. * c
 else :
     raise ValueError("polA should be 7 or 8 to achieve a high order \
     angular approximation (no boundaries in this direction).")
@@ -353,7 +401,7 @@ stcB = stc                  #stencil-size for enforcing boundary conditions
 
 NxBot, NyBot, NxTop, NyTop \
 , TxBot, TyBot, TxTop, TyTop \
-, someFactor \
+, someFactor, normgradsBot, normgradsTop \
 = common.getTangentsAndNormals( th, stcB, rSurf, dsdr, dsdth )
 
 ###########################################################################
@@ -382,9 +430,9 @@ Wlam = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th, m=1 \
 #Simple (and technically incorrect) angular HV:
 Whvlam = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th, m=phsA-1 \
 , phsDegree=phsA, polyDegree=polA, stencilSize=stcA )
-Whvlam = alpA * dth0**(phsA-2) * Whvlam           #scaled angular HV matrix
-# dthPol = spdiags( dth**polA, np.array([0]), len(dth), len(dth) )
-# Whvlam = alpA * dthPol.dot(Whvlam)
+# Whvlam = alpA * dth0**(phsA-2) * Whvlam           #scaled angular HV matrix
+dthPol = spdiags( dth**(phsA-2), np.array([0]), len(dth), len(dth) )
+Whvlam = alpA * dthPol.dot(Whvlam)
 
 ###########################################################################
 
@@ -399,6 +447,7 @@ wHinner = phs1.getWeights( innerRadius, s[1:stcB+1], 0, phs, pol )
 wIouter = phs1.getWeights( outerRadius, s[-1:-stcB-1:-1], 0, phs, pol )
 wEouter = phs1.getWeights( s[-1],       s[-2:-stcB-2:-1], 0, phs, pol )
 wDouter = phs1.getWeights( outerRadius, s[-1:-stcB-1:-1], 1, phs, pol )
+wHouter = phs1.getWeights( outerRadius, s[-2:-stcB-2:-1], 0, phs, pol )
 
 ###########################################################################
 
@@ -434,8 +483,8 @@ if mlv == 1 :
         U = eulerEquations.setGhostNodesMidLevels( U \
         , NxBot, NyBot, NxTop, NyTop \
         , TxBot, TyBot, TxTop, TyTop \
-        , someFactor, stcB, Wlam, Rd \
-        , wIinner, wEinner, wDinner, wHinner, wIouter, wEouter, wDouter )
+        , someFactor, stcB, Wlam, Rd, Gbot, Gtop, normgradsBot, normgradsTop \
+        , wIinner, wEinner, wDinner, wHinner, wIouter, wEouter, wDouter, wHouter )
         return U
 elif mlv == 0 :
     raise ValueError("This isn't working for Euler equations yet.")
@@ -450,7 +499,8 @@ else :
 dUdt = np.zeros( np.shape(U) )
 def odefun( t, U, dUdt ) :
     dUdt = eulerEquations.odefunCartesian( t, U, dUdt \
-    , setGhostNodes, Dx, Dy, HV )
+    , setGhostNodes, Dx, Dy, HV \
+    , gx, gy )
     return dUdt
 
 q1 = dUdt               #let q1 be another reference to the same array dUdt
