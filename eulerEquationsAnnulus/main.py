@@ -71,7 +71,7 @@ def initialCondition( x, y ) :
 
 saveString = eulerEquations.getSavestring( Rd, innerRadius, outerRadius \
 , tf, saveDel, exp, amp, frq \
-, mlv, phs, pol, stc, pta, ptr, rks, nlv, dti )
+, mlv, phs, pol, stc, clu, ptr, rks, nlv, dti )
 
 if ( saveArrays ) & ( not plotFromSaved ) :
     if os.path.exists( saveString + '*.npy' ) :
@@ -92,17 +92,18 @@ if saveContours :
 t = 0.                                                       #starting time
 nTimesteps = np.int(np.round( tf / dt ))         #total number of timesteps
 
-th = common.getClusteredAngles( numSlices=36, style="linear" )
-nth = len(th)
-
-# nth = common.getNth( innerRadius, outerRadius, nlv )#nmbr of angular levels
-# dth0 = 2.*np.pi / nth                                 #constant delta theta
-th0  = np.linspace( th[0], th[0]+2.*np.pi, nth+1 )    #vector of all angles
-th0  = th0[0:-1]                         #remove last angle (same as first)
-# tmp = (pta/100.) * dth0                       #relative perturbation factor
-# ran = -tmp + 2.*tmp*np.random.rand(nth)         #random perturbation vector
-# th = th0.copy()                                     #copy regular th vector
-# th = th + ran                                 #th vector after perturbation
+if ( clu == "linear" ) | ( clu == "quadratic" ) :
+    th = common.fastAngles( innerRadius, outerRadius, nlv, ang1, .025 )
+    # th = common.getClusteredAngles( innerRadius, outerRadius, nlv \
+    # , style=clu, center=ang1, nMin=2, increment=1 )
+    nth = len(th)
+else :
+    #Get regularly spaced angles:
+    nth = common.getNth( innerRadius, outerRadius, nlv )    #nmbr of angles
+    th  = np.linspace( ang1-np.pi, ang1+np.pi, nth+1 )#vector of all angles
+    th  = th[0:-1]                       #remove last angle (same as first)
+th0 = np.linspace( th[0], th[0]+2.*np.pi, nth+1 )
+th0 = th0[0:-1]
 
 if mlv == 1 :
     ds0 = ( outerRadius - innerRadius ) / (nlv-2)         #constant delta s
@@ -169,11 +170,206 @@ yy0 = rr0 * np.sin(thth0)                         #mesh of regular x-coords
 
 ###########################################################################
 
+#Get height coordinate s and its derivatives:
+
+sFunc, dsdth, dsdr \
+= common.getHeightCoordinate( innerRadius, outerRadius, rSurf, rSurfPrime )
+
+dsdthi = dsdth( rri, ththi )             #interior values of dsdth function
+dsdri  = dsdr( rri, ththi )               #interior values of dsdr function
+
+dsdthAll = dsdth( rr, thth )                 #dsdth values over entire mesh
+dsdrAll  = dsdr( rr, thth )                   #dsdr values over entire mesh
+
+###########################################################################
+
+#Metric terms that will be used in Dx() and Dy() functions:
+
+mtx = dsdrAll * drdxAll + dsdthAll * dthdxAll             #Dx() metric term
+mty = dsdrAll * drdyAll + dsdthAll * dthdyAll             #Dy() metric term
+
+###########################################################################
+
+#Set (x,y) on the bottom boundary (B) and top boundary (T):
+
+xB0 = rSurf(th0) * np.cos(th0)
+yB0 = rSurf(th0) * np.sin(th0)
+xT0 = outerRadius * np.cos(th0)
+yT0 = outerRadius * np.sin(th0)
+
+###########################################################################
+
+#Set font sizes for any plots that might be requested below:
+
+fst = 40                                               #font-size for title
+fsc = 30                                            #font-size for colorbar
+fsa = 30                                                #font-size for axes
+
+###########################################################################
+
+if plotNodes :
+    
+    plt.rc( 'font', size=fsa )
+    fig = plt.figure()
+    # fig = plt.figure( figsize=(13,12) )
+    
+    #Plot the nodes:
+    
+    plt.plot( xx.flatten(), yy.flatten(), ".", markersize=10 )
+    plt.plot( np.hstack((xB0,xB0[0])), np.hstack((yB0,yB0[0])), "k-" \
+    , np.hstack((xT0,xT0[0])), np.hstack((yT0,yT0[0])), "k-" \
+    , linewidth=3 )
+    tmp = outerRadius + .2
+    plt.axis([-tmp,tmp,-tmp,tmp])
+    plt.axis('image')
+    # plt.xlabel( 'x' )
+    # plt.ylabel( 'y' )
+    plt.title( "clu={0:1s}, ptr={1:1d}".format(clu,ptr), fontsize=fst )
+    plt.show()
+
+###########################################################################
+
+if plotHeightCoord :
+    
+    plt.rc( 'font', size=fsa )
+    
+    #Plot the coordinate transformation functions:
+    
+    plt.contourf( xx, yy, sFunc(rr,thth), 20 )
+    plt.plot( xB0, yB0, "r-", xT0, yT0, "r-" )
+    plt.axis( 'equal' )
+    tmp = plt.colorbar()
+    tmp.ax.tick_params( labelsize=fsc )
+    plt.title( 's(r,th)', fontsize=fst )
+    plt.show()
+    
+    plt.contourf( xx, yy, dsdthAll, 20 )
+    plt.plot( xB0, yB0, "r-", xT0, yT0, "r-" )
+    plt.axis( 'equal' )
+    tmp = plt.colorbar()
+    tmp.ax.tick_params( labelsize=fsc )
+    plt.title( 'ds/dth', fontsize=fst )
+    plt.show()
+    
+    plt.contourf( xx, yy, dsdrAll, 20 )
+    plt.plot( xB0, yB0, "r-", xT0, yT0, "r-" )
+    plt.axis( 'equal' )
+    tmp = plt.colorbar()
+    tmp.ax.tick_params( labelsize=fsc )
+    plt.title( 'ds/dr', fontsize=fst )
+    plt.show()
+
+###########################################################################
+
+if plotRadii :
+    
+    plt.rc( 'font', size=fsa )
+    
+    #Plot the perturbed radii:
+    
+    fig, ax = plt.subplots( 1, 2, figsize=(8,4) )
+    ax[0].plot( s0, s0, '-', s0, s, '.' )   #plot of initial vs perturbed s
+    ax[0].set_xlabel('s0')
+    ax[0].set_ylabel('s')
+    ax[1].plot( s[1:-1], ds, '-' )            #plot of s vs non-constant ds
+    ax[1].set_xlabel('s')
+    ax[1].set_ylabel('ds')
+    plt.show()
+
+###########################################################################
+
+if plotNodes or plotHeightCoord or plotRadii :
+    
+    sys.exit("\nFinished plotting.")
+
+###########################################################################
+
+#Check the max value of the initial condition on the boundaries:
+
+print()
+print( 'max value on boundaries =', np.max(np.hstack(( \
+initialCondition(xB0,yB0),                               \
+initialCondition(xT0,yT0) ))) )
+print()
+
+###########################################################################
+
+#Hyperviscosity coefficient (alp) for radial direction:
+
+c = np.sqrt( Rd * 300. )
+
+if noRadialHV :
+    alp = 0.                                   #remove radial HV completely
+else :
+    if pol == 1 :
+        alp =  2.**-2.  * c
+    elif pol == 3 :
+        alp = -2.**-6.  * c
+    elif pol == 5 :
+        alp =  2.**-10.  * c
+    elif pol == 7 :
+        alp = -2.**-14. * c
+    #######################
+    elif pol == 2 :
+        alp =  2.**-4.  * c
+    elif pol == 4 :
+        alp = -2.**-8.  * c
+    elif pol == 6 :
+        alp =  2.**-12. * c
+    elif pol == 8 :
+        alp = -2.**-16. * c
+    else :
+        raise ValueError("1 <= pol <= 8")
+
+###########################################################################
+
+#Parameters for angular approximations:
+
+if angularFD :
+    #parameters for conventional FD8 approximation:
+    phsA = 9
+    polA = 8
+    stcA = 9
+else :
+    #parameters for PHSFD approximation (polA=7 or polA=8):
+    phsA = 9
+    polA = 8
+    stcA = 17
+
+if noAngularHV :
+    alpA = 0.                                 #remove angular HV completely
+elif polA == 8 :
+    alpA = -2.**-15. * c
+elif polA == 7 :
+    alpA = -2.**-14. * c
+else :
+    raise ValueError("polA should be 7 or 8 to achieve a high order \
+    angular approximation (no boundaries in this direction).")
+
+###########################################################################
+
+#Extra things needed to enforce the Neumann boundary condition for P:
+
+stcB = stc                  #stencil-size for enforcing boundary conditions
+# stcB = min( nlv-1, 2*(pol+2)+1 )
+
+NxBot, NyBot, NxTop, NyTop \
+, TxBot, TyBot, TxTop, TyTop \
+, someFactor, normgradsBot, normgradsTop \
+= common.getTangentsAndNormals( th, stcB, rSurf, dsdr, dsdth )
+
+###########################################################################
+
 #Set initial condition for U[2,:,:] (T), U[3,:,:] (rho), and U[4,:,:] (P):
 
 U = np.zeros(( 5, nlv, nth ))
 
 if useGravity :
+    
+    xT = outerRadius * np.cos(th)
+    yT = outerRadius * np.sin(th)
+    xB = rSurf(th) * np.cos(th)
+    yB = rSurf(th) * np.sin(th)
     
     Cp = 1004.
     Cv = 717.
@@ -213,196 +409,6 @@ else :
     
     gx = 0.
     gy = 0.
-
-###########################################################################
-
-#Get height coordinate s and its derivatives:
-
-sFunc, dsdth, dsdr \
-= common.getHeightCoordinate( innerRadius, outerRadius, rSurf, rSurfPrime )
-
-dsdthi = dsdth( rri, ththi )             #interior values of dsdth function
-dsdri  = dsdr( rri, ththi )               #interior values of dsdr function
-
-dsdthAll = dsdth( rr, thth )                 #dsdth values over entire mesh
-dsdrAll  = dsdr( rr, thth )                   #dsdr values over entire mesh
-
-###########################################################################
-
-#Metric terms that will be used in Dx() and Dy() functions:
-
-mtx = dsdrAll * drdxAll + dsdthAll * dthdxAll             #Dx() metric term
-mty = dsdrAll * drdyAll + dsdthAll * dthdyAll             #Dy() metric term
-
-###########################################################################
-
-#Set (x,y) on the bottom boundary (B) and top boundary (T):
-
-xB = rSurf(th0) * np.cos(th0)
-yB = rSurf(th0) * np.sin(th0)
-xT = outerRadius * np.cos(th0)
-yT = outerRadius * np.sin(th0)
-
-###########################################################################
-
-#Set font sizes for any plots that might be requested below:
-
-fst = 40                                               #font-size for title
-fsc = 30                                            #font-size for colorbar
-fsa = 30                                                #font-size for axes
-
-###########################################################################
-
-if plotNodes :
-    
-    plt.rc( 'font', size=fsa )
-    fig = plt.figure()
-    # fig = plt.figure( figsize=(13,12) )
-    
-    #Plot the nodes:
-    
-    plt.plot( xx.flatten(), yy.flatten(), ".", markersize=10 )
-    plt.plot( np.hstack((xB,xB[0])), np.hstack((yB,yB[0])), "k-" \
-    , np.hstack((xT,xT[0])), np.hstack((yT,yT[0])), "k-" \
-    , linewidth=3 )
-    tmp = outerRadius + .2
-    plt.axis([-tmp,tmp,-tmp,tmp])
-    plt.axis('image')
-    # plt.xlabel( 'x' )
-    # plt.ylabel( 'y' )
-    plt.title( "pta={0:1d}, ptr={1:1d}".format(pta,ptr), fontsize=fst )
-    plt.show()
-
-###########################################################################
-
-if plotHeightCoord :
-    
-    plt.rc( 'font', size=fsa )
-    
-    #Plot the coordinate transformation functions:
-    
-    plt.contourf( xx, yy, sFunc(rr,thth), 20 )
-    plt.plot( xB, yB, "r-", xT, yT, "r-" )
-    plt.axis( 'equal' )
-    tmp = plt.colorbar()
-    tmp.ax.tick_params( labelsize=fsc )
-    plt.title( 's(r,th)', fontsize=fst )
-    plt.show()
-    
-    plt.contourf( xx, yy, dsdthAll, 20 )
-    plt.plot( xB, yB, "r-", xT, yT, "r-" )
-    plt.axis( 'equal' )
-    tmp = plt.colorbar()
-    tmp.ax.tick_params( labelsize=fsc )
-    plt.title( 'ds/dth', fontsize=fst )
-    plt.show()
-    
-    plt.contourf( xx, yy, dsdrAll, 20 )
-    plt.plot( xB, yB, "r-", xT, yT, "r-" )
-    plt.axis( 'equal' )
-    tmp = plt.colorbar()
-    tmp.ax.tick_params( labelsize=fsc )
-    plt.title( 'ds/dr', fontsize=fst )
-    plt.show()
-
-###########################################################################
-
-if plotRadii :
-    
-    plt.rc( 'font', size=fsa )
-    
-    #Plot the perturbed radii:
-    
-    fig, ax = plt.subplots( 1, 2, figsize=(8,4) )
-    ax[0].plot( s0, s0, '-', s0, s, '.' )   #plot of initial vs perturbed s
-    ax[0].set_xlabel('s0')
-    ax[0].set_ylabel('s')
-    ax[1].plot( s[1:-1], ds, '-' )            #plot of s vs non-constant ds
-    ax[1].set_xlabel('s')
-    ax[1].set_ylabel('ds')
-    plt.show()
-
-###########################################################################
-
-if plotNodes or plotHeightCoord or plotRadii :
-    
-    sys.exit("\nFinished plotting.")
-
-###########################################################################
-
-#Check the max value of the initial condition on the boundaries:
-
-print()
-print( 'max value on boundaries =', np.max(np.hstack(( \
-initialCondition(xB,yB),                               \
-initialCondition(xT,yT) ))) )
-print()
-
-###########################################################################
-
-#Hyperviscosity coefficient (alp) for radial direction:
-
-c = np.sqrt( Rd * 300. )
-
-if noRadialHV :
-    alp = 0.                                   #remove radial HV completely
-else :
-    if pol == 1 :
-        alp =  2.**-2.  * c
-    elif pol == 3 :
-        alp = -2.**-6.  * c
-    elif pol == 5 :
-        alp =  2.**-10.  * c
-    elif pol == 7 :
-        alp = -2.**-14. * c
-    #######################
-    elif pol == 2 :
-        alp =  2.**-3.  * c
-    elif pol == 4 :
-        alp = -2.**-7.  * c
-    elif pol == 6 :
-        alp =  2.**-11. * c
-    elif pol == 8 :
-        alp = -2.**-15. * c
-    else :
-        raise ValueError("1 <= pol <= 8")
-
-###########################################################################
-
-#Parameters for angular approximations:
-
-if angularFD :
-    #parameters for conventional FD8 approximation:
-    phsA = 9
-    polA = 8
-    stcA = 9
-else :
-    #parameters for PHSFD approximation (polA=7 or polA=8):
-    phsA = 9
-    polA = 7
-    stcA = 17
-
-if noAngularHV :
-    alpA = 0.                                 #remove angular HV completely
-elif polA == 8 :
-    alpA = -2.**-15. * c
-elif polA == 7 :
-    alpA = -2.**-14. * c
-else :
-    raise ValueError("polA should be 7 or 8 to achieve a high order \
-    angular approximation (no boundaries in this direction).")
-
-###########################################################################
-
-#Extra things needed to enforce the Neumann boundary condition for P:
-
-stcB = stc                  #stencil-size for enforcing boundary conditions
-# stcB = min( nlv-1, 2*(pol+2)+1 )
-
-NxBot, NyBot, NxTop, NyTop \
-, TxBot, TyBot, TxTop, TyTop \
-, someFactor, normgradsBot, normgradsTop \
-= common.getTangentsAndNormals( th, stcB, rSurf, dsdr, dsdth )
 
 ###########################################################################
 
@@ -500,7 +506,7 @@ dUdt = np.zeros( np.shape(U) )
 def odefun( t, U, dUdt ) :
     dUdt = eulerEquations.odefunCartesian( t, U, dUdt \
     , setGhostNodes, Dx, Dy, HV \
-    , gx, gy )
+    , gx, gy, wavesOnly )
     return dUdt
 
 q1 = dUdt               #let q1 be another reference to the same array dUdt
@@ -526,7 +532,7 @@ def plotSomething( U, t ) :
     eulerEquations.plotSomething( U, t \
     , Dx, Dy \
     , whatToPlot, xx, yy, xx0, yy0, Wradial, Wangular \
-    , Rd, xB, yB, xT, yT, outerRadius, fig \
+    , Rd, xB0, yB0, xT0, yT0, outerRadius, fig \
     , dynamicColorbar, noInterp )
 
 ###########################################################################
