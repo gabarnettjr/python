@@ -87,22 +87,26 @@ if saveContours :
 
 ###########################################################################
 
-#Get th and s vectors and save them (randomly perturbed):
+#Get th and s vectors and save them:
 
 t = 0.                                                       #starting time
 nTimesteps = np.int(np.round( tf / dt ))         #total number of timesteps
 
-if ( clu == "linear" ) | ( clu == "quadratic" ) :
-    th = common.fastAngles( innerRadius, outerRadius, nlv, ang1, .025 )
-    # th = common.getClusteredAngles( innerRadius, outerRadius, nlv \
-    # , style=clu, center=ang1, nMin=2, increment=1 )
+if clu == "linear" :
+    pct = .05
+    th = common.fastAngles( innerRadius, outerRadius, nlv, ang1, clu, pct )
+    nth = len(th)
+elif clu == "geometric" :
+    pct = .01
+    th = common.fastAngles( innerRadius, outerRadius, nlv, ang1, clu, pct )
     nth = len(th)
 else :
     #Get regularly spaced angles:
     nth = common.getNth( innerRadius, outerRadius, nlv )    #nmbr of angles
-    th  = np.linspace( ang1-np.pi, ang1+np.pi, nth+1 )#vector of all angles
+    th  = np.linspace( ang1, ang1+2.*np.pi, nth+1 )   #vector of all angles
     th  = th[0:-1]                       #remove last angle (same as first)
-th0 = np.linspace( th[0], th[0]+2.*np.pi, nth+1 )
+
+th0 = np.linspace( ang1, ang1+2.*np.pi, nth+1 )
 th0 = th0[0:-1]
 
 if mlv == 1 :
@@ -224,7 +228,7 @@ if plotNodes :
     plt.axis('image')
     # plt.xlabel( 'x' )
     # plt.ylabel( 'y' )
-    plt.title( "clu={0:1s}, ptr={1:1d}".format(clu,ptr), fontsize=fst )
+    plt.title( "clu={0:1s}, pct={1:1g}, ptr={2:1d}".format(clu,pct,ptr), fontsize=fst )
     plt.show()
 
 ###########################################################################
@@ -313,7 +317,7 @@ else :
     elif pol == 2 :
         alp =  2.**-4.  * c
     elif pol == 4 :
-        alp = -2.**-8.  * c
+        alp = -2.**-8. * c
     elif pol == 6 :
         alp =  2.**-12. * c
     elif pol == 8 :
@@ -339,7 +343,7 @@ else :
 if noAngularHV :
     alpA = 0.                                 #remove angular HV completely
 elif polA == 8 :
-    alpA = -2.**-15. * c
+    alpA = -2.**-35. * c
 elif polA == 7 :
     alpA = -2.**-14. * c
 else :
@@ -378,11 +382,14 @@ if useGravity :
     Po = 10.**5.
     
     thetaBar = 300.
-    theta = thetaBar + ( initialCondition(xx,yy) - 1. )
-    pi = 1. - g / Cp / thetaBar * ( rr - innerRadius )
-    U[2,:,:] = pi * theta
-    U[4,:,:] = Po * pi**(Rd/Cp)
+    theta = thetaBar + 20*( initialCondition(xx,yy) - 1. )
+    piBar = 1. - g / Cp / thetaBar * ( rr - innerRadius )
+    U[2,:,:] = piBar * theta
+    U[4,:,:] = Po * piBar**(Cp/Rd)
     U[3,:,:] = U[4,:,:] / Rd / U[2,:,:]
+    Tbar = piBar * thetaBar
+    Pbar = Po * piBar**(Cp/Rd)
+    rhoBar = Pbar / Rd / Tbar
     
     tmp = np.sqrt( xB**2. + yB**2. )
     gx = g * xB / tmp
@@ -410,6 +417,16 @@ else :
     gx = 0.
     gy = 0.
 
+    Tbar = 0.
+    rhoBar = 0.
+    thetaBar = 0.
+    Pbar = 0.
+
+    Cp = 0.
+    Cv = 0.
+    g  = 0.
+    Po = 0.
+
 ###########################################################################
 
 #Radial PHS-FD weights arranged in a differentiation matrix:
@@ -436,9 +453,10 @@ Wlam = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th, m=1 \
 #Simple (and technically incorrect) angular HV:
 Whvlam = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th, m=phsA-1 \
 , phsDegree=phsA, polyDegree=polA, stencilSize=stcA )
-# Whvlam = alpA * dth0**(phsA-2) * Whvlam           #scaled angular HV matrix
-dthPol = spdiags( dth**(phsA-2), np.array([0]), len(dth), len(dth) )
-Whvlam = alpA * dthPol.dot(Whvlam)
+dth0 = ds0 / innerRadius
+Whvlam = alpA * dth0**(phsA-2) * Whvlam           #scaled angular HV matrix
+# dthPol = spdiags( dth**(phsA-2), np.array([0]), len(dth), len(dth) )
+# Whvlam = alpA * dthPol.dot(Whvlam)
 
 ###########################################################################
 
@@ -506,7 +524,7 @@ dUdt = np.zeros( np.shape(U) )
 def odefun( t, U, dUdt ) :
     dUdt = eulerEquations.odefunCartesian( t, U, dUdt \
     , setGhostNodes, Dx, Dy, HV \
-    , gx, gy, wavesOnly )
+    , gx, gy, wavesOnly, Tbar, rhoBar )
     return dUdt
 
 q1 = dUdt               #let q1 be another reference to the same array dUdt
@@ -531,9 +549,9 @@ if saveContours :
 def plotSomething( U, t ) :
     eulerEquations.plotSomething( U, t \
     , Dx, Dy \
-    , whatToPlot, xx, yy, xx0, yy0, Wradial, Wangular \
-    , Rd, xB0, yB0, xT0, yT0, outerRadius, fig \
-    , dynamicColorbar, noInterp )
+    , whatToPlot, xx, yy, th, xx0, yy0, th0, Wradial, Wangular \
+    , Rd, Po, Cp, xB0, yB0, xT0, yT0, outerRadius, fig \
+    , dynamicColorbar, noInterp, ang1, Tbar, rhoBar, thetaBar, Pbar )
 
 ###########################################################################
 
