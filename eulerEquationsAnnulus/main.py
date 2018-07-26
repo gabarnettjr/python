@@ -102,6 +102,7 @@ elif clu == "geometric" :
     nth = len(th)
 else :
     #Get regularly spaced angles:
+    pct = 0.
     nth = common.getNth( innerRadius, outerRadius, nlv )    #nmbr of angles
     th  = np.linspace( ang1, ang1+2.*np.pi, nth+1 )   #vector of all angles
     th  = th[0:-1]                       #remove last angle (same as first)
