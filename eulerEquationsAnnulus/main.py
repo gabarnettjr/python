@@ -97,7 +97,7 @@ if clu == "linear" :
     th = common.fastAngles( innerRadius, outerRadius, nlv, ang1, clu, pct )
     nth = len(th)
 elif clu == "geometric" :
-    pct = .01
+    pct = .005
     th = common.fastAngles( innerRadius, outerRadius, nlv, ang1, clu, pct )
     nth = len(th)
 else :
@@ -309,16 +309,16 @@ else :
     if pol == 1 :
         alp =  2.**-2.  * c
     elif pol == 3 :
-        alp = -2.**-6.  * c
+        alp = -2.**-5.  * c
     elif pol == 5 :
-        alp =  2.**-10.  * c
+        alp =  2.**-10. * c
     elif pol == 7 :
         alp = -2.**-14. * c
     #######################
     elif pol == 2 :
         alp =  2.**-4.  * c
     elif pol == 4 :
-        alp = -2.**-8. * c
+        alp = -2.**-8.  * c
     elif pol == 6 :
         alp =  2.**-12. * c
     elif pol == 8 :
@@ -338,7 +338,7 @@ if angularFD :
 else :
     #parameters for PHSFD approximation (polA=7 or polA=8):
     phsA = 9
-    polA = 8
+    polA = 7
     stcA = 17
 
 if noAngularHV :
@@ -346,7 +346,7 @@ if noAngularHV :
 elif polA == 8 :
     alpA = -2.**-35. * c
 elif polA == 7 :
-    alpA = -2.**-14. * c
+    alpA = -2.**-35. * c
 else :
     raise ValueError("polA should be 7 or 8 to achieve a high order \
     angular approximation (no boundaries in this direction).")
@@ -373,8 +373,8 @@ if useGravity :
     
     xT = outerRadius * np.cos(th)
     yT = outerRadius * np.sin(th)
-    xB = rSurf(th) * np.cos(th)
-    yB = rSurf(th) * np.sin(th)
+    xB = rSurf(th)   * np.cos(th)
+    yB = rSurf(th)   * np.sin(th)
     
     Cp = 1004.
     Cv = 717.
@@ -382,14 +382,15 @@ if useGravity :
     g  = 9.81
     Po = 10.**5.
     
-    thetaBar = 300.
-    theta = thetaBar + 20*( initialCondition(xx,yy) - 1. )
+    thetaBar = 300. * np.ones(( nlv, nth ))
+    theta = thetaBar.copy()
+    theta = theta - 20.*( initialCondition(xx,yy) - 1. )
     piBar = 1. - g / Cp / thetaBar * ( rr - innerRadius )
     U[2,:,:] = piBar * theta
-    U[4,:,:] = Po * piBar**(Cp/Rd)
+    U[4,:,:] = Po * piBar ** (Cp/Rd)
     U[3,:,:] = U[4,:,:] / Rd / U[2,:,:]
     Tbar = piBar * thetaBar
-    Pbar = Po * piBar**(Cp/Rd)
+    Pbar = Po * piBar ** (Cp/Rd)
     rhoBar = Pbar / Rd / Tbar
     
     tmp = np.sqrt( xB**2. + yB**2. )
@@ -401,7 +402,7 @@ if useGravity :
     gx = g * xT / tmp
     gy = g * yT / tmp
     Gtop = gx * NxTop[0,:] + gy * NyTop[0,:]            #gdotN on top bndry
-
+    
     tmp = np.sqrt( xx**2. + yy**2. )
     gx = g * xx / tmp               #horizontal component of gravity vector
     gy = g * yy / tmp                 #vertical component of gravity vector
@@ -411,18 +412,19 @@ else :
     U[2,:,:] = 300.
     U[3,:,:] = initialCondition(xx,yy)
     U[4,:,:] = U[3,:,:] * Rd * U[2,:,:]
-
+    
     Gbot = 0.
     Gtop = 0.
     
     gx = 0.
     gy = 0.
-
+    
     Tbar = 0.
     rhoBar = 0.
     thetaBar = 0.
     Pbar = 0.
-
+    piBar = 0.
+    
     Cp = 0.
     Cv = 0.
     g  = 0.
@@ -552,7 +554,8 @@ def plotSomething( U, t ) :
     , Dx, Dy \
     , whatToPlot, xx, yy, th, xx0, yy0, th0, Wradial, Wangular \
     , Rd, Po, Cp, xB0, yB0, xT0, yT0, outerRadius, fig \
-    , dynamicColorbar, noInterp, ang1, Tbar, rhoBar, thetaBar, Pbar )
+    , dynamicColorbar, noInterp, ang1 \
+    , Tbar, rhoBar, thetaBar, Pbar, piBar )
 
 ###########################################################################
 
