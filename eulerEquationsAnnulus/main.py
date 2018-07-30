@@ -389,7 +389,7 @@ if not wavesOnly :
     piBar = 1. - g / Cp / thetaBar * ( rr - innerRadius )
     piPrime = np.zeros(( nlv, nth ))
     Tbar = piBar * thetaBar
-    Tprime = piBar * thetaPrime
+    Tprime = ( piBar + piPrime ) * ( thetaBar + thetaPrime ) - Tbar
     Pbar = Po * piBar ** (Cp/Rd)
     Pprime = Po * ( piBar + piPrime ) ** (Cp/Rd) - Pbar
     rhoBar = Pbar / Rd / Tbar
