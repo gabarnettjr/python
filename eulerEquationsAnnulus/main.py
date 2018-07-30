@@ -31,8 +31,8 @@ rSurf, rSurfPrime \
 = common.getTopoFunc( innerRadius, outerRadius, amp, frq )
 
 ang1 = eval(ang1)                                  #convert string to float
-xc1 = (rSurf(ang1)+outerRadius)/2.*np.cos(ang1)         #x-coord of GA bell
-yc1 = (rSurf(ang1)+outerRadius)/2.*np.sin(ang1)         #y-coord of GA bell
+xc1 = (rSurf(ang1)+(outerRadius-rSurf(ang1))/3.)*np.cos(ang1)#x-coord of GA
+yc1 = (rSurf(ang1)+(outerRadius-rSurf(ang1))/3.)*np.sin(ang1)#y-coord of GA
 if ang2 :
     ang2 = eval(ang2)                              #convert string to float
     xc2 = (rSurf(ang2)+outerRadius)/2.*np.cos(ang2)     #x-coord of GA bell
@@ -52,7 +52,7 @@ def initialCondition( x, y ) :
     return z
     # #Wendland function:
     # def wf( xc, yc ) :
-    #     r = np.sqrt( 6 * ( (x-xc)**2. + (y-yc)**2. ) )
+    #     r = np.sqrt( 6. * ( (x-xc)**2. + (y-yc)**2. ) )
     #     ind = r<1.
     #     w = np.zeros( np.shape(x) )
     #     w[ind] = ( 1. - r[ind] ) ** 10. * ( 429.*r[ind]**4. + 450.*r[ind]**3. \
@@ -69,7 +69,7 @@ def initialCondition( x, y ) :
 
 #Delete old stuff, and set things up for saving:
 
-saveString = eulerEquations.getSavestring( Rd, innerRadius, outerRadius \
+saveString = eulerEquations.getSavestring( innerRadius, outerRadius \
 , tf, saveDel, exp, amp, frq \
 , mlv, phs, pol, stc, clu, ptr, rks, nlv, dti )
 
@@ -97,7 +97,7 @@ if clu == "linear" :
     th = common.fastAngles( innerRadius, outerRadius, nlv, ang1, clu, pct )
     nth = len(th)
 elif clu == "geometric" :
-    pct = .005
+    pct = .01
     th = common.fastAngles( innerRadius, outerRadius, nlv, ang1, clu, pct )
     nth = len(th)
 else :
@@ -294,19 +294,10 @@ if plotNodes or plotHeightCoord or plotRadii :
 
 ###########################################################################
 
-#Check the max value of the initial condition on the boundaries:
-
-print()
-print( 'max value on boundaries =', np.max(np.hstack(( \
-initialCondition(xB0,yB0),                               \
-initialCondition(xT0,yT0) ))) )
-print()
-
-###########################################################################
 
 #Hyperviscosity coefficient (alp) for radial direction:
 
-c = np.sqrt( Rd * 300. )
+c = np.sqrt( 287. * 300. )
 
 if noRadialHV :
     alp = 0.                                   #remove radial HV completely
@@ -370,79 +361,50 @@ NxBot, NyBot, NxTop, NyTop \
 
 ###########################################################################
 
-#Set initial condition for U[2,:,:] (T), U[3,:,:] (rho), and U[4,:,:] (P):
+#Set initial condition for U[2,:,:] (T) and U[3,:,:] (rho):
 
 U = np.zeros(( 5, nlv, nth ))
 
-if not wavesOnly :
-    
-    
-    Cp = 1004.
-    Cv = 717.
-    Rd = Cp - Cv
-    g  = 9.81
-    Po = 10.**5.
-    
-    #Hydrostatic background states and initial theta perturbation:
-    thetaBar = 300. * np.ones(( nlv, nth ))
-    thetaPrime = - 2.*( initialCondition(xx,yy) - 1. )
-    piBar = 1. - g / Cp / thetaBar * ( rr - innerRadius )
-    piPrime = np.zeros(( nlv, nth ))
-    Tbar = piBar * thetaBar
-    Tprime = ( piBar + piPrime ) * ( thetaBar + thetaPrime ) - Tbar
-    Pbar = Po * piBar ** (Cp/Rd)
-    Pprime = Po * ( piBar + piPrime ) ** (Cp/Rd) - Pbar
-    rhoBar = Pbar / Rd / Tbar
-    rhoPrime = ( Pbar + Pprime ) / Rd / ( Tbar + Tprime ) - rhoBar
-    
-    #Initial condition for temperature and density perturbations:
-    U[2,:,:] = Tprime.copy()
-    U[3,:,:] = rhoPrime.copy()
-    U[4,:,:] = Pprime.copy()
-    
-    #Radial derivatives of hydrostatic background states:
-    dthetaBarDr = np.zeros(( nlv, nth ))
-    dpiBarDr = -g / Cp / thetaBar
-    dTbarDr = piBar * dthetaBarDr + thetaBar * dpiBarDr
-    dPbarDr = Po * Cp/Rd * piBar**(Cp/Rd-1.) * dpiBarDr
-    drhoBarDr = ( dPbarDr - Rd*rhoBar*dTbarDr ) / ( Rd * Tbar )
-    
-    tmp = np.sqrt( xB**2. + yB**2. )
-    gx = g * xB / tmp
-    gy = g * yB / tmp
-    Gbot = gx * NxBot[0,:] + gy * NyBot[0,:]         #gdotN on bottom bndry
-    
-    tmp = np.sqrt( xT**2. + yT**2. )
-    gx = g * xT / tmp
-    gy = g * yT / tmp
-    Gtop = gx * NxTop[0,:] + gy * NyTop[0,:]            #gdotN on top bndry
-    
-    tmp = np.sqrt( xx**2. + yy**2. )
-    gx = g * xx / tmp               #horizontal component of gravity vector
-    gy = g * yy / tmp                 #vertical component of gravity vector
+#Atmospheric constants:
+Cp = 1004.
+Cv = 717.
+Rd = Cp - Cv
+g  = 9.81
+Po = 10.**5.
 
-else :
-    
-    U[2,:,:] = 300.
-    U[3,:,:] = initialCondition(xx,yy)
-    U[4,:,:] = U[3,:,:] * Rd * U[2,:,:]
-    
-    Gbot = 0.
-    Gtop = 0.
-    
-    gx = 0.
-    gy = 0.
-    
-    Tbar     = np.zeros(( nlv, nth ))
-    rhoBar   = np.zeros(( nlv, nth ))
-    thetaBar = np.zeros(( nlv, nth ))
-    Pbar     = np.zeros(( nlv, nth ))
-    piBar    = np.zeros(( nlv, nth ))
-    
-    Cp = 0.
-    Cv = 0.
-    g  = 0.
-    Po = 0.
+#Hydrostatic background states and initial theta perturbation:
+thetaBar = 300. * np.ones(( nlv, nth ))
+thetaPrime = 2.*( initialCondition(xx,yy) - 1. )
+# thetaPrime = np.zeros(( nlv, nth ))
+piBar = 1. - g / Cp / thetaBar * ( rr - innerRadius )
+piPrime = np.zeros(( nlv, nth ))
+Tbar = piBar * thetaBar
+Tprime = ( piBar + piPrime ) * ( thetaBar + thetaPrime ) - Tbar
+Pbar = Po * piBar ** (Cp/Rd)
+Pprime = Po * ( piBar + piPrime ) ** (Cp/Rd) - Pbar
+rhoBar = Pbar / Rd / Tbar
+rhoPrime = ( Pbar + Pprime ) / Rd / ( Tbar + Tprime ) - rhoBar
+
+#Initial condition for temperature and density perturbations:
+U[2,:,:] = Tprime
+U[3,:,:] = rhoPrime
+
+#Radial derivatives of hydrostatic background states:
+dthetaBarDr = np.zeros(( nlv, nth ))
+dpiBarDr = -g / Cp / thetaBar
+dTbarDr = piBar * dthetaBarDr + thetaBar * dpiBarDr
+dPbarDr = Po * Cp/Rd * piBar**(Cp/Rd-1.) * dpiBarDr
+drhoBarDr = ( dPbarDr - Rd*rhoBar*dTbarDr ) / ( Rd * Tbar )
+
+###########################################################################
+
+#Check the max value of the temperature perturbation on the boundaries:
+
+print()
+print( 'min/max(T) on boundaries =' \
+, np.min(np.hstack(((U[2,-1,:]+U[2,1,:])/2.,(U[2,-1,:]+U[2,-2,:])/2.))) \
+, np.max(np.hstack(((U[2,-1,:]+U[2,1,:])/2.,(U[2,-1,:]+U[2,-2,:])/2.))) )
+print()
 
 ###########################################################################
 
@@ -470,8 +432,7 @@ Wlam = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th, m=1 \
 #Simple (and technically incorrect) angular HV:
 Whvlam = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th, m=phsA-1 \
 , phsDegree=phsA, polyDegree=polA, stencilSize=stcA )
-dth0 = ds0 / innerRadius
-Whvlam = alpA * dth0**(phsA-2) * Whvlam           #scaled angular HV matrix
+Whvlam = alpA * (ds0/innerRadius)**(phsA-2) * Whvlam           #scaled angular HV matrix
 # dthPol = spdiags( dth**(phsA-2), np.array([0]), len(dth), len(dth) )
 # Whvlam = alpA * dthPol.dot(Whvlam)
 
@@ -510,9 +471,9 @@ def Ds(U) :
 def Dlam(U) :
     return Wlam.dot(U.T).T
 
-# def Dr(U) :                                        #du/dr = (du/ds)*(ds/dr)
-#     return Ds(U) * dsdrAll
-# 
+def Dr(U) :                                        #du/dr = (du/ds)*(ds/dr)
+    return Ds(U) * dsdrAll
+
 # def Dth(U) :                           #du/dth = du/dlam + (du/ds)*(ds/dth)
 #     return Dlam(U) + Ds(U) * dsdthAll
 
@@ -531,7 +492,7 @@ if mlv == 1 :
         , NxBot, NyBot, NxTop, NyTop \
         , TxBot, TyBot, TxTop, TyTop \
         , rhoBar, Tbar, Pbar \
-        , someFactor, stcB, Wlam, Rd, Gbot, Gtop, normgradsBot, normgradsTop \
+        , someFactor, stcB, Wlam, Rd \
         , wIinner, wEinner, wDinner, wHinner, wIouter, wEouter, wDouter, wHouter )
         return U
 elif mlv == 0 :
@@ -544,30 +505,31 @@ elif mlv == 0 :
 else :
     raise ValueError("Only mlv=0 and mlv=1 are currently supported.")
 
-dUdt = np.zeros( np.shape(U) )
+dUdt = np.zeros(( 5, nlv, nth ))
 if wavesOnly :
     def odefun( t, U, dUdt ) :
-        dUdt = eulerEquations.odefunCartesian( t, U, dUdt   \
-        , setGhostNodes, Dx, Dy, HV \
-        , gx, gy, wavesOnly, Tbar, rhoBar, Pbar )
-        return dUdt
-else :
-    def odefun( t, U, dUdt ) :
-        dUdt = eulerEquations.odefunEuler( t, U, dUdt \
+        dUdt = eulerEquations.odefunWaves( t, U, dUdt \
         , setGhostNodes, Dx, Dy, HV \
         , drdxAll, drdyAll \
         , Tbar, rhoBar, dTbarDr, drhoBarDr, g )
         return dUdt
+else :
+    def odefun( t, U, dUdt ) :
+        dUdt = eulerEquations.odefunEuler( t, U, dUdt \
+        , setGhostNodes, Dx, Dy, HV, Dr \
+        , drdxAll, drdyAll \
+        , Tbar, rhoBar, dTbarDr, drhoBarDr, Rd, Cv, g )
+        return dUdt
 
 q1 = dUdt               #let q1 be another reference to the same array dUdt
-q2 = np.zeros( np.shape(U) )          #rk3 and rk4 both need a second array
+q2 = np.zeros( np.shape(dUdt) )       #rk3 and rk4 both need a second array
 if rks == 3 :
     def RK( t, U ) :
         t, U = rk.rk3( t, U, odefun, dt, q1, q2 )
         return t, U
 elif rks == 4 :
-    q3 = np.zeros( np.shape(U) )
-    q4 = np.zeros( np.shape(U) )
+    q3 = np.zeros( np.shape(dUdt) )
+    q4 = np.zeros( np.shape(dUdt) )
     def RK( t, U ) :
         t, U = rk.rk4( t, U, odefun, dt, q1, q2, q3, q4 )
         return t, U
@@ -582,7 +544,7 @@ def plotSomething( U, t ) :
     eulerEquations.plotSomething( U, t \
     , Dx, Dy \
     , whatToPlot, xx, yy, th, xx0, yy0, th0, Wradial, Wangular \
-    , Rd, Po, Cp, xB0, yB0, xT0, yT0, outerRadius, fig \
+    , Rd, Po, Cp, xB, yB, xT, yT, outerRadius, fig \
     , dynamicColorbar, noInterp, ang1 \
     , Tbar, rhoBar, thetaBar, Pbar, piBar )
 
@@ -604,12 +566,14 @@ for i in np.arange( 0, nTimesteps+1 ) :
             + '{0:04d}'.format(np.int(np.round(t))) + '.npy' )
         
         if saveArrays or saveContours :
-            tmpU = setGhostNodes(U)
+            U = setGhostNodes(U)
+        
         if saveArrays :
             np.save( saveString \
-            + '{0:04d}'.format(np.int(np.round(t))) + '.npy', tmpU[0:4,:,:] )
+            + '{0:04d}'.format(np.int(np.round(t))) + '.npy', U[0:4,:,:] )
+        
         if saveContours :
-            plotSomething( tmpU, t )
+            plotSomething( U, t )
     
     if plotFromSaved :
         t = t + dt
