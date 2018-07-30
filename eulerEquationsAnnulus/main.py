@@ -202,6 +202,11 @@ yB0 = rSurf(th0) * np.sin(th0)
 xT0 = outerRadius * np.cos(th0)
 yT0 = outerRadius * np.sin(th0)
 
+xT = outerRadius * np.cos(th)
+yT = outerRadius * np.sin(th)
+xB = rSurf(th)   * np.cos(th)
+yB = rSurf(th)   * np.sin(th)
+
 ###########################################################################
 
 #Set font sizes for any plots that might be requested below:
@@ -221,8 +226,8 @@ if plotNodes :
     #Plot the nodes:
     
     plt.plot( xx.flatten(), yy.flatten(), ".", markersize=10 )
-    plt.plot( np.hstack((xB0,xB0[0])), np.hstack((yB0,yB0[0])), "k-" \
-    , np.hstack((xT0,xT0[0])), np.hstack((yT0,yT0[0])), "k-" \
+    plt.plot( np.hstack((xB,xB[0])), np.hstack((yB,yB[0])), "k-" \
+    , np.hstack((xT,xT[0])), np.hstack((yT,yT[0])), "k-" \
     , linewidth=3 )
     tmp = outerRadius + .2
     plt.axis([-tmp,tmp,-tmp,tmp])
@@ -241,7 +246,7 @@ if plotHeightCoord :
     #Plot the coordinate transformation functions:
     
     plt.contourf( xx, yy, sFunc(rr,thth), 20 )
-    plt.plot( xB0, yB0, "r-", xT0, yT0, "r-" )
+    plt.plot( xB, yB, "r-", xT, yT, "r-" )
     plt.axis( 'equal' )
     tmp = plt.colorbar()
     tmp.ax.tick_params( labelsize=fsc )
@@ -249,7 +254,7 @@ if plotHeightCoord :
     plt.show()
     
     plt.contourf( xx, yy, dsdthAll, 20 )
-    plt.plot( xB0, yB0, "r-", xT0, yT0, "r-" )
+    plt.plot( xB, yB, "r-", xT, yT, "r-" )
     plt.axis( 'equal' )
     tmp = plt.colorbar()
     tmp.ax.tick_params( labelsize=fsc )
@@ -257,7 +262,7 @@ if plotHeightCoord :
     plt.show()
     
     plt.contourf( xx, yy, dsdrAll, 20 )
-    plt.plot( xB0, yB0, "r-", xT0, yT0, "r-" )
+    plt.plot( xB, yB, "r-", xT, yT, "r-" )
     plt.axis( 'equal' )
     tmp = plt.colorbar()
     tmp.ax.tick_params( labelsize=fsc )
@@ -369,12 +374,8 @@ NxBot, NyBot, NxTop, NyTop \
 
 U = np.zeros(( 5, nlv, nth ))
 
-if useGravity :
+if not wavesOnly :
     
-    xT = outerRadius * np.cos(th)
-    yT = outerRadius * np.sin(th)
-    xB = rSurf(th)   * np.cos(th)
-    yB = rSurf(th)   * np.sin(th)
     
     Cp = 1004.
     Cv = 717.
@@ -382,16 +383,29 @@ if useGravity :
     g  = 9.81
     Po = 10.**5.
     
+    #Hydrostatic background states and initial theta perturbation:
     thetaBar = 300. * np.ones(( nlv, nth ))
-    theta = thetaBar.copy()
-    theta = theta - 20.*( initialCondition(xx,yy) - 1. )
+    thetaPrime = - 2.*( initialCondition(xx,yy) - 1. )
     piBar = 1. - g / Cp / thetaBar * ( rr - innerRadius )
-    U[2,:,:] = piBar * theta
-    U[4,:,:] = Po * piBar ** (Cp/Rd)
-    U[3,:,:] = U[4,:,:] / Rd / U[2,:,:]
+    piPrime = np.zeros(( nlv, nth ))
     Tbar = piBar * thetaBar
+    Tprime = piBar * thetaPrime
     Pbar = Po * piBar ** (Cp/Rd)
+    Pprime = Po * ( piBar + piPrime ) ** (Cp/Rd) - Pbar
     rhoBar = Pbar / Rd / Tbar
+    rhoPrime = ( Pbar + Pprime ) / Rd / ( Tbar + Tprime ) - rhoBar
+    
+    #Initial condition for temperature and density perturbations:
+    U[2,:,:] = Tprime.copy()
+    U[3,:,:] = rhoPrime.copy()
+    U[4,:,:] = Pprime.copy()
+    
+    #Radial derivatives of hydrostatic background states:
+    dthetaBarDr = np.zeros(( nlv, nth ))
+    dpiBarDr = -g / Cp / thetaBar
+    dTbarDr = piBar * dthetaBarDr + thetaBar * dpiBarDr
+    dPbarDr = Po * Cp/Rd * piBar**(Cp/Rd-1.) * dpiBarDr
+    drhoBarDr = ( dPbarDr - Rd*rhoBar*dTbarDr ) / ( Rd * Tbar )
     
     tmp = np.sqrt( xB**2. + yB**2. )
     gx = g * xB / tmp
@@ -419,11 +433,11 @@ else :
     gx = 0.
     gy = 0.
     
-    Tbar = 0.
-    rhoBar = 0.
-    thetaBar = 0.
-    Pbar = 0.
-    piBar = 0.
+    Tbar     = np.zeros(( nlv, nth ))
+    rhoBar   = np.zeros(( nlv, nth ))
+    thetaBar = np.zeros(( nlv, nth ))
+    Pbar     = np.zeros(( nlv, nth ))
+    piBar    = np.zeros(( nlv, nth ))
     
     Cp = 0.
     Cv = 0.
@@ -496,6 +510,12 @@ def Ds(U) :
 def Dlam(U) :
     return Wlam.dot(U.T).T
 
+# def Dr(U) :                                        #du/dr = (du/ds)*(ds/dr)
+#     return Ds(U) * dsdrAll
+# 
+# def Dth(U) :                           #du/dth = du/dlam + (du/ds)*(ds/dth)
+#     return Dlam(U) + Ds(U) * dsdthAll
+
 def Dx(U) :                    #du/dx = (du/dr)*(dr/dx) + (du/dth)*(dth/dx)
     return mtx * Ds(U) + dthdxAll * Dlam(U)
 
@@ -510,6 +530,7 @@ if mlv == 1 :
         U = eulerEquations.setGhostNodesMidLevels( U \
         , NxBot, NyBot, NxTop, NyTop \
         , TxBot, TyBot, TxTop, TyTop \
+        , rhoBar, Tbar, Pbar \
         , someFactor, stcB, Wlam, Rd, Gbot, Gtop, normgradsBot, normgradsTop \
         , wIinner, wEinner, wDinner, wHinner, wIouter, wEouter, wDouter, wHouter )
         return U
@@ -524,11 +545,19 @@ else :
     raise ValueError("Only mlv=0 and mlv=1 are currently supported.")
 
 dUdt = np.zeros( np.shape(U) )
-def odefun( t, U, dUdt ) :
-    dUdt = eulerEquations.odefunCartesian( t, U, dUdt \
-    , setGhostNodes, Dx, Dy, HV \
-    , gx, gy, wavesOnly, Tbar, rhoBar )
-    return dUdt
+if wavesOnly :
+    def odefun( t, U, dUdt ) :
+        dUdt = eulerEquations.odefunCartesian( t, U, dUdt   \
+        , setGhostNodes, Dx, Dy, HV \
+        , gx, gy, wavesOnly, Tbar, rhoBar, Pbar )
+        return dUdt
+else :
+    def odefun( t, U, dUdt ) :
+        dUdt = eulerEquations.odefunEuler( t, U, dUdt \
+        , setGhostNodes, Dx, Dy, HV \
+        , drdxAll, drdyAll \
+        , Tbar, rhoBar, dTbarDr, drhoBarDr, g )
+        return dUdt
 
 q1 = dUdt               #let q1 be another reference to the same array dUdt
 q2 = np.zeros( np.shape(U) )          #rk3 and rk4 both need a second array
@@ -581,9 +610,6 @@ for i in np.arange( 0, nTimesteps+1 ) :
             + '{0:04d}'.format(np.int(np.round(t))) + '.npy', tmpU[0:4,:,:] )
         if saveContours :
             plotSomething( tmpU, t )
-        
-        # if np.max(np.abs(U)) > 5. :
-        #     raise ValueError("Solution greater than 5 in magnitude.  Unstable in time.")
     
     if plotFromSaved :
         t = t + dt
