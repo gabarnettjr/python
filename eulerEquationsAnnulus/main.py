@@ -69,9 +69,9 @@ def initialCondition( x, y ) :
 
 #Delete old stuff, and set things up for saving:
 
-saveString = eulerEquations.getSavestring( innerRadius, outerRadius \
-, tf, saveDel, exp, amp, frq \
-, mlv, phs, pol, stc, clu, ptr, rks, nlv, dti )
+saveString = eulerEquations.getSavestring( wavesOnly \
+, innerRadius, outerRadius, tf, saveDel, exp, amp, frq \
+, mlv, phs, pol, stc, clu, pct, rks, nlv, dti )
 
 if ( saveArrays ) & ( not plotFromSaved ) :
     if os.path.exists( saveString + '*.npy' ) :
@@ -92,12 +92,11 @@ if saveContours :
 t = 0.                                                       #starting time
 nTimesteps = np.int(np.round( tf / dt ))         #total number of timesteps
 
+pct = pct / 100.
 if clu == "linear" :
-    pct = .05
     th = common.fastAngles( innerRadius, outerRadius, nlv, ang1, clu, pct )
     nth = len(th)
 elif clu == "geometric" :
-    pct = .01
     th = common.fastAngles( innerRadius, outerRadius, nlv, ang1, clu, pct )
     nth = len(th)
 else :
@@ -113,21 +112,21 @@ th0 = th0[0:-1]
 if mlv == 1 :
     ds0 = ( outerRadius - innerRadius ) / (nlv-2)         #constant delta s
     s0  = np.linspace( innerRadius-ds0/2, outerRadius+ds0/2, nlv )#s vector
-    tmp = (ptr/100.) * ds0                    #relative perturbation factor
-    ran = -tmp + 2.*tmp*np.random.rand(nlv)     #random perturbation vector
+    # tmp = (ptr/100.) * ds0                    #relative perturbation factor
+    # ran = -tmp + 2.*tmp*np.random.rand(nlv)     #random perturbation vector
     s   = s0.copy()                                  #copy regular s vector
-    s   = s + ran                              #s vector after perturbation
+    # s   = s + ran                              #s vector after perturbation
 elif mlv == 0 :
     ds0 = ( outerRadius - innerRadius ) / (nlv-3)         #constant delta s
     s0  = np.linspace( innerRadius-ds0, outerRadius+ds0, nlv )    #s vector
-    tmp = (ptr/100.) * ds0                    #relative perturbation factor
-    ranBot = -tmp + 2.*tmp*np.random.rand(1)
-    ranMid = -tmp + 2.*tmp*np.random.rand(nlv-4)
-    ranTop = -tmp + 2.*tmp*np.random.rand(1)
+    # tmp = (ptr/100.) * ds0                    #relative perturbation factor
+    # ranBot = -tmp + 2.*tmp*np.random.rand(1)
+    # ranMid = -tmp + 2.*tmp*np.random.rand(nlv-4)
+    # ranTop = -tmp + 2.*tmp*np.random.rand(1)
     s = s0.copy()                                    #copy regular s vector
-    s[0] = s[0] + ranBot                         #perturb bottom ghost node
-    s[2:-2] = s[2:-2] + ranMid           #perturb interior nodes (no bndry)
-    s[-1] = s[-1] + ranTop                          #perturb top ghost node
+    # s[0] = s[0] + ranBot                         #perturb bottom ghost node
+    # s[2:-2] = s[2:-2] + ranMid           #perturb interior nodes (no bndry)
+    # s[-1] = s[-1] + ranTop                          #perturb top ghost node
 else :
     raise ValueError("mlv should be 0 or 1")
 
@@ -294,7 +293,6 @@ if plotNodes or plotHeightCoord or plotRadii :
 
 ###########################################################################
 
-
 #Hyperviscosity coefficient (alp) for radial direction:
 
 c = np.sqrt( 287. * 300. )
@@ -303,22 +301,22 @@ if noRadialHV :
     alp = 0.                                   #remove radial HV completely
 else :
     if pol == 1 :
-        alp =  2.**-2.  * c
+        alp =  2.**-6.  * c
     elif pol == 3 :
-        alp = -2.**-5.  * c
+        alp = -2.**-10.  * c
     elif pol == 5 :
-        alp =  2.**-10. * c
+        alp =  2.**-14. * c
     elif pol == 7 :
-        alp = -2.**-14. * c
+        alp = -2.**-18. * c
     #######################
     elif pol == 2 :
-        alp =  2.**-4.  * c
+        alp =  2.**-6.  * c
     elif pol == 4 :
-        alp = -2.**-8.  * c
+        alp = -2.**-10. * c
     elif pol == 6 :
-        alp =  2.**-12. * c
+        alp =  2.**-14. * c
     elif pol == 8 :
-        alp = -2.**-16. * c
+        alp = -2.**-18. * c
     else :
         raise ValueError("1 <= pol <= 8")
 
@@ -349,22 +347,6 @@ else :
 
 ###########################################################################
 
-#Extra things needed to enforce the Neumann boundary condition for P:
-
-stcB = stc                  #stencil-size for enforcing boundary conditions
-# stcB = min( nlv-1, 2*(pol+2)+1 )
-
-NxBot, NyBot, NxTop, NyTop \
-, TxBot, TyBot, TxTop, TyTop \
-, someFactor, normgradsBot, normgradsTop \
-= common.getTangentsAndNormals( th, stcB, rSurf, dsdr, dsdth )
-
-###########################################################################
-
-#Set initial condition for U[2,:,:] (T) and U[3,:,:] (rho):
-
-U = np.zeros(( 5, nlv, nth ))
-
 #Atmospheric constants:
 Cp = 1004.
 Cv = 717.
@@ -372,10 +354,28 @@ Rd = Cp - Cv
 g  = 9.81
 Po = 10.**5.
 
+###########################################################################
+
+#Extra things needed to enforce the Neumann boundary condition for P:
+
+stcB = stc                  #stencil-size for enforcing boundary conditions
+# stcB = min( nlv-1, 2*(pol+2)+1 )
+
+NxBot, NyBot, NxTop, NyTop \
+, TxBot, TyBot, TxTop, TyTop \
+, someFactor, bottomFactor, topFactor \
+= common.getTangentsAndNormals( th, stcB, rSurf, dsdr, dsdth, g )
+
+###########################################################################
+
+#Set initial condition for U[2,:,:] (T) and U[3,:,:] (rho):
+
+U = np.zeros(( 5, nlv, nth ))
+
 #Hydrostatic background states and initial theta perturbation:
 thetaBar = 300. * np.ones(( nlv, nth ))
-thetaPrime = 2.*( initialCondition(xx,yy) - 1. )
 # thetaPrime = np.zeros(( nlv, nth ))
+thetaPrime = 2.*( initialCondition(xx,yy) - 1. )
 piBar = 1. - g / Cp / thetaBar * ( rr - innerRadius )
 piPrime = np.zeros(( nlv, nth ))
 Tbar = piBar * thetaBar
@@ -390,6 +390,8 @@ U[2,:,:] = Tprime
 U[3,:,:] = rhoPrime
 
 #Radial derivatives of hydrostatic background states:
+#For derivation, please see "Background States" section of
+#https://www.overleaf.com/read/jpddcpggwyhh
 dthetaBarDr = np.zeros(( nlv, nth ))
 dpiBarDr = -g / Cp / thetaBar
 dTbarDr = piBar * dthetaBarDr + thetaBar * dpiBarDr
@@ -432,9 +434,9 @@ Wlam = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th, m=1 \
 #Simple (and technically incorrect) angular HV:
 Whvlam = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th, m=phsA-1 \
 , phsDegree=phsA, polyDegree=polA, stencilSize=stcA )
-Whvlam = alpA * (ds0/innerRadius)**(phsA-2) * Whvlam           #scaled angular HV matrix
-# dthPol = spdiags( dth**(phsA-2), np.array([0]), len(dth), len(dth) )
-# Whvlam = alpA * dthPol.dot(Whvlam)
+# Whvlam = alpA * (ds0/innerRadius)**(phsA-2) * Whvlam     #scaled angular HV
+dthPol = spdiags( dth**(phsA-2), np.array([0]), len(dth), len(dth) )
+Whvlam = alpA * dthPol.dot(Whvlam)
 
 ###########################################################################
 
@@ -471,9 +473,9 @@ def Ds(U) :
 def Dlam(U) :
     return Wlam.dot(U.T).T
 
-def Dr(U) :                                        #du/dr = (du/ds)*(ds/dr)
-    return Ds(U) * dsdrAll
-
+# def Dr(U) :                                        #du/dr = (du/ds)*(ds/dr)
+#     return Ds(U) * dsdrAll
+# 
 # def Dth(U) :                           #du/dth = du/dlam + (du/ds)*(ds/dth)
 #     return Dlam(U) + Ds(U) * dsdthAll
 
@@ -492,8 +494,10 @@ if mlv == 1 :
         , NxBot, NyBot, NxTop, NyTop \
         , TxBot, TyBot, TxTop, TyTop \
         , rhoBar, Tbar, Pbar \
-        , someFactor, stcB, Wlam, Rd \
-        , wIinner, wEinner, wDinner, wHinner, wIouter, wEouter, wDouter, wHouter )
+        , someFactor, bottomFactor, topFactor \
+        , stcB, Wlam, Rd \
+        , wIinner, wEinner, wDinner, wHinner \
+        , wIouter, wEouter, wDouter, wHouter )
         return U
 elif mlv == 0 :
     raise ValueError("This isn't working for Euler equations yet.")
@@ -503,7 +507,7 @@ elif mlv == 0 :
     #     , someFactor, stcB, Wlam \
     #     , wEinner, wDinner, wEouter, wDouter )
 else :
-    raise ValueError("Only mlv=0 and mlv=1 are currently supported.")
+    raise ValueError("Only mlv=1 please.")
 
 dUdt = np.zeros(( 5, nlv, nth ))
 if wavesOnly :
@@ -511,12 +515,12 @@ if wavesOnly :
         dUdt = eulerEquations.odefunWaves( t, U, dUdt \
         , setGhostNodes, Dx, Dy, HV \
         , drdxAll, drdyAll \
-        , Tbar, rhoBar, dTbarDr, drhoBarDr, g )
+        , Tbar, rhoBar, dTbarDr, drhoBarDr, Rd, Cv, g )
         return dUdt
 else :
     def odefun( t, U, dUdt ) :
         dUdt = eulerEquations.odefunEuler( t, U, dUdt \
-        , setGhostNodes, Dx, Dy, HV, Dr \
+        , setGhostNodes, Dx, Dy, HV \
         , drdxAll, drdyAll \
         , Tbar, rhoBar, dTbarDr, drhoBarDr, Rd, Cv, g )
         return dUdt
@@ -545,7 +549,7 @@ def plotSomething( U, t ) :
     , Dx, Dy \
     , whatToPlot, xx, yy, th, xx0, yy0, th0, Wradial, Wangular \
     , Rd, Po, Cp, xB, yB, xT, yT, outerRadius, fig \
-    , dynamicColorbar, noInterp, ang1 \
+    , dynamicColorbar, interp, ang1 \
     , Tbar, rhoBar, thetaBar, Pbar, piBar )
 
 ###########################################################################
@@ -558,7 +562,11 @@ for i in np.arange( 0, nTimesteps+1 ) :
     
     if np.mod( i, np.int(np.round(saveDel/dt)) ) == 0 :
         
-        print( "t =", np.int(np.round(t)), ",  et =", time.time()-et )
+        print( "t = {0:5d} |  et = {1:6.2f} |  maxAbsRho = {2:.2e}" \
+        . format( np.int(np.round(t)) \
+        , time.time()-et \
+        , np.max(np.abs(U[3,:,:])) ) )
+        
         et = time.time()
         
         if plotFromSaved :
