@@ -161,10 +161,10 @@ sinTh = np.sin(thth)                                                 #dr/dy
 cosThOverR = cosTh/rr                                               #dth/dy
 sinThOverR = sinTh/rr                                              #-dth/dx
 
-drdxAll  =  np.cos(thth)
-drdyAll  =  np.sin(thth)
-dthdyAll =  np.cos(thth)/rr
-dthdxAll = -np.sin(thth)/rr
+drdx  =  np.cos(thth)
+drdy  =  np.sin(thth)
+dthdy =  np.cos(thth)/rr
+dthdx = -np.sin(thth)/rr
 
 thth0, ss0 = np.meshgrid( th0, s0[1:-1] )        #regular mesh for plotting
 rr0 = common.getRadii( thth0, ss0 \
@@ -189,8 +189,8 @@ dsdrAll  = dsdr( rr, thth )                   #dsdr values over entire mesh
 
 #Metric terms that will be used in Dx() and Dy() functions:
 
-mtx = dsdrAll * drdxAll + dsdthAll * dthdxAll             #Dx() metric term
-mty = dsdrAll * drdyAll + dsdthAll * dthdyAll             #Dy() metric term
+mtx = dsdrAll * drdx + dsdthAll * dthdx             #Dx() metric term
+mty = dsdrAll * drdy + dsdthAll * dthdy             #Dy() metric term
 
 ###########################################################################
 
@@ -201,10 +201,13 @@ yB0 = rSurf(th0) * np.sin(th0)
 xT0 = outerRadius * np.cos(th0)
 yT0 = outerRadius * np.sin(th0)
 
-xT = outerRadius * np.cos(th)
-yT = outerRadius * np.sin(th)
 xB = rSurf(th)   * np.cos(th)
 yB = rSurf(th)   * np.sin(th)
+xT = outerRadius * np.cos(th)
+yT = outerRadius * np.sin(th)
+
+rB = rSurf(th)
+rT = outerRadius
 
 ###########################################################################
 
@@ -303,7 +306,7 @@ else :
     if pol == 1 :
         alp =  2.**-6.  * c
     elif pol == 3 :
-        alp = -2.**-10.  * c
+        alp = -2.**-10. * c
     elif pol == 5 :
         alp =  2.**-14. * c
     elif pol == 7 :
@@ -370,33 +373,10 @@ NxBot, NyBot, NxTop, NyTop \
 
 #Set initial condition for U[2,:,:] (T) and U[3,:,:] (rho):
 
-U = np.zeros(( 5, nlv, nth ))
-
-#Hydrostatic background states and initial theta perturbation:
-thetaBar = 300. * np.ones(( nlv, nth ))
-# thetaPrime = np.zeros(( nlv, nth ))
-thetaPrime = 2.*( initialCondition(xx,yy) - 1. )
-piBar = 1. - g / Cp / thetaBar * ( rr - innerRadius )
-piPrime = np.zeros(( nlv, nth ))
-Tbar = piBar * thetaBar
-Tprime = ( piBar + piPrime ) * ( thetaBar + thetaPrime ) - Tbar
-Pbar = Po * piBar ** (Cp/Rd)
-Pprime = Po * ( piBar + piPrime ) ** (Cp/Rd) - Pbar
-rhoBar = Pbar / Rd / Tbar
-rhoPrime = ( Pbar + Pprime ) / Rd / ( Tbar + Tprime ) - rhoBar
-
-#Initial condition for temperature and density perturbations:
-U[2,:,:] = Tprime
-U[3,:,:] = rhoPrime
-
-#Radial derivatives of hydrostatic background states:
-#For derivation, please see "Background States" section of
-#https://www.overleaf.com/read/jpddcpggwyhh
-dthetaBarDr = np.zeros(( nlv, nth ))
-dpiBarDr = -g / Cp / thetaBar
-dTbarDr = piBar * dthetaBarDr + thetaBar * dpiBarDr
-dPbarDr = Po * Cp/Rd * piBar**(Cp/Rd-1.) * dpiBarDr
-drhoBarDr = ( dPbarDr - Rd*rhoBar*dTbarDr ) / ( Rd * Tbar )
+U, thetaBar, piBar, Tbar, Pbar, rhoBar, phiBar \
+, dTbarDr, drhoBarDr \
+= eulerEquations.getInitialConditions( 'bubble', nlv, nth \
+, initialCondition, xx, yy, rr, innerRadius, Cp, Cv, Rd, g, Po )
 
 ###########################################################################
 
@@ -480,24 +460,31 @@ def Dlam(U) :
 #     return Dlam(U) + Ds(U) * dsdthAll
 
 def Dx(U) :                    #du/dx = (du/dr)*(dr/dx) + (du/dth)*(dth/dx)
-    return mtx * Ds(U) + dthdxAll * Dlam(U)
+    return mtx * Ds(U) + dthdx * Dlam(U)
 
 def Dy(U) :                    #du/dy = (du/dr)*(dr/dy) + (du/dth)*(dth/dy)
-    return mty * Ds(U) + dthdyAll * Dlam(U)
+    return mty * Ds(U) + dthdy * Dlam(U)
 
 def HV(U) :
     return Whvs.dot(U) + Whvlam.dot(U[1:-1,:].T).T
+
+def fastBackgroundStates( phi ) :
+    Pbar, rhoBar, Tbar, drhoBarDr, dTbarDr \
+    = eulerEquations.fastBackgroundStates( phi \
+    , 'bubble', nlv, nth, g, Cp, Rd, Po )
+    return Pbar, rhoBar, Tbar, drhoBarDr, dTbarDr
 
 if mlv == 1 :
     def setGhostNodes( U ) :
         U = eulerEquations.setGhostNodesMidLevels( U \
         , NxBot, NyBot, NxTop, NyTop \
         , TxBot, TyBot, TxTop, TyTop \
-        , rhoBar, Tbar, Pbar \
+        , fastBackgroundStates \
         , someFactor, bottomFactor, topFactor \
         , stcB, Wlam, Rd \
         , wIinner, wEinner, wDinner, wHinner \
-        , wIouter, wEouter, wDouter, wHouter )
+        , wIouter, wEouter, wDouter, wHouter \
+        , innerRadius, outerRadius, rB, rT, g )
         return U
 elif mlv == 0 :
     raise ValueError("This isn't working for Euler equations yet.")
@@ -509,20 +496,25 @@ elif mlv == 0 :
 else :
     raise ValueError("Only mlv=1 please.")
 
-dUdt = np.zeros(( 5, nlv, nth ))
+dUdt = np.zeros(( 6, nlv, nth ))
 if wavesOnly :
     def odefun( t, U, dUdt ) :
         dUdt = eulerEquations.odefunWaves( t, U, dUdt \
         , setGhostNodes, Dx, Dy, HV \
-        , drdxAll, drdyAll \
+        , drdx, drdy \
         , Tbar, rhoBar, dTbarDr, drhoBarDr, Rd, Cv, g )
         return dUdt
 else :
     def odefun( t, U, dUdt ) :
-        dUdt = eulerEquations.odefunEuler( t, U, dUdt \
-        , setGhostNodes, Dx, Dy, HV \
-        , drdxAll, drdyAll \
-        , Tbar, rhoBar, dTbarDr, drhoBarDr, Rd, Cv, g )
+        dUdt = eulerEquations.odefunFast( t, U, dUdt \
+        , setGhostNodes, Ds, Dlam, HV \
+        , drdx, drdy, dthdx, dthdy \
+        , phiBar, fastBackgroundStates \
+        , Rd, Cv, g, innerRadius, VL )
+        # dUdt = eulerEquations.odefunEuler( t, U, dUdt \
+        # , setGhostNodes, Dx, Dy, HV \
+        # , drdx, drdy \
+        # , Tbar, rhoBar, dTbarDr, drhoBarDr, Rd, Cv, g )
         return dUdt
 
 q1 = dUdt               #let q1 be another reference to the same array dUdt
@@ -570,7 +562,7 @@ for i in np.arange( 0, nTimesteps+1 ) :
         et = time.time()
         
         if plotFromSaved :
-            U[0:4,:,:] = np.load( saveString \
+            U[0:5,:,:] = np.load( saveString \
             + '{0:04d}'.format(np.int(np.round(t))) + '.npy' )
         
         if saveArrays or saveContours :
@@ -578,7 +570,7 @@ for i in np.arange( 0, nTimesteps+1 ) :
         
         if saveArrays :
             np.save( saveString \
-            + '{0:04d}'.format(np.int(np.round(t))) + '.npy', U[0:4,:,:] )
+            + '{0:04d}'.format(np.int(np.round(t))) + '.npy', U[0:5,:,:] )
         
         if saveContours :
             plotSomething( U, t )
@@ -587,5 +579,8 @@ for i in np.arange( 0, nTimesteps+1 ) :
         t = t + dt
     else :
         t, U = RK( t, U )
+
+    if VL :
+        U = eulerEquations.verticalRemap( U, U[4,:,:], phiBar )
 
 ###########################################################################
