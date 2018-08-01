@@ -562,7 +562,7 @@ for i in np.arange( 0, nTimesteps+1 ) :
     
     if np.mod( i, np.int(np.round(saveDel/dt)) ) == 0 :
         
-        print( "t = {0:5d} |  et = {1:6.2f} |  maxAbsRho = {2:.2e}" \
+        print( "t = {0:5d} | et = {1:6.2f} | maxAbsRho = {2:.2e}" \
         . format( np.int(np.round(t)) \
         , time.time()-et \
         , np.max(np.abs(U[3,:,:])) ) )
