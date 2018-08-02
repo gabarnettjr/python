@@ -71,7 +71,7 @@ def initialCondition( x, y ) :
 
 saveString = eulerEquations.getSavestring( wavesOnly \
 , innerRadius, outerRadius, tf, saveDel, exp, amp, frq \
-, mlv, phs, pol, stc, clu, pct, rks, nlv, dti )
+, VL, phs, pol, stc, clu, pct, rks, nlv, dti )
 
 if ( saveArrays ) & ( not plotFromSaved ) :
     if os.path.exists( saveString + '*.npy' ) :
@@ -236,7 +236,8 @@ if plotNodes :
     plt.axis('image')
     # plt.xlabel( 'x' )
     # plt.ylabel( 'y' )
-    plt.title( "clu={0:1s}, pct={1:1g}, ptr={2:1d}".format(clu,pct,ptr), fontsize=fst )
+    plt.title( "clu={0:1s}, pct={1:1g}, ptr={2:1d}".format(clu,pct,ptr) \
+    , fontsize=fst )
     plt.show()
 
 ###########################################################################
@@ -470,6 +471,7 @@ def HV(U) :
 
 e    = np.ones((  nlv, nth ))
 null = np.zeros(( nlv, nth ))
+
 def fastBackgroundStates( phi, e, null ) :
     Pbar, rhoBar, Tbar, drhoBarDr, dTbarDr \
     = eulerEquations.fastBackgroundStates( phi, e, null \
@@ -511,8 +513,8 @@ else :
     def odefun( t, U, dUdt ) :
         dUdt = eulerEquations.odefunFast( t, U, dUdt \
         , setGhostNodes, Ds, Dlam, HV \
-        , drdx, drdy, dthdx, dthdy \
-        , phiBar \
+        , drdx, drdy \
+        , phiBar, null \
         , Rd, Cv, g, innerRadius, VL )
         # dUdt = eulerEquations.odefunEuler( t, U, dUdt \
         # , setGhostNodes, Dx, Dy, HV \
@@ -551,9 +553,18 @@ def plotSomething( U, t ) :
 
 #Main time-stepping loop:
 
+nullRemap = np.zeros(( 4, nlv, nth ))
+
 et = time.time()
 
 for i in np.arange( 0, nTimesteps+1 ) :
+    
+    if np.mod( i, 16 ) == 0 :
+        if VL and not plotFromSaved :
+            U, tmp, tmp, tmp, tmp, tmp = setGhostNodes( U )
+            U[0:4,:,:] = eulerEquations.verticalRemap( U[0:4,:,:] \
+            , U[4,:,:], phiBar, nlv-2, nullRemap )
+            U[4,:,:] = phiBar
     
     if np.mod( i, np.int(np.round(saveDel/dt)) ) == 0 :
         
@@ -570,6 +581,11 @@ for i in np.arange( 0, nTimesteps+1 ) :
         
         if saveArrays or saveContours :
             U, tmp, tmp, tmp, tmp, tmp = setGhostNodes( U )
+            if VL :
+                U[0:4,:,:] = eulerEquations.verticalRemap( U[0:4,:,:] \
+                , U[4,:,:], phiBar, nlv-2, nullRemap )
+                U[4,:,:] = phiBar
+                U, tmp, tmp, tmp, tmp, tmp = setGhostNodes( U )
         
         if saveArrays :
             np.save( saveString \
@@ -582,8 +598,5 @@ for i in np.arange( 0, nTimesteps+1 ) :
         t = t + dt
     else :
         t, U = RK( t, U )
-    
-    if VL :
-        U = eulerEquations.verticalRemap( U, U[4,:,:], phiBar, nlv-2 )
 
 ###########################################################################
