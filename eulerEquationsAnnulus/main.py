@@ -502,6 +502,7 @@ else :
     raise ValueError("Only mlv=1 please.")
 
 dUdt = np.zeros(( 6, nlv, nth ))
+
 if wavesOnly :
     def odefun( t, U, dUdt ) :
         dUdt = eulerEquations.odefunWaves( t, U, dUdt \
@@ -524,6 +525,7 @@ else :
 
 q1 = dUdt               #let q1 be another reference to the same array dUdt
 q2 = np.zeros( np.shape(dUdt) )       #rk3 and rk4 both need a second array
+
 if rks == 3 :
     def RK( t, U ) :
         t, U = rk.rk3( t, U, odefun, dt, q1, q2 )
@@ -547,7 +549,7 @@ def plotSomething( U, t ) :
     , whatToPlot, xx, yy, th, xx0, yy0, th0, Wradial, Wangular \
     , Rd, Po, Cp, xB, yB, xT, yT, outerRadius, fig \
     , dynamicColorbar, interp, ang1 \
-    , Tbar, rhoBar, thetaBar, Pbar, piBar )
+    , Tbar, rhoBar, thetaBar, Pbar, piBar, phiBar )
 
 ###########################################################################
 
@@ -559,12 +561,12 @@ et = time.time()
 
 for i in np.arange( 0, nTimesteps+1 ) :
     
-    if np.mod( i, 16 ) == 0 :
-        if VL and not plotFromSaved :
-            U, tmp, tmp, tmp, tmp, tmp = setGhostNodes( U )
-            U[0:4,:,:] = eulerEquations.verticalRemap( U[0:4,:,:] \
-            , U[4,:,:], phiBar, nlv-2, nullRemap )
-            U[4,:,:] = phiBar
+    #Vertical re-map:
+    if np.mod(i,4)==0 and VL and not plotFromSaved :
+        U, tmp, tmp, tmp, tmp, tmp = setGhostNodes( U )
+        U[0:4,:,:] = eulerEquations.verticalRemap( U[0:4,:,:] \
+        , U[4,:,:], phiBar, nlv-2, nullRemap )
+        U[4,:,:] = phiBar
     
     if np.mod( i, np.int(np.round(saveDel/dt)) ) == 0 :
         
