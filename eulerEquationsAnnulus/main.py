@@ -468,24 +468,27 @@ def Dy(U) :                    #du/dy = (du/dr)*(dr/dy) + (du/dth)*(dth/dy)
 def HV(U) :
     return Whvs.dot(U) + Whvlam.dot(U[1:-1,:].T).T
 
-def fastBackgroundStates( phi ) :
+e    = np.ones((  nlv, nth ))
+null = np.zeros(( nlv, nth ))
+def fastBackgroundStates( phi, e, null ) :
     Pbar, rhoBar, Tbar, drhoBarDr, dTbarDr \
-    = eulerEquations.fastBackgroundStates( phi \
+    = eulerEquations.fastBackgroundStates( phi, e, null \
     , 'bubble', nlv, nth, g, Cp, Rd, Po )
     return Pbar, rhoBar, Tbar, drhoBarDr, dTbarDr
 
 if mlv == 1 :
     def setGhostNodes( U ) :
-        U = eulerEquations.setGhostNodesMidLevels( U \
+        U, Pbar, rhoBar, Tbar, drhoBarDr, dTbarDr \
+        = eulerEquations.setGhostNodesMidLevels( U \
         , NxBot, NyBot, NxTop, NyTop \
         , TxBot, TyBot, TxTop, TyTop \
-        , fastBackgroundStates \
+        , fastBackgroundStates, e, null \
         , someFactor, bottomFactor, topFactor \
         , stcB, Wlam, Rd \
         , wIinner, wEinner, wDinner, wHinner \
         , wIouter, wEouter, wDouter, wHouter \
         , innerRadius, outerRadius, rB, rT, g )
-        return U
+        return U, Pbar, rhoBar, Tbar, drhoBarDr, dTbarDr
 elif mlv == 0 :
     raise ValueError("This isn't working for Euler equations yet.")
     # def setGhostNodes(U) :
@@ -509,7 +512,7 @@ else :
         dUdt = eulerEquations.odefunFast( t, U, dUdt \
         , setGhostNodes, Ds, Dlam, HV \
         , drdx, drdy, dthdx, dthdy \
-        , phiBar, fastBackgroundStates \
+        , phiBar \
         , Rd, Cv, g, innerRadius, VL )
         # dUdt = eulerEquations.odefunEuler( t, U, dUdt \
         # , setGhostNodes, Dx, Dy, HV \
@@ -566,7 +569,7 @@ for i in np.arange( 0, nTimesteps+1 ) :
             + '{0:04d}'.format(np.int(np.round(t))) + '.npy' )
         
         if saveArrays or saveContours :
-            U = setGhostNodes(U)
+            U, tmp, tmp, tmp, tmp, tmp = setGhostNodes( U )
         
         if saveArrays :
             np.save( saveString \
@@ -579,8 +582,8 @@ for i in np.arange( 0, nTimesteps+1 ) :
         t = t + dt
     else :
         t, U = RK( t, U )
-
+    
     if VL :
-        U = eulerEquations.verticalRemap( U, U[4,:,:], phiBar )
+        U = eulerEquations.verticalRemap( U, U[4,:,:], phiBar, nlv-2 )
 
 ###########################################################################
