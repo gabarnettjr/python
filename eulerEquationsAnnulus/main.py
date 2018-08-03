@@ -21,6 +21,7 @@ for k in temporaryDictionary.keys() :
     exec("{} = args.{}".format(k,k))
 
 dt = 1./dti
+halfWidth = eval( halfWidth )
 
 if plotFromSaved :
     saveContours = True
@@ -30,9 +31,9 @@ if plotFromSaved :
 rSurf, rSurfPrime \
 = common.getTopoFunc( innerRadius, outerRadius, amp, frq )
 
-ang1 = eval(ang1)                                  #convert string to float
-xc1 = (rSurf(ang1)+(outerRadius-rSurf(ang1))/3.)*np.cos(ang1)#x-coord of GA
-yc1 = (rSurf(ang1)+(outerRadius-rSurf(ang1))/3.)*np.sin(ang1)#y-coord of GA
+ang1 = eval(ang1)                              #convert string to float
+xc1 = (rSurf(ang1)+(outerRadius-rSurf(ang1))/hf)*np.cos(ang1)#x-coord
+yc1 = (rSurf(ang1)+(outerRadius-rSurf(ang1))/hf)*np.sin(ang1)#y-coord
 if ang2 :
     ang2 = eval(ang2)                              #convert string to float
     xc2 = (rSurf(ang2)+outerRadius)/2.*np.cos(ang2)     #x-coord of GA bell
@@ -42,13 +43,13 @@ if ang2 :
         xc3 = (rSurf(ang3)+outerRadius)/2.*np.cos(ang3) #x-coord of GA bell
         yc3 = (rSurf(ang3)+outerRadius)/2.*np.sin(ang3) #y-coord of GA bell
 
-def initialCondition( x, y ) :
+def initialCondition( x, y, kx, ky ) :
     #Gaussian:
-    z = 1. + np.exp( -exp*( (x-xc1)**2. + (y-yc1)**2. ) )
+    z = 1. + np.exp( -steepness*( (kx*(x-xc1))**2. + (ky*(y-yc1))**2. ) )
     if ang2 :
-        z = z + np.exp( -exp*( (x-xc2)**2. + (y-yc2)**2. ) )
+        z = z + np.exp( -steepness*( (x-xc2)**2. + (y-yc2)**2. ) )
         if ang3 :
-            z = z + np.exp( -exp*( (x-xc3)**2. + (y-yc3)**2. ) )
+            z = z + np.exp( -steepness*( (x-xc3)**2. + (y-yc3)**2. ) )
     return z
     # #Wendland function:
     # def wf( xc, yc ) :
@@ -70,8 +71,8 @@ def initialCondition( x, y ) :
 #Delete old stuff, and set things up for saving:
 
 saveString = eulerEquations.getSavestring( wavesOnly \
-, innerRadius, outerRadius, tf, saveDel, exp, amp, frq \
-, VL, phs, pol, stc, clu, pct, rks, nlv, dti )
+, innerRadius, outerRadius, tf, saveDel, steepness, amp, frq \
+, VL, phs, pol, stc, clusterType, clusterStrength, rks, nlv, dti )
 
 if ( saveArrays ) & ( not plotFromSaved ) :
     if os.path.exists( saveString + '*.npy' ) :
@@ -92,16 +93,18 @@ if saveContours :
 t = 0.                                                       #starting time
 nTimesteps = np.int(np.round( tf / dt ))         #total number of timesteps
 
-pct = pct / 100.
-if clu == "linear" :
-    th = common.fastAngles( innerRadius, outerRadius, nlv, ang1, clu, pct )
+clusterStrength = clusterStrength / 100.
+if clusterType == "linear" :
+    th = common.fastAngles( innerRadius, outerRadius, nlv, ang1 \
+    , clusterType, clusterStrength )
     nth = len(th)
-elif clu == "geometric" :
-    th = common.fastAngles( innerRadius, outerRadius, nlv, ang1, clu, pct )
+elif clusterType == "geometric" :
+    th = common.fastAngles( innerRadius, outerRadius, nlv, ang1 \
+    , clusterType, clusterStrength )
     nth = len(th)
 else :
     #Get regularly spaced angles:
-    pct = 0.
+    clusterStrength = 0.
     nth = common.getNth( innerRadius, outerRadius, nlv )    #nmbr of angles
     th  = np.linspace( ang1, ang1+2.*np.pi, nth+1 )   #vector of all angles
     th  = th[0:-1]                       #remove last angle (same as first)
@@ -151,10 +154,6 @@ rr = common.getRadii( thth, ss \
 , innerRadius, outerRadius, rSurf )                #mesh of perturbed radii
 xx = rr * np.cos(thth)                               #mesh of x-coordinates
 yy = rr * np.sin(thth)                               #mesh of y-coordinates
-xxi = xx[1:-1,:]                                    #x without ghost layers
-yyi = yy[1:-1,:]                                    #y without ghost layers
-ththi = thth[1:-1,:]                               #th without ghost layers
-rri = rr[1:-1,:]                                    #r without ghost layers
 
 cosTh = np.cos(thth)                                                 #dr/dx
 sinTh = np.sin(thth)                                                 #dr/dy
@@ -178,9 +177,6 @@ yy0 = rr0 * np.sin(thth0)                         #mesh of regular x-coords
 
 sFunc, dsdth, dsdr \
 = common.getHeightCoordinate( innerRadius, outerRadius, rSurf, rSurfPrime )
-
-dsdthi = dsdth( rri, ththi )             #interior values of dsdth function
-dsdri  = dsdr( rri, ththi )               #interior values of dsdr function
 
 dsdthAll = dsdth( rr, thth )                 #dsdth values over entire mesh
 dsdrAll  = dsdr( rr, thth )                   #dsdr values over entire mesh
@@ -236,8 +232,8 @@ if plotNodes :
     plt.axis('image')
     # plt.xlabel( 'x' )
     # plt.ylabel( 'y' )
-    plt.title( "clu={0:1s}, pct={1:1g}, ptr={2:1d}".format(clu,pct,ptr) \
-    , fontsize=fst )
+    plt.title( "clusterType={0:1s}, clusterStrength={1:1g}, ptr={2:1d}" \
+    . format(clusterType,clusterStrength,ptr), fontsize=fst )
     plt.show()
 
 ###########################################################################
@@ -376,8 +372,8 @@ NxBot, NyBot, NxTop, NyTop \
 
 U, thetaBar, piBar, Tbar, Pbar, rhoBar, phiBar \
 , dTbarDr, drhoBarDr \
-= eulerEquations.getInitialConditions( 'bubble', nlv, nth \
-, initialCondition, xx, yy, rr, innerRadius, Cp, Cv, Rd, g, Po )
+= eulerEquations.getInitialConditions( testCase, nlv, nth \
+, initialCondition, xx, yy, kx, ky, rr, innerRadius, Cp, Cv, Rd, g, Po )
 
 ###########################################################################
 
@@ -475,7 +471,7 @@ null = np.zeros(( nlv, nth ))
 def fastBackgroundStates( phi, e, null ) :
     Pbar, rhoBar, Tbar, drhoBarDr, dTbarDr \
     = eulerEquations.fastBackgroundStates( phi, e, null \
-    , 'bubble', nlv, nth, g, Cp, Rd, Po )
+    , testCase, nlv, nth, g, Cp, Rd, Po )
     return Pbar, rhoBar, Tbar, drhoBarDr, dTbarDr
 
 if mlv == 1 :
@@ -548,7 +544,7 @@ def plotSomething( U, t ) :
     , Dx, Dy \
     , whatToPlot, xx, yy, th, xx0, yy0, th0, Wradial, Wangular \
     , Rd, Po, Cp, xB, yB, xT, yT, outerRadius, fig \
-    , dynamicColorbar, interp, ang1 \
+    , dynamicColorbar, interp, ang1, halfWidth \
     , Tbar, rhoBar, thetaBar, Pbar, piBar, phiBar )
 
 ###########################################################################
