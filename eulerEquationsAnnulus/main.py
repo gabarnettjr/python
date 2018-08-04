@@ -232,8 +232,8 @@ if plotNodes :
     plt.axis('image')
     # plt.xlabel( 'x' )
     # plt.ylabel( 'y' )
-    plt.title( "clusterType={0:1s}, clusterStrength={1:1g}, ptr={2:1d}" \
-    . format(clusterType,clusterStrength,ptr), fontsize=fst )
+    plt.title( "clusterType={0:1s}, clusterStrength={1:1g}" \
+    . format(clusterType,clusterStrength), fontsize=fst )
     plt.show()
 
 ###########################################################################
