@@ -71,7 +71,7 @@ def initialCondition( x, y, kx, ky ) :
 #Delete old stuff, and set things up for saving:
 
 saveString = eulerEquations.getSavestring( wavesOnly \
-, innerRadius, outerRadius, tf, saveDel, steepness, amp, frq \
+, testCase, innerRadius, outerRadius, tf, saveDel, steepness, amp, frq \
 , VL, phs, pol, stc, clusterType, clusterStrength, rks, nlv, dti )
 
 if ( saveArrays ) & ( not plotFromSaved ) :
