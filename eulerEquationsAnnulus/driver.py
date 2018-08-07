@@ -1,20 +1,20 @@
 import os
 import sys
 
-s = ""
+s = " --testCase {}" . format( sys.argv[1] )
 
 ###########################################################################
 
 #General parameters that can be adjusted by the user:
 
-s = s + " --clusterStrength 2"
+s = s + " --clusterStrength 1"
 
-s = s + " --saveArrays"
+# s = s + " --saveArrays"
 s = s + " --saveContours"
 # s = s + " --plotFromSaved"
 
-s = s + " --whatToPlot theta"
-# s = s + " --dynamicColorbar"
+s = s + " --whatToPlot v"
+s = s + " --dynamicColorbar"
 
 # s = s + " --phs 5 --pol 4 --stc 9"
 # s = s + " --rks 4"
@@ -28,7 +28,7 @@ s = s + " --nlv {} --dti {}" . format( sys.argv[2], sys.argv[3] )
 
 if sys.argv[1] == "bubble" :
     
-    s = s + " --testCase bubble"
+    s = s + " --topoType trig"
     s = s + " --tf 1000 --saveDel 100"
     s = s + " --hf 3"
     s = s + " --halfWidth np.pi/3e3"
@@ -40,14 +40,24 @@ if sys.argv[1] == "bubble" :
     
 elif sys.argv[1] == "densityCurrent" :
     
-    s = s + " --testCase densityCurrent"
+    s = s + " --topoType GA"
     s = s + " --tf 900 --saveDel 50"
     s = s + " --hf 2"
     s = s + " --halfWidth np.pi/1e3"
-    s = s + " --amp 0000"
+    s = s + " --amp 1000"
     s = s + " --frq 3001"
     s = s + " --steepness 1e-7"
     s = s + " --kx 1 --ky 3"
+    s = s + " --innerRadius 6371000 --outerRadius 6381000"
+    
+elif sys.argv[1] == "gravityWaves" :
+    
+    s = s + " --topoType GA"
+    s = s + " --tf 50 --saveDel 5"
+    s = s + " --halfWidth np.pi/1e3"
+    s = s + " --amp 1000"
+    s = s + " --frq 6000"
+    s = s + " --steepness 1e-7"
     s = s + " --innerRadius 6371000 --outerRadius 6381000"
     
 else :

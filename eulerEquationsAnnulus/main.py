@@ -29,7 +29,8 @@ if plotFromSaved :
 ###########################################################################
 
 rSurf, rSurfPrime \
-= common.getTopoFunc( innerRadius, outerRadius, amp, frq )
+= common.getTopoFunc( innerRadius, outerRadius, topoType \
+, amp, frq, steepness, eval(ang1) )
 
 ang1 = eval(ang1)                              #convert string to float
 xc1 = (rSurf(ang1)+(outerRadius-rSurf(ang1))/hf)*np.cos(ang1)#x-coord
@@ -372,8 +373,8 @@ NxBot, NyBot, NxTop, NyTop \
 
 U, thetaBar, piBar, Tbar, Pbar, rhoBar, phiBar \
 , dTbarDr, drhoBarDr \
-= eulerEquations.getInitialConditions( testCase, nlv, nth \
-, initialCondition, xx, yy, kx, ky, rr, innerRadius, Cp, Cv, Rd, g, Po )
+= eulerEquations.getInitialConditions( testCase, nlv, nth, initialCondition \
+, xx, yy, kx, ky, rr, thth, innerRadius, Cp, Cv, Rd, g, Po )
 
 ###########################################################################
 
