@@ -374,7 +374,7 @@ NxBot, NyBot, NxTop, NyTop \
 U, thetaBar, piBar, Tbar, Pbar, rhoBar, phiBar \
 , dTbarDr, drhoBarDr \
 = eulerEquations.getInitialConditions( testCase, nlv, nth, initialCondition \
-, xx, yy, kx, ky, rr, thth, innerRadius, Cp, Cv, Rd, g, Po )
+, xx, yy, kx, ky, rr, thth, innerRadius, ang1, Cp, Cv, Rd, g, Po )
 
 ###########################################################################
 
@@ -542,7 +542,7 @@ if saveContours :
 
 def plotSomething( U, t ) :
     eulerEquations.plotSomething( U, t \
-    , Dx, Dy \
+    , testCase, Dx, Dy \
     , whatToPlot, xx, yy, th, xx0, yy0, th0, Wradial, Wangular \
     , Rd, Po, Cp, xB, yB, xT, yT, outerRadius, fig \
     , dynamicColorbar, interp, ang1, halfWidth \
