@@ -32,9 +32,9 @@ rSurf, rSurfPrime \
 = common.getTopoFunc( innerRadius, outerRadius, topoType \
 , amp, frq, steepness, eval(ang1) )
 
-ang1 = eval(ang1)                              #convert string to float
-xc1 = (rSurf(ang1)+(outerRadius-rSurf(ang1))/hf)*np.cos(ang1)#x-coord
-yc1 = (rSurf(ang1)+(outerRadius-rSurf(ang1))/hf)*np.sin(ang1)#y-coord
+ang1 = eval(ang1)                                  #convert string to float
+xc1 = (rSurf(ang1)+(outerRadius-rSurf(ang1))/hf)*np.cos(ang1)      #x-coord
+yc1 = (rSurf(ang1)+(outerRadius-rSurf(ang1))/hf)*np.sin(ang1)      #y-coord
 if ang2 :
     ang2 = eval(ang2)                              #convert string to float
     xc2 = (rSurf(ang2)+outerRadius)/2.*np.cos(ang2)     #x-coord of GA bell
@@ -89,17 +89,25 @@ if saveContours :
 
 ###########################################################################
 
-#Get th and s vectors and save them:
+#Atmospheric constants:
+Cp = 1004.
+Cv = 717.
+Rd = Cp - Cv
+g  = 9.81
+Po = 10.**5.
+
+###########################################################################
 
 t = 0.                                                       #starting time
 nTimesteps = np.int(np.round( tf / dt ))         #total number of timesteps
 
+###########################################################################
+
+#Get th vector using the prescribed clustering method:
+
 clusterStrength = clusterStrength / 100.
-if clusterType == "linear" :
-    th = common.fastAngles( innerRadius, outerRadius, nlv, ang1 \
-    , clusterType, clusterStrength )
-    nth = len(th)
-elif clusterType == "geometric" :
+
+if ( clusterType == "linear" ) | ( clusterType == "geometric" ) :
     th = common.fastAngles( innerRadius, outerRadius, nlv, ang1 \
     , clusterType, clusterStrength )
     nth = len(th)
@@ -110,29 +118,41 @@ else :
     th  = np.linspace( ang1, ang1+2.*np.pi, nth+1 )   #vector of all angles
     th  = th[0:-1]                       #remove last angle (same as first)
 
-th0 = np.linspace( ang1, ang1+2.*np.pi, nth+1 )
-th0 = th0[0:-1]
+###########################################################################
 
-if mlv == 1 :
-    ds0 = ( outerRadius - innerRadius ) / (nlv-2)         #constant delta s
-    s0  = np.linspace( innerRadius-ds0/2, outerRadius+ds0/2, nlv )#s vector
-    # tmp = (ptr/100.) * ds0                    #relative perturbation factor
-    # ran = -tmp + 2.*tmp*np.random.rand(nlv)     #random perturbation vector
-    s   = s0.copy()                                  #copy regular s vector
-    # s   = s + ran                              #s vector after perturbation
-elif mlv == 0 :
-    ds0 = ( outerRadius - innerRadius ) / (nlv-3)         #constant delta s
-    s0  = np.linspace( innerRadius-ds0, outerRadius+ds0, nlv )    #s vector
-    # tmp = (ptr/100.) * ds0                    #relative perturbation factor
-    # ranBot = -tmp + 2.*tmp*np.random.rand(1)
-    # ranMid = -tmp + 2.*tmp*np.random.rand(nlv-4)
-    # ranTop = -tmp + 2.*tmp*np.random.rand(1)
-    s = s0.copy()                                    #copy regular s vector
-    # s[0] = s[0] + ranBot                         #perturb bottom ghost node
-    # s[2:-2] = s[2:-2] + ranMid           #perturb interior nodes (no bndry)
-    # s[-1] = s[-1] + ranTop                          #perturb top ghost node
+#Get the main background state functions based on the test case:
+
+e    = np.ones((  nlv, nth ))
+null = np.zeros(( nlv, nth ))
+
+exnerPressure, inverseExnerPressure \
+, potentialTemperature, potentialTemperatureDerivative \
+= eulerEquations.getExnerPressureAndPotentialTemperatureFunctions( testCase \
+, innerRadius, Cp, g, e, null )
+
+###########################################################################
+
+#Get s-levels and computational mesh (thth,ss):
+
+if verticalCoordinate == "height" :
+    ds = ( outerRadius - innerRadius ) / (nlv-2)          #constant delta s
+    s  = np.linspace( innerRadius-ds/2, outerRadius+ds/2, nlv )   #s vector
+    thth, ss = np.meshgrid( th, s )            #mesh of s values and angles
+    rr = common.getRadiiOnHeightCoordinateLevels( thth, ss \
+    , innerRadius, outerRadius, rSurf )                      #mesh of radii
+elif verticalCoordinate == "hybridSigma" :
+    rr, s, ds \
+    = eulerEquations.getRadiiOnPressureCoordinateLevels( nlv, nth, th \
+    , rSurf, exnerPressure, inverseExnerPressure \
+    , outerRadius, Po, Rd, Cp )
+    thth, ss = np.meshgrid( th, s )
 else :
-    raise ValueError("mlv should be 0 or 1")
+    raise ValueError("verticalCoordinate should be 'height' or \
+    'hybridSigma'")
+
+###########################################################################
+
+#Load th and s vectors if plotting from saved, otherwise save them:
 
 if plotFromSaved :
     th = np.load( saveString + 'th' + '.npy' )    #load vector of th values
@@ -144,15 +164,11 @@ else :
 
 tmp = np.hstack(( th[-1]-2.*np.pi, th, th[0]+2.*np.pi ))
 dth = ( tmp[2:nth+2] - tmp[0:nth] ) / 2.             #non-constant delta th
-ds  = ( s[2:nlv] - s[0:nlv-2] ) / 2.                  #non-constant delta s
 
 ###########################################################################
 
-#Get computational mesh and mesh for contour plotting:
+#Get Cartesian mesh and some metric terms:
 
-thth, ss = np.meshgrid( th, s )      #mesh of perturbed s values and angles
-rr = common.getRadii( thth, ss \
-, innerRadius, outerRadius, rSurf )                #mesh of perturbed radii
 xx = rr * np.cos(thth)                               #mesh of x-coordinates
 yy = rr * np.sin(thth)                               #mesh of y-coordinates
 
@@ -166,15 +182,9 @@ drdy  =  np.sin(thth)
 dthdy =  np.cos(thth)/rr
 dthdx = -np.sin(thth)/rr
 
-thth0, ss0 = np.meshgrid( th0, s0[1:-1] )        #regular mesh for plotting
-rr0 = common.getRadii( thth0, ss0 \
-, innerRadius, outerRadius, rSurf )                  #mesh of regular radii
-xx0 = rr0 * np.cos(thth0)                         #mesh of regular x-coords
-yy0 = rr0 * np.sin(thth0)                         #mesh of regular x-coords
-
 ###########################################################################
 
-#Get height coordinate s and its derivatives:
+#Get height coordinate function and its derivatives:
 
 sFunc, dsdth, dsdr \
 = common.getHeightCoordinate( innerRadius, outerRadius, rSurf, rSurfPrime )
@@ -191,12 +201,7 @@ mty = dsdrAll * drdy + dsdthAll * dthdy             #Dy() metric term
 
 ###########################################################################
 
-#Set (x,y) on the bottom boundary (B) and top boundary (T):
-
-xB0 = rSurf(th0) * np.cos(th0)
-yB0 = rSurf(th0) * np.sin(th0)
-xT0 = outerRadius * np.cos(th0)
-yT0 = outerRadius * np.sin(th0)
+#Set (x,y) and r on the bottom boundary (B) and top boundary (T):
 
 xB = rSurf(th)   * np.cos(th)
 yB = rSurf(th)   * np.sin(th)
@@ -233,8 +238,9 @@ if plotNodes :
     plt.axis('image')
     # plt.xlabel( 'x' )
     # plt.ylabel( 'y' )
-    plt.title( "clusterType={0:1s}, clusterStrength={1:1g}" \
-    . format(clusterType,clusterStrength), fontsize=fst )
+    plt.title( "verticalCoord={0:1s}, clusterType={1:1s}, clusterStrength={2:g}" \
+    . format(verticalCoordinate,clusterType,clusterStrength) \
+    , fontsize=fst )
     plt.show()
 
 ###########################################################################
@@ -348,15 +354,6 @@ else :
 
 ###########################################################################
 
-#Atmospheric constants:
-Cp = 1004.
-Cv = 717.
-Rd = Cp - Cv
-g  = 9.81
-Po = 10.**5.
-
-###########################################################################
-
 #Extra things needed to enforce the Neumann boundary condition for P:
 
 stcB = stc                  #stencil-size for enforcing boundary conditions
@@ -397,7 +394,7 @@ Ws = phs1.getDM( x=s, X=s, m=1 \
 #Simple (but still correct with dsdr multiplier) radial HV:
 Whvs = phs1.getDM( x=s, X=s[1:-1], m=phs-1 \
 , phsDegree=phs, polyDegree=pol, stencilSize=stc )
-Whvs = alp * ds0**(phs-2) * Whvs                   #scaled radial HV matrix
+Whvs = alp * ds**(phs-2) * Whvs                   #scaled radial HV matrix
 # dsPol = spdiags( ds**(phs-2), np.array([0]), len(ds), len(ds) )
 # Whvs = alp * dsPol.dot(Whvs)
 
@@ -435,11 +432,11 @@ wHouter = phs1.getWeights( outerRadius, s[-2:-stcB-2:-1], 0, phs, pol )
 
 #Weights to interpolate from perturbed mesh to regular mesh for plotting:
 
-Wradial = phs1.getDM( x=s, X=s0[1:-1], m=0 \
-, phsDegree=phs, polyDegree=pol, stencilSize=stc )
-
-Wangular = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th0, m=0 \
-, phsDegree=phsA, polyDegree=polA, stencilSize=stcA )
+# Wradial = phs1.getDM( x=s, X=s0[1:-1], m=0 \
+# , phsDegree=phs, polyDegree=pol, stencilSize=stc )
+# 
+# Wangular = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th0, m=0 \
+# , phsDegree=phsA, polyDegree=polA, stencilSize=stcA )
 
 ###########################################################################
 
@@ -466,13 +463,11 @@ def Dy(U) :                    #du/dy = (du/dr)*(dr/dy) + (du/dth)*(dth/dy)
 def HV(U) :
     return Whvs.dot(U) + Whvlam.dot(U[1:-1,:].T).T
 
-e    = np.ones((  nlv, nth ))
-null = np.zeros(( nlv, nth ))
-
-def fastBackgroundStates( phi, e, null ) :
+def fastBackgroundStates( phi ) :
     Pbar, rhoBar, Tbar, drhoBarDr, dTbarDr \
-    = eulerEquations.fastBackgroundStates( phi, e, null \
-    , testCase, nlv, nth, g, Cp, Rd, Po )
+    = eulerEquations.fastBackgroundStates( phi \
+    , potentialTemperature, exnerPressure, potentialTemperatureDerivative \
+    , g, innerRadius, Po, Cp, Rd )
     return Pbar, rhoBar, Tbar, drhoBarDr, dTbarDr
 
 if mlv == 1 :
@@ -483,7 +478,7 @@ if mlv == 1 :
         , TxBot, TyBot, TxTop, TyTop \
         , fastBackgroundStates, e, null \
         , someFactor, bottomFactor, topFactor \
-        , stcB, Wlam, Rd \
+        , stcB, Wlam, Rd, cosTh[0,:], sinTh[0,:] \
         , wIinner, wEinner, wDinner, wHinner \
         , wIouter, wEouter, wDouter, wHouter \
         , innerRadius, outerRadius, rB, rT, g )
@@ -513,7 +508,7 @@ else :
         , setGhostNodes, Ds, Dlam, HV \
         , drdx, drdy \
         , phiBar, null \
-        , Rd, Cv, g, innerRadius, VL )
+        , Rd, Cv, g, innerRadius, VL, verticalCoordinate )
         # dUdt = eulerEquations.odefunEuler( t, U, dUdt \
         # , setGhostNodes, Dx, Dy, HV \
         # , drdx, drdy \
@@ -543,9 +538,9 @@ if saveContours :
 def plotSomething( U, t ) :
     eulerEquations.plotSomething( U, t \
     , testCase, Dx, Dy \
-    , whatToPlot, xx, yy, th, xx0, yy0, th0, Wradial, Wangular \
+    , whatToPlot, xx, yy, th \
     , Rd, Po, Cp, xB, yB, xT, yT, outerRadius, fig \
-    , dynamicColorbar, interp, ang1, halfWidth \
+    , dynamicColorbar, ang1, halfWidth \
     , Tbar, rhoBar, thetaBar, Pbar, piBar, phiBar )
 
 ###########################################################################

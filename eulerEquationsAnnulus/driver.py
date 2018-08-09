@@ -13,8 +13,10 @@ s = " --testCase {}" . format( sys.argv[1] )
 
 s = s + " --clusterStrength 1"
 
-# s = s + " --saveArrays"
-s = s + " --plotFromSaved"
+# s = s + " --verticalCoordinate hybridSigma"
+
+s = s + " --saveArrays"
+# s = s + " --plotFromSaved"
 s = s + " --saveContours"
 
 s = s + " --whatToPlot theta"
@@ -22,7 +24,7 @@ s = s + " --dynamicColorbar"
 
 # s = s + " --phs 5 --pol 4 --stc 9"
 # s = s + " --rks 4"
-# s = s + " --VL"
+s = s + " --VL"
 
 s = s + " --nlv {} --dti {}" . format( sys.argv[2], sys.argv[3] )
 
