@@ -25,6 +25,7 @@ halfWidth = eval( halfWidth )
 
 if plotFromSaved :
     saveContours = True
+    saveArrays   = False
 
 ###########################################################################
 
@@ -73,7 +74,8 @@ def initialCondition( x, y, kx, ky ) :
 
 saveString = eulerEquations.getSavestring( wavesOnly \
 , testCase, innerRadius, outerRadius, tf, saveDel, steepness, amp, frq \
-, VL, phs, pol, stc, clusterType, clusterStrength, rks, nlv, dti )
+, verticallyLagrangian, phs, pol, stc, clusterType, clusterStrength \
+, rks, nlv, dti )
 
 if ( saveArrays ) & ( not plotFromSaved ) :
     if os.path.exists( saveString + '*.npy' ) :
@@ -140,7 +142,7 @@ if verticalCoordinate == "height" :
     thth, ss = np.meshgrid( th, s )            #mesh of s values and angles
     rr = common.getRadiiOnHeightCoordinateLevels( thth, ss \
     , innerRadius, outerRadius, rSurf )                      #mesh of radii
-elif verticalCoordinate == "hybridSigma" :
+elif verticalCoordinate == "pressure" :
     rr, s, ds \
     = eulerEquations.getRadiiOnPressureCoordinateLevels( nlv, nth, th \
     , rSurf, exnerPressure, inverseExnerPressure \
@@ -148,7 +150,7 @@ elif verticalCoordinate == "hybridSigma" :
     thth, ss = np.meshgrid( th, s )
 else :
     raise ValueError("verticalCoordinate should be 'height' or \
-    'hybridSigma'")
+'pressure'")
 
 ###########################################################################
 
@@ -350,7 +352,7 @@ elif polA == 7 :
     alpA = -2.**-35. * c
 else :
     raise ValueError("polA should be 7 or 8 to achieve a high order \
-    angular approximation (no boundaries in this direction).")
+angular approximation (no boundaries in this direction).")
 
 ###########################################################################
 
@@ -508,7 +510,8 @@ else :
         , setGhostNodes, Ds, Dlam, HV \
         , drdx, drdy \
         , phiBar, null \
-        , Rd, Cv, g, innerRadius, VL, verticalCoordinate )
+        , Rd, Cv, g, innerRadius \
+        , verticallyLagrangian, verticalCoordinate )
         # dUdt = eulerEquations.odefunEuler( t, U, dUdt \
         # , setGhostNodes, Dx, Dy, HV \
         # , drdx, drdy \
@@ -530,7 +533,7 @@ elif rks == 4 :
         return t, U
 else :
     raise ValueError("rks should be 3 or 4 in this problem.  \
-    rks=1 and rks=2 are unstable.")
+rks=1 and rks=2 are unstable.")
 
 if saveContours :
     fig = plt.figure( figsize = (18,14) )
@@ -538,9 +541,9 @@ if saveContours :
 def plotSomething( U, t ) :
     eulerEquations.plotSomething( U, t \
     , testCase, Dx, Dy \
-    , whatToPlot, xx, yy, th \
-    , Rd, Po, Cp, xB, yB, xT, yT, outerRadius, fig \
-    , dynamicColorbar, ang1, halfWidth \
+    , whatToPlot, xx, yy, thth, th \
+    , Rd, Po, Cp, xB, yB, xT, yT, innerRadius, outerRadius, fig \
+    , dynamicColorbar, ang1, halfWidth, g \
     , Tbar, rhoBar, thetaBar, Pbar, piBar, phiBar )
 
 ###########################################################################
@@ -553,12 +556,12 @@ et = time.time()
 
 for i in np.arange( 0, nTimesteps+1 ) :
     
-    #Vertical re-map:
-    if np.mod(i,4)==0 and VL and not plotFromSaved :
-        U, tmp, tmp, tmp, tmp, tmp = setGhostNodes( U )
-        U[0:4,:,:] = eulerEquations.verticalRemap( U[0:4,:,:] \
-        , U[4,:,:], phiBar, nlv-2, nullRemap )
-        U[4,:,:] = phiBar
+    # #Vertical re-map:
+    # if np.mod(i,4)==0 and verticallyLagrangian and not plotFromSaved :
+    #     U, tmp, tmp, tmp, tmp, tmp = setGhostNodes( U )
+    #     U[0:4,:,:] = eulerEquations.verticalRemap( U[0:4,:,:] \
+    #     , U[4,:,:], phiBar, nlv-2, nullRemap )
+    #     U[4,:,:] = phiBar
     
     if np.mod( i, np.int(np.round(saveDel/dt)) ) == 0 :
         
@@ -575,11 +578,11 @@ for i in np.arange( 0, nTimesteps+1 ) :
         
         if saveArrays or saveContours :
             U, tmp, tmp, tmp, tmp, tmp = setGhostNodes( U )
-            if VL :
-                U[0:4,:,:] = eulerEquations.verticalRemap( U[0:4,:,:] \
-                , U[4,:,:], phiBar, nlv-2, nullRemap )
-                U[4,:,:] = phiBar
-                U, tmp, tmp, tmp, tmp, tmp = setGhostNodes( U )
+            # if verticallyLagrangian :
+            #     U[0:4,:,:] = eulerEquations.verticalRemap( U[0:4,:,:] \
+            #     , U[4,:,:], phiBar, nlv-2, nullRemap )
+            #     U[4,:,:] = phiBar
+            #     U, tmp, tmp, tmp, tmp, tmp = setGhostNodes( U )
         
         if saveArrays :
             np.save( saveString \
