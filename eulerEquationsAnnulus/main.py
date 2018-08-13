@@ -247,35 +247,39 @@ if plotNodes :
 
 ###########################################################################
 
-if plotHeightCoord :
+if plotVerticalCoordinate :
     
     plt.rc( 'font', size=fsa )
     
     #Plot the coordinate transformation functions:
     
-    plt.contourf( xx, yy, sFunc(rr,thth), 20 )
+    # tmpx = ss*np.cos(thth)
+    # tmpy = ss*np.sin(thth)
+    plt.contourf( xx, yy, ss, np.int(np.round(nlv)) )
     plt.plot( xB, yB, "r-", xT, yT, "r-" )
+    plt.plot( xx.flatten(), yy.flatten(), 'r.' )
     plt.axis( 'equal' )
+    plt.axis( [-15000,15000,innerRadius-1000,outerRadius+1000] )
     tmp = plt.colorbar()
     tmp.ax.tick_params( labelsize=fsc )
     plt.title( 's(r,th)', fontsize=fst )
     plt.show()
     
-    plt.contourf( xx, yy, dsdthAll, 20 )
-    plt.plot( xB, yB, "r-", xT, yT, "r-" )
-    plt.axis( 'equal' )
-    tmp = plt.colorbar()
-    tmp.ax.tick_params( labelsize=fsc )
-    plt.title( 'ds/dth', fontsize=fst )
-    plt.show()
-    
-    plt.contourf( xx, yy, dsdrAll, 20 )
-    plt.plot( xB, yB, "r-", xT, yT, "r-" )
-    plt.axis( 'equal' )
-    tmp = plt.colorbar()
-    tmp.ax.tick_params( labelsize=fsc )
-    plt.title( 'ds/dr', fontsize=fst )
-    plt.show()
+    # plt.contourf( xx, yy, dsdthAll, 20 )
+    # plt.plot( xB, yB, "r-", xT, yT, "r-" )
+    # plt.axis( 'equal' )
+    # tmp = plt.colorbar()
+    # tmp.ax.tick_params( labelsize=fsc )
+    # plt.title( 'ds/dth', fontsize=fst )
+    # plt.show()
+    # 
+    # plt.contourf( xx, yy, dsdrAll, 20 )
+    # plt.plot( xB, yB, "r-", xT, yT, "r-" )
+    # plt.axis( 'equal' )
+    # tmp = plt.colorbar()
+    # tmp.ax.tick_params( labelsize=fsc )
+    # plt.title( 'ds/dr', fontsize=fst )
+    # plt.show()
 
 ###########################################################################
 
@@ -296,7 +300,7 @@ if plotRadii :
 
 ###########################################################################
 
-if plotNodes or plotHeightCoord or plotRadii :
+if plotNodes or plotVerticalCoordinate or plotRadii :
     
     sys.exit("\nFinished plotting.")
 
@@ -374,6 +378,13 @@ U, thetaBar, piBar, Tbar, Pbar, rhoBar, phiBar \
 , dTbarDr, drhoBarDr \
 = eulerEquations.getInitialConditions( testCase, nlv, nth, initialCondition \
 , xx, yy, kx, ky, rr, thth, innerRadius, ang1, Cp, Cv, Rd, g, Po )
+
+# plt.contourf( xx, yy, Pbar, 20 )
+# plt.colorbar()
+# plt.axis('image')
+# plt.axis([-15000,15000,innerRadius-2000, outerRadius+2000])
+# plt.show()
+# sys.exit("\ndone for now.\n")
 
 ###########################################################################
 
@@ -543,7 +554,7 @@ def plotSomething( U, t ) :
     , testCase, Dx, Dy \
     , whatToPlot, xx, yy, thth, th \
     , Rd, Po, Cp, xB, yB, xT, yT, innerRadius, outerRadius, fig \
-    , dynamicColorbar, ang1, halfWidth, g \
+    , dynamicColorbar, ang1, halfWidth, g, amp \
     , Tbar, rhoBar, thetaBar, Pbar, piBar, phiBar )
 
 ###########################################################################
@@ -556,12 +567,12 @@ et = time.time()
 
 for i in np.arange( 0, nTimesteps+1 ) :
     
-    # #Vertical re-map:
-    # if np.mod(i,4)==0 and verticallyLagrangian and not plotFromSaved :
-    #     U, tmp, tmp, tmp, tmp, tmp = setGhostNodes( U )
-    #     U[0:4,:,:] = eulerEquations.verticalRemap( U[0:4,:,:] \
-    #     , U[4,:,:], phiBar, nlv-2, nullRemap )
-    #     U[4,:,:] = phiBar
+    #Vertical re-map:
+    if np.mod(i,4)==0 and verticallyLagrangian and not plotFromSaved :
+        U, tmp, tmp, tmp, tmp, tmp = setGhostNodes( U )
+        U[0:4,:,:] = eulerEquations.verticalRemap( U[0:4,:,:] \
+        , U[4,:,:], phiBar, nlv-2, nullRemap )
+        U[4,:,:] = phiBar
     
     if np.mod( i, np.int(np.round(saveDel/dt)) ) == 0 :
         

@@ -15,15 +15,15 @@ s = s + " --clusterStrength 1"
 
 # s = s + " --verticalCoordinate pressure"
 
-# s = s + " --saveArrays"
+s = s + " --saveArrays"
 s = s + " --saveContours"
 
-# s = s + " --plotFromSaved"
+s = s + " --plotFromSaved"
 
-s = s + " --whatToPlot P"
+s = s + " --whatToPlot theta"
 s = s + " --dynamicColorbar"
 
-s = s + " --verticallyLagrangian"
+# s = s + " --verticallyLagrangian"
 
 # s = s + " --phs 5 --pol 4 --stc 9"
 # s = s + " --rks 4"
@@ -70,7 +70,7 @@ elif sys.argv[1] == "mountainWaves" :
     
 elif sys.argv[1] == "igw" :
     
-    s = s + " --tf 50 --saveDel 5"
+    s = s + " --tf 3000 --saveDel 250"
     s = s + " --halfWidth np.pi/2e2"
     s = s + " --amp 0000"
     s = s + " --innerRadius 6371000 --outerRadius 6381000"
