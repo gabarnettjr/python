@@ -22,9 +22,48 @@ verticalCoordinate = "height"
 #Choose 0, 1, 2, 3, or 4:
 refinementLevel = 1
 
-verticallyLagrangian           = False
-plotNodesAndExit               = False
-contourBackgroundStatesAndExit = False
+verticallyLagrangian = False
+saveArrays           = True
+saveContours         = True
+contourFromSaved     = False
+plotNodesAndExit     = False
+
+#Choose which variable to plot ("u", "w", "T", "rho", "phi", "P"):
+whatToPlot = "rho"
+
+#Choose either a number of contours, or a range of contours:
+contours = 20
+
+###########################################################################
+
+#Get string for saving results:
+
+saveString = "./results/" + testCase + "_" + verticalCoordinate + "_"
+
+if verticallyLagrangian:
+    saveString = saveString + "vLag" + "_"
+else:
+    saveString = saveString + "vEul" + "_"
+
+saveString = saveString + str(refinementLevel) + "/"
+
+###########################################################################
+
+if ( saveArrays ) & ( not contourFromSaved ) :
+    if os.path.exists( saveString + '*.npy' ) :
+        os.remove( saveString + '*.npy' )                 #remove old files
+    if not os.path.exists( saveString ) :
+        os.makedirs( saveString )                     #make new directories
+
+if saveContours :
+    tmp = os.listdir( os.getcwd() )
+    for item in tmp :
+        if item.endswith(".png") :
+            os.remove( os.path.join( os.getcwd(), item ) )
+
+if contourFromSaved:
+    saveArrays = False
+    saveContours = True
 
 ###########################################################################
 
@@ -84,49 +123,52 @@ else:
 #horizontal node spacing dx, and the number of vertical levels nLev:
 
 if testCase == "risingBubble":
-    left   = -5000.
-    right  = 5000.
-    bottom = 0.
-    top    = 10000.
-    dx     = 400. / 2**refinementLevel
-    nLev   = 25 * 2**refinementLevel
-    dt     = 1./4. / 2**refinementLevel
-    tf     = 1200.
+    left    = -5000.
+    right   = 5000.
+    bottom  = 0.
+    top     = 10000.
+    dx      = 400. / 2**refinementLevel
+    nLev    = 25 * 2**refinementLevel
+    dt      = 1./4. / 2**refinementLevel
+    tf      = 1200.
+    saveDel = 100
     def zSurf(x):
         return 1000. * np.sin(2.*np.pi / 10000. * x)
     def zSurfPrime(x):
         return 1000. * 2.*np.pi/10000 * np.cos(2.*np.pi / 10000. * x)
-    def thetaPrime(x, z):
-        return 2. * np.exp(-7e-7*(x**2. + (z-5000.)**2.))
+    def thetaPtb(x, z):
+        return 2. * np.exp(-1e-6*(x**2. + (z-4000.)**2.))
 elif testCase == "densityCurrent":
-    left   = -25600.
-    right  = 25600.
-    bottom = 0.
-    top    = 6400.
-    dx     = 400. / 2**refinementLevel
-    nLev   = 16 * 2**refinementLevel
-    dt     = 1./6. / 2**refinementLevel
-    tf     = 900.
+    left    = -25600.
+    right   = 25600.
+    bottom  = 0.
+    top     = 6400.
+    dx      = 400. / 2**refinementLevel
+    nLev    = 16 * 2**refinementLevel
+    dt      = 1./6. / 2**refinementLevel
+    tf      = 900.
+    saveDel = 50
     def zSurf(x):
         return np.zeros(np.shape(x))
     def zSurfPrime(x):
         return np.zeros(np.shape(x))
-    def thetaPrime(x, z):
+    def thetaPtb(x, z):
         return -20. * np.exp(-7e-7*(x**2. + (z-3000.)**2.))
 elif testCase == "inertiaGravityWaves":
-    left   = -150000.
-    right  = 150000.
-    bottom = 0.
-    top    = 10000.
-    dx     = 1000. / 2**refinementLevel
-    nLev   = 10 * 2**refinementLevel
-    dt     = 1. / 2**refinementLevel
-    tf     = 3000.
+    left    = -150000.
+    right   = 150000.
+    bottom  = 0.
+    top     = 10000.
+    dx      = 1000. / 2**refinementLevel
+    nLev    = 10 * 2**refinementLevel
+    dt      = 1./2. / 2**refinementLevel
+    tf      = 3000.
+    saveDel = 250
     def zSurf(x):
         return np.zeros(np.shape(x))
     def zSurfPrime(x):
         return np.zeros(np.shape(x))
-    def thetaPrime(x, z):
+    def thetaPtb(x, z):
         thetaC = .01
         hC = 10000.
         aC = 5000.
@@ -137,15 +179,20 @@ else:
 
 ###########################################################################
 
+t = 0.
+
 nTimesteps = np.int(np.round(tf / dt))
 
 nCol = np.int(np.round((right - left) / dx))
 
 x = np.linspace(left+dx/2, right-dx/2, nCol)
 
+zSurf = zSurf(x)
+zSurfPrime = zSurfPrime(x)
+
 ###########################################################################
 
-def getLevels(verticalCoordinate):
+def getLevels(verticalCoordinate, zSurf, top):
         
     if verticalCoordinate == "height":
         
@@ -154,19 +201,22 @@ def getLevels(verticalCoordinate):
         zz = np.zeros((nLev+2, nCol))
         
         for j in range(nCol):
-            dz = (top - zSurf(x[j])) / (top - bottom) * ds
-            zz[:,j] = np.linspace(zSurf(x[j])-dz/2, top+dz/2, nLev+2)
+            dz = (top - zSurf[j]) / (top - bottom) * ds
+            zz[:,j] = np.linspace(zSurf[j]-dz/2, top+dz/2, nLev+2)
+
+        pTop = 0.
+        A = 0.
+        B = 0.
         
     elif verticalCoordinate == "pressure":
         
-        piSurf = exnerPressure(zSurf(x))
+        piSurf = exnerPressure(zSurf)
         piTop  = exnerPressure(top)
         pSurf = Po * piSurf ** (Cp/Rd)     #hydrostatic pressure at surface
         pTop  = Po * piTop  ** (Cp/Rd)         #hydrostatic pressure at top
         sTop = pTop / Po                      #value of s on upper boundary
         ds = (1. - sTop) / nLev
         s = np.linspace(sTop-ds/2., 1.+ds/2., nLev+2)
-        s = np.flipud(s)
         ss = np.tile(s, (nCol,1)).T
         def A(s):
             return (1. - s) / (1. - sTop) * sTop
@@ -175,19 +225,37 @@ def getLevels(verticalCoordinate):
         p = A(ss) * Po + B(ss) * np.tile(pSurf,(nLev+2,1))
         pi = (p / Po) ** (Rd/Cp)
         zz = inverseExnerPressure(pi)
+        # zSurf = (zz[-2,:] + zz[-1,:]) / 2. 
+        # top = np.min((zz[0,:] + zz[1,:]) / 2.)
         
-    return s, ds, zz
+    return s, ds, zz, pTop, A, B, zSurf, top
 
 ###########################################################################
 
-s, ds, zz = getLevels(verticalCoordinate)
+s, ds, zz, pTop, A, B, zSurf, top \
+= getLevels(verticalCoordinate, zSurf, top)
+
+# for i in range(5):
+#     s, ds, zz, pTop, A, B, zSurf, top \
+#     = getLevels(verticalCoordinate, zSurf, top)
+#     plt.figure()
+#     plt.plot(x, zSurf - (zz[-1,:]+zz[-2,:])/2)
+#     plt.plot(x, top - (zz[0,:]+zz[1,:])/2.)
+#     plt.show()
+#     zSurf = (zz[-1,:] + zz[-2,:]) / 2. 
+#     top = np.min((zz[0,:] + zz[1,:]) / 2.)
+# sys.exit("done for now.")
+
+# print(np.min((zz[0,:] + zz[1,:]) / 2.))
+# print(np.max((zz[0,:] + zz[1,:]) / 2.))
+# print(top)
 
 xx, ss = np.meshgrid(x, s)
 
 if plotNodesAndExit:
     plt.figure()
     plt.plot(xx.flatten(), zz.flatten(), '.')
-    plt.plot(x, zSurf(x), 'r-')
+    plt.plot(x, zSurf, 'r-')
     plt.plot(x, top*np.ones(np.shape(x)), 'r-')
     plt.axis("image")
     plt.show()
@@ -198,63 +266,70 @@ if plotNodesAndExit:
 #Assignment of hydrostatic background states:
 thetaBar = potentialTemperature(zz)
 piBar = exnerPressure(zz)
-piPrime = np.zeros((nLev+2, nCol))
+piPtb = np.zeros((nLev+2, nCol))
 Tbar = piBar * thetaBar
-Tprime = (piBar + piPrime) * (thetaBar + thetaPrime(xx,zz)) - Tbar
+Tptb = (piBar + piPtb) * (thetaBar + thetaPtb(xx,zz)) - Tbar
 Pbar = Po * piBar ** (Cp/Rd)
-Pprime = Po * (piBar + piPrime) ** (Cp/Rd) - Pbar
+Pptb = Po * (piBar + piPtb) ** (Cp/Rd) - Pbar
 rhoBar = Pbar / Rd / Tbar
-rhoPrime = (Pbar + Pprime) / Rd / (Tbar + Tprime) - rhoBar
+rhoPtb = (Pbar + Pptb) / Rd / (Tbar + Tptb) - rhoBar
 phiBar = g * zz
 
-#Assignment of initial conditions:
+#Assignment of initial conditions.
+#U[0,:,:] : horizontal velocity
+#U[1,:,:] : vertical velocity
+#U[2,:,:] : temperature
+#U[3,:,:] : density
+#U[4,:,:] : geopotential
+#U[5,:,:] : pressure
 U = np.zeros((6, nLev+2, nCol))
-if testCase == "igw":
+if testCase == "inertiaGravityWaves":
     U[0,:,:] =  20. * np.ones((nLev+2, nCol))
-U[2,:,:] = Tprime
-U[3,:,:] = rhoPrime
+U[2,:,:] = Tptb
+U[3,:,:] = rhoPtb
 U[4,:,:] = phiBar
 
-if contourBackgroundStatesAndExit:
-    plt.figure()
-    plt.contourf(xx, zz, U[2,:,:], 20)
-    plt.axis("image")
-    plt.colorbar()
-    plt.show()
-    sys.exit("Finished contour plots.")
+# if contourBackgroundStatesAndExit:
+#     plt.figure()
+#     plt.contourf(xx, zz, U[2,:,:], 20)
+#     plt.axis("image")
+#     plt.colorbar()
+#     plt.show()
+#     sys.exit("Finished contour plots.")
 
 ###########################################################################
 
 #All of the polyharmonic spline radial basis function weights:
 
-phs = 11
-pol = 5
-stc = 11
-alp = 2.**-10.
+phs = 11                                 #lateral PHS exponent (odd number)
+pol = 5                         #highest degree polynomial in lateral basis
+stc = 11                                              #lateral stencil size
+alp = 2.**-10. * 300.                      #lateral dissipation coefficient
 Wa   = phs1.getPeriodicDM(period=right-left, x=x, X=x, m=1 \
 , phsDegree=phs, polyDegree=pol, stencilSize=stc)
 Whva = phs1.getPeriodicDM(period=right-left, x=x, X=x, m=pol+1 \
 , phsDegree=phs, polyDegree=pol, stencilSize=stc)
 Whva = alp * dx**pol * Whva
-phs = 5
-pol = 3
-stc = 7
-alp = -2.**-7.
+
+phs = 7                                              #vertical PHS exponent
+pol = 3                        #highest degree polynomial in vertical basis
+stc = 7                                              #vertical stencil size
+alp = -2.**-7. * 300.                     #vertical dissipation coefficient
 Ws   = phs1.getDM(x=s, X=s,       m=1 \
 , phsDegree=phs, polyDegree=pol, stencilSize=stc)
 Whvs = phs1.getDM(x=s, X=s[1:-1], m=pol+1 \
 , phsDegree=phs, polyDegree=pol, stencilSize=stc)
 Whvs = alp * ds**pol * Whvs
 
-wIbot = phs1.getWeights(0.,   s[0:stc],   0, phs, pol)
-wEbot = phs1.getWeights(s[0], s[1:stc+1], 0, phs, pol)
-wDbot = phs1.getWeights(0.,   s[0:stc],   1, phs, pol)
-wHbot = phs1.getWeights(0.,   s[1:stc+1], 0, phs, pol)
+wIbot = phs1.getWeights((s[0]+s[1])/2.,   s[0:stc],        0, phs,   pol)
+wEbot = phs1.getWeights(s[0],             s[1:stc+1],      0, phs,   pol)
+wDbot = phs1.getWeights((s[0]+s[1])/2.,   s[0:stc],        1, phs-2, pol)
+wHbot = phs1.getWeights((s[0]+s[1])/2.,   s[1:stc+1],      0, phs,   pol)
 
-wItop = phs1.getWeights(top,   s[-1:-1-stc:-1], 0, phs, pol)
-wEtop = phs1.getWeights(s[-1], s[-2:-2-stc:-1], 0, phs, pol)
-wDtop = phs1.getWeights(top,   s[-1:-1-stc:-1], 1, phs, pol)
-wHtop = phs1.getWeights(s[-1], s[-2:-2-stc:-1], 0, phs, pol)
+wItop = phs1.getWeights((s[-2]+s[-1])/2., s[-1:-1-stc:-1], 0, phs,   pol)
+wEtop = phs1.getWeights(s[-1],            s[-2:-2-stc:-1], 0, phs,   pol)
+wDtop = phs1.getWeights((s[-2]+s[-1])/2., s[-1:-1-stc:-1], 1, phs-2, pol)
+wHtop = phs1.getWeights(s[-1],            s[-2:-2-stc:-1], 0, phs,   pol)
 
 def Da(U):
     return Wa.dot(U.T).T
@@ -269,7 +344,7 @@ def HV(U):
 
 #Unit tangent and unit normal vectors along bottom and top boundaries:
 
-TzBot = zSurfPrime(x)
+TzBot = zSurfPrime
 TxBot = np.ones((nCol))
 tmp = np.sqrt(TxBot**2 + TzBot**2)
 TxBot = TxBot / tmp
@@ -286,6 +361,92 @@ NzTop = np.ones((stc-1, nCol))
 
 TxTop = np.ones((stc, nCol))
 TzTop = np.zeros((stc, nCol))
+
+###########################################################################
+
+if saveContours :
+    if testCase == "inertiaGravityWaves":
+        fig = plt.figure(figsize = (18,3))
+    else:
+        fig = plt.figure(figsize = (18,14))
+
+def contourSomething(U, t):
+    
+    if whatToPlot == "u":
+        tmp = U[0,:,:]
+    elif whatToPlot == "w":
+        tmp = U[1,:,:]
+    elif whatToPlot == "T":
+        # tmp = Tbar
+        tmp = U[2,:,:]
+    elif whatToPlot == "rho":
+        # tmp = rhoBar
+        tmp = U[3,:,:]
+    elif whatToPlot == "phi":
+        tmp = U[4,:,:] - phiBar
+    elif whatToPlot == "P":
+        # tmp = Pbar
+        tmp = U[5,:,:]
+    elif whatToPlot == "theta":
+        tmp = (U[2,:,:]+Tbar) / ((U[5,:,:]+Pbar)/Po)**(Rd/Cp) - thetaBar
+    elif whatToPlot == "pi":
+        tmp = ( (U[5,:,:]+Pbar) / Po ) ** (Rd/Cp) - piBar
+    else:
+        raise ValueError("Invalid whatToPlot string.")
+    
+    zz = U[4,:,:] / g
+    
+    plt.contourf(xx, zz, tmp, contours)
+    if testCase != "inertiaGravityWaves":
+        plt.axis("image")
+    plt.colorbar(orientation='vertical')
+    fig.savefig( '{0:04d}'.format(np.int(np.round(t)+1e-12)) \
+    + '.png', bbox_inches = 'tight' )                 #save figure as a png
+    plt.clf()
+
+###########################################################################
+
+if verticallyLagrangian:
+    if verticalCoordinate == "height":
+        V = np.zeros((4, nLev+2, nCol ))
+    else:
+        V = np.zeros((5, nLev+2, nCol))
+
+def verticalRemap( U, z, Z, V ) : #used only in vertically Lagrangian
+    """
+    Interpolate columns of U from z to Z
+    nLev is the number of interior levels of U
+    """
+    z = np.tile( z, (np.shape(U)[0],1,1) )
+    Z = np.tile( Z, (np.shape(U)[0],1,1) )
+    #quadratic on bottom:
+    z0 = z[:,0,:]
+    z1 = z[:,1,:]
+    z2 = z[:,2,:]
+    ZZ = Z[:,0,:]
+    V[:,0,:] = \
+      ( ZZ - z1 ) * ( ZZ - z2 ) * U[:,0,:] / ( z0 - z1 ) / ( z0 - z2 ) \
+    + ( ZZ - z0 ) * ( ZZ - z2 ) * U[:,1,:] / ( z1 - z0 ) / ( z1 - z2 ) \
+    + ( ZZ - z0 ) * ( ZZ - z1 ) * U[:,2,:] / ( z2 - z0 ) / ( z2 - z1 )
+    #quadratic on interior:
+    z0 = z[:,0:nLev+0,:]
+    z1 = z[:,1:nLev+1,:]
+    z2 = z[:,2:nLev+2,:]
+    ZZ = Z[:,1:nLev+1,:]
+    V[:,1:nLev+1,:] = \
+      ( ZZ - z1 ) * ( ZZ - z2 ) * U[:,0:nLev+0,:] / ( z0 - z1 ) / ( z0 - z2 ) \
+    + ( ZZ - z0 ) * ( ZZ - z2 ) * U[:,1:nLev+1,:] / ( z1 - z0 ) / ( z1 - z2 ) \
+    + ( ZZ - z0 ) * ( ZZ - z1 ) * U[:,2:nLev+2,:] / ( z2 - z0 ) / ( z2 - z1 )
+    #quadratic on top:
+    z0 = z[:,nLev-1,:]
+    z1 = z[:,nLev+0,:]
+    z2 = z[:,nLev+1,:]
+    ZZ = Z[:,nLev+1,:]
+    V[:,nLev+1,:] = \
+      ( ZZ - z1 ) * ( ZZ - z2 ) * U[:,nLev-1,:] / ( z0 - z1 ) / ( z0 - z2 ) \
+    + ( ZZ - z0 ) * ( ZZ - z2 ) * U[:,nLev+0,:] / ( z1 - z0 ) / ( z1 - z2 ) \
+    + ( ZZ - z0 ) * ( ZZ - z1 ) * U[:,nLev+1,:] / ( z2 - z0 ) / ( z2 - z1 )
+    return V
 
 ###########################################################################
 
@@ -313,7 +474,7 @@ def fastBackgroundStates(phi):
 def setGhostNodes(U):
     
     #Enforce phi=g*z on bottom boundary:
-    U[4,0,:] = (g*zSurf(x) - wIbot[1:stc].dot(U[4,1:stc,:])) / wIbot[0]
+    U[4,0,:] = (g*zSurf - wIbot[1:stc].dot(U[4,1:stc,:])) / wIbot[0]
     
     #Enforce phi=g*z on top boundary:
     U[4,-1,:] = (g*top - wItop[1:stc].dot(U[4,-2:-1-stc:-1,:])) / wItop[0]
@@ -329,12 +490,13 @@ def setGhostNodes(U):
     uN = U[0,1:stc,:] * NxBot + U[1,1:stc,:] * NzBot
     uN = -wIbot[1:stc].dot(uN) / wIbot[0]
     
-    #use uT and uN to get (u,w) on bottom ghost nodes, then get (u,w) on
-    #top ghost nodes:
+    #use uT and uN to get (u,w) on bottom ghost nodes:
     U[0,0,:] = uT*TxBot[0,:] + uN*NxBot[0,:]
     U[1,0,:] = uT*TzBot[0,:] + uN*NzBot[0,:]
-    U[0,-1,:] = wEtop.dot(U[0,-2:-(stc+2):-1,:])
-    U[1,-1,:] = -wItop[1:stc].dot(U[1,-2:-(stc+1):-1,:]) / wItop[0]
+    
+    #get (u,w) on top ghost nodes (easier because it's flat):
+    U[0,-1,:] = wEtop.dot(U[0,-2:-2-stc:-1,:])
+    U[1,-1,:] = -wItop[1:stc].dot(U[1,-2:-1-stc:-1,:]) / wItop[0]
     
     #get pressure on interior nodes using the equation of state:
     U[5,1:-1,:] = ((rhoBar+U[3,:,:]) * Rd * (Tbar+U[2,:,:]) - Pbar)[1:-1,:]
@@ -368,24 +530,45 @@ def setGhostNodes(U):
     #extrapolate density to bottom and top ghost nodes using EOS:
     U[3,0,:] = (Pbar[0,:]+U[5,0,:]) / Rd / (Tbar[0,:]+U[2,0,:]) \
     - rhoBar[0,:]
-    U[3,-1,:] = (Pbar[-1,:]+U[5,-1,:]) / Rd / (Tbar[0,:]+U[2,-1,:]) \
+    U[3,-1,:] = (Pbar[-1,:]+U[5,-1,:]) / Rd / (Tbar[-1,:]+U[2,-1,:]) \
     - rhoBar[-1,:]
     
-    return U
+    return U, Pbar, rhoBar, Tbar, drhoBarDz, dTbarDz
 
 ###########################################################################
 
+#Initial arrays of zeros for storing Runge-Kutta sub-steps.  If we are
+#using RK3, then we need only two arrays, but for RK4 we need 4.  Note
+#that dUdt and q1 are two different names for the same array.
+
+rks = 3                           #hard-coded: number of Runge-Kutta stages
+
+dUdt = np.zeros((6, nLev+2, nCol))
+q1   = dUdt
+q2   = np.zeros((6, nLev+2, nCol))
+
+if rks == 4:
+    q3 = np.zeros((6, nLev+2, nCol))
+    q4 = np.zeros((6, nLev+2, nCol))
+
+###########################################################################
+
+#This describes the RHS of the system of ODEs in time that will be solved:
+
 def odefun(t, U, dUdt):
     
-    U = setGhostNodes(U)
+    #Preliminaries:
+    
+    U, Pbar, rhoBar, Tbar, drhoBarDz, dTbarDz = setGhostNodes(U)
     
     rhoInv = 1. / (rhoBar + U[3,:,:])
-    dPds = Ds(U[5,:,:])
-    duda = Da(U[0,:,:])
-    duds = Ds(U[0,:,:])
-    dwda = Da(U[1,:,:])
-    dwds = Ds(U[1,:,:])
+    duda   = Da(U[0,:,:])
+    duds   = Ds(U[0,:,:])
+    dwda   = Da(U[1,:,:])
+    dwds   = Ds(U[1,:,:])
     dphids = Ds(U[4,:,:])
+    dPds   = Ds(U[5,:,:])
+    
     dsdx = -Da(U[4,:,:]) / dphids
     dsdz = g / dphids
     divU = (duda + duds * dsdx) + (dwds * dsdz)
@@ -397,23 +580,29 @@ def odefun(t, U, dUdt):
         if verticalCoordinate == "height":
             sDot = uDotGradS
         else:
-            sDot = getSdot(U)
+            raise ValueError("Still need to add this part, which will \
+require vertical integration with midpoint rule.")
     
-    dUdt[0,:,:] = (-U[0,:,:] * duda - sDot * duds \
+    #Main part:
+    
+    dUdt[0,1:-1,:] = (-U[0,:,:] * duda - sDot * duds \
     - rhoInv * (Da(U[5,:,:]) + dPds * dsdx))[1:-1,:] \
     + HV(U[0,:,:])
     
-    dUdt[1,:,:] = (-U[0,:,:] * dwda - sDot * dwds \
+    dUdt[1,1:-1,:] = (-U[0,:,:] * dwda - sDot * dwds \
     - rhoInv * (dPds * dsdz) - U[3,:,:] * g * rhoInv)[1:-1,:] \
     + HV(U[1,:,:])
 
-    dUdt[2,:,:] = (-U[0,:,:] * Da(U[2,:,:]) - sDot * Ds(U[2,:,:]) \
+    dUdt[2,1:-1,:] = (-U[0,:,:] * Da(U[2,:,:]) - sDot * Ds(U[2,:,:]) \
     - U[1,:,:] * dTbarDz - Rd/Cv * (Tbar + U[2,:,:]) * divU)[1:-1,:] \
     + HV(U[2,:,:])
 
-    dUdt[3,:,:] = (-U[0,:,:] * Da(U[3,:,:]) - sDot * Ds(U[3,:,:]) \
+    dUdt[3,1:-1,:] = (-U[0,:,:] * Da(U[3,:,:]) - sDot * Ds(U[3,:,:]) \
     - U[1,:,:] * drhoBarDz - (rhoBar + U[3,:,:]) * divU)[1:-1,:] \
     + HV(U[3,:,:])
+
+    dUdt[4,1:-1,:] = ((uDotGradS - sDot) * dphids)[1:-1,:] \
+    + HV(U[4,:,:] - phiBar)
     
     return dUdt
 
@@ -421,8 +610,74 @@ def odefun(t, U, dUdt):
 
 #Main time-stepping loop:
 
-# for i in range(1, nTimesteps+1):
+et = time.time()
+
+for i in np.arange( 0, nTimesteps+1 ) :
     
+    #Vertical re-map:
+    if np.mod(i,4)==0 and verticallyLagrangian and not contourFromSaved :
+        U = setGhostNodes(U)[0]
+        if verticalCoordinate == "height":
+            U[0:4,:,:] = verticalRemap(U[0:4,:,:], U[4,:,:], phiBar, V)
+            U[4,:,:] = phiBar
+        else:
+            integrand = - (rhoBar+U[3,:,:]) * Ds(U[4,:,:])
+            integrand = (integrand[0:-1,:] + integrand[1:,:]) / 2.
+            integrand = integrand[0:-1,:] - integrand[1:,:]
+            tmp = pTop * np.ones((nCol))
+            pHydro = np.zeros((nLev+1, nCol))
+            pHydro[-1,:] = tmp
+            for j in np.arange(nLev-1, -1, -1):
+                tmp = tmp + integrand[j] * ds
+                pHydro[j,:] = tmp.copy()
+            pHydroSurf = pHydro[0,:]
+            pHydro = np.vstack((3./2.*pHydro[0,:] - 1./2.*pHydro[1,:] \
+            , (pHydro[0:-1,:] + pHydro[1:,:])/2. \
+            , 3./2.*pHydro[-1,:] - 1./2.*pHydro[-2,:]))
+            
+            pHydroNew = A(ss) * Po \
+            + B(ss) * np.tile(pHydroSurf, (nLev+2, 1))
+            U[0:5,:,:] = verticalRemap(U[0:5,:,:], pHydro, pHydroNew, V)
+            U[3,:,:] = -Ds(pHydroNew) / Ds(U[4,:,:]) - rhoBar
     
+    if np.mod( i, np.int(np.round(saveDel/dt)) ) == 0 :
+        
+        print( "t = {0:5d} | et = {1:6.2f} | maxAbsRho = {2:.2e}" \
+        . format( np.int(np.round(t)) \
+        , time.time()-et \
+        , np.max(np.abs(U[3,:,:])) ) )
+        
+        et = time.time()
+        
+        if contourFromSaved :
+            U[0:5,:,:] = np.load( saveString \
+            + '{0:04d}'.format(np.int(np.round(t))) + '.npy' )
+        
+        if saveArrays or saveContours :
+            U = setGhostNodes(U)[0]
+            # if verticallyLagrangian :
+            #     U[0:4,:,:] = verticalRemap( U[0:4,:,:], U[4,:,:], phiBar \
+            #     , V )
+            #     U[4,:,:] = phiBar
+            #     U = setGhostNodes(U)[0]
+        
+        if saveArrays :
+            np.save( saveString \
+            + '{0:04d}'.format(np.int(np.round(t))) + '.npy', U[0:5,:,:] )
+        
+        if saveContours :
+            contourSomething( U, t )
+    
+    if contourFromSaved :
+        t = t + dt
+    else :
+        if rks == 3:
+            t, U = rk.rk3(t, U, odefun, dt, q1, q2)
+        elif rks == 4:
+            t, U = rk.rk4(t, U, odefun, dt, q1, q2, q3, q4)
+        else:
+            raise ValueError("Please use RK3 or RK4 for this problem.  \
+RK1 and RK2 are unstable in time, since their stability regions have no \
+imaginary axis coverage.")
 
 ###########################################################################
