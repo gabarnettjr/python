@@ -14,22 +14,24 @@ from gab.nonhydro import common
 #to modify when running the code, unless they want to add a new test case.
 
 #Choose "risingBubble", "densityCurrent", or "inertiaGravityWaves":
-testCase = "risingBubble"
+testCase = "inertiaGravityWaves"
 
 #Choose "pressure" or "height":
-verticalCoordinate = "height"
+verticalCoordinate   = "pressure"
+verticallyLagrangian = True
 
 #Choose 0, 1, 2, 3, or 4:
 refinementLevel = 1
 
-verticallyLagrangian = False
-saveArrays           = True
-saveContours         = True
-contourFromSaved     = False
-plotNodesAndExit     = False
+#Switches to control what happens:
+saveArrays       = True
+saveContours     = True
+contourFromSaved = False
+plotNodesAndExit = False
 
-#Choose which variable to plot ("u", "w", "T", "rho", "phi", "P"):
-whatToPlot = "rho"
+#Choose which variable to plot:
+#("u", "w", "T", "rho", "phi", "P", "theta", "pi", "phi")
+whatToPlot = "theta"
 
 #Choose either a number of contours, or a range of contours:
 contours = 20
@@ -129,13 +131,15 @@ if testCase == "risingBubble":
     top     = 10000.
     dx      = 400. / 2**refinementLevel
     nLev    = 25 * 2**refinementLevel
-    dt      = 1./4. / 2**refinementLevel
+    dt      = 1./2. / 2**refinementLevel
     tf      = 1200.
     saveDel = 100
     def zSurf(x):
-        return 1000. * np.sin(2.*np.pi / 10000. * x)
+        return np.zeros(np.shape(x))
+        # return 1000. * np.sin(2.*np.pi / 10000. * x)
     def zSurfPrime(x):
-        return 1000. * 2.*np.pi/10000 * np.cos(2.*np.pi / 10000. * x)
+        return np.zeros(np.shape(x))
+        # return 1000. * 2.*np.pi/10000 * np.cos(2.*np.pi / 10000. * x)
     def thetaPtb(x, z):
         return 2. * np.exp(-1e-6*(x**2. + (z-4000.)**2.))
 elif testCase == "densityCurrent":
@@ -145,7 +149,7 @@ elif testCase == "densityCurrent":
     top     = 6400.
     dx      = 400. / 2**refinementLevel
     nLev    = 16 * 2**refinementLevel
-    dt      = 1./6. / 2**refinementLevel
+    dt      = 1./3. / 2**refinementLevel
     tf      = 900.
     saveDel = 50
     def zSurf(x):
@@ -161,7 +165,7 @@ elif testCase == "inertiaGravityWaves":
     top     = 10000.
     dx      = 1000. / 2**refinementLevel
     nLev    = 10 * 2**refinementLevel
-    dt      = 1./2. / 2**refinementLevel
+    dt      = 1./1. / 2**refinementLevel
     tf      = 3000.
     saveDel = 250
     def zSurf(x):
@@ -169,6 +173,7 @@ elif testCase == "inertiaGravityWaves":
     def zSurfPrime(x):
         return np.zeros(np.shape(x))
     def thetaPtb(x, z):
+        # return np.zeros(np.shape(x))
         thetaC = .01
         hC = 10000.
         aC = 5000.
@@ -225,8 +230,8 @@ def getLevels(verticalCoordinate, zSurf, top):
         p = A(ss) * Po + B(ss) * np.tile(pSurf,(nLev+2,1))
         pi = (p / Po) ** (Rd/Cp)
         zz = inverseExnerPressure(pi)
-        # zSurf = (zz[-2,:] + zz[-1,:]) / 2. 
-        # top = np.min((zz[0,:] + zz[1,:]) / 2.)
+        zSurf = inverseExnerPressure(piSurf)
+        top = inverseExnerPressure(piTop)
         
     return s, ds, zz, pTop, A, B, zSurf, top
 
@@ -287,7 +292,7 @@ if testCase == "inertiaGravityWaves":
     U[0,:,:] =  20. * np.ones((nLev+2, nCol))
 U[2,:,:] = Tptb
 U[3,:,:] = rhoPtb
-U[4,:,:] = phiBar
+U[4,:,:] = phiBar.copy()
 
 # if contourBackgroundStatesAndExit:
 #     plt.figure()
@@ -304,32 +309,35 @@ U[4,:,:] = phiBar
 phs = 11                                 #lateral PHS exponent (odd number)
 pol = 5                         #highest degree polynomial in lateral basis
 stc = 11                                              #lateral stencil size
-alp = 2.**-10. * 300.                      #lateral dissipation coefficient
+alp = 2.**-14. * 300.                      #lateral dissipation coefficient
 Wa   = phs1.getPeriodicDM(period=right-left, x=x, X=x, m=1 \
 , phsDegree=phs, polyDegree=pol, stencilSize=stc)
 Whva = phs1.getPeriodicDM(period=right-left, x=x, X=x, m=pol+1 \
 , phsDegree=phs, polyDegree=pol, stencilSize=stc)
 Whva = alp * dx**pol * Whva
 
-phs = 7                                              #vertical PHS exponent
+phs = 5                                              #vertical PHS exponent
 pol = 3                        #highest degree polynomial in vertical basis
 stc = 7                                              #vertical stencil size
-alp = -2.**-7. * 300.                     #vertical dissipation coefficient
+if verticalCoordinate == "pressure":
+    alp = -2.**-20. * 300.                #vertical dissipation coefficient
+else:
+    alp = -2.**-10. * 300.           #much larger in height coordinate case
 Ws   = phs1.getDM(x=s, X=s,       m=1 \
 , phsDegree=phs, polyDegree=pol, stencilSize=stc)
 Whvs = phs1.getDM(x=s, X=s[1:-1], m=pol+1 \
 , phsDegree=phs, polyDegree=pol, stencilSize=stc)
 Whvs = alp * ds**pol * Whvs
 
-wIbot = phs1.getWeights((s[0]+s[1])/2.,   s[0:stc],        0, phs,   pol)
-wEbot = phs1.getWeights(s[0],             s[1:stc+1],      0, phs,   pol)
-wDbot = phs1.getWeights((s[0]+s[1])/2.,   s[0:stc],        1, phs-2, pol)
-wHbot = phs1.getWeights((s[0]+s[1])/2.,   s[1:stc+1],      0, phs,   pol)
+wIbot = phs1.getWeights((s[0]+s[1])/2.,   s[0:stc],        0, phs, pol)
+wEbot = phs1.getWeights(s[0],             s[1:stc+1],      0, phs, pol)
+wDbot = phs1.getWeights((s[0]+s[1])/2.,   s[0:stc],        1, phs, pol)
+wHbot = phs1.getWeights((s[0]+s[1])/2.,   s[1:stc+1],      0, phs, pol)
 
-wItop = phs1.getWeights((s[-2]+s[-1])/2., s[-1:-1-stc:-1], 0, phs,   pol)
-wEtop = phs1.getWeights(s[-1],            s[-2:-2-stc:-1], 0, phs,   pol)
-wDtop = phs1.getWeights((s[-2]+s[-1])/2., s[-1:-1-stc:-1], 1, phs-2, pol)
-wHtop = phs1.getWeights(s[-1],            s[-2:-2-stc:-1], 0, phs,   pol)
+wItop = phs1.getWeights((s[-2]+s[-1])/2., s[-1:-1-stc:-1], 0, phs, pol)
+wEtop = phs1.getWeights(s[-1],            s[-2:-2-stc:-1], 0, phs, pol)
+wDtop = phs1.getWeights((s[-2]+s[-1])/2., s[-1:-1-stc:-1], 1, phs, pol)
+wHtop = phs1.getWeights(s[-1],            s[-2:-2-stc:-1], 0, phs, pol)
 
 def Da(U):
     return Wa.dot(U.T).T
@@ -383,13 +391,16 @@ def contourSomething(U, t):
         # tmp = rhoBar
         tmp = U[3,:,:]
     elif whatToPlot == "phi":
+        # tmp = phiBar
         tmp = U[4,:,:] - phiBar
     elif whatToPlot == "P":
         # tmp = Pbar
         tmp = U[5,:,:]
     elif whatToPlot == "theta":
+        # tmp = thetaBar
         tmp = (U[2,:,:]+Tbar) / ((U[5,:,:]+Pbar)/Po)**(Rd/Cp) - thetaBar
     elif whatToPlot == "pi":
+        # tmp = piBar
         tmp = ( (U[5,:,:]+Pbar) / Po ) ** (Rd/Cp) - piBar
     else:
         raise ValueError("Invalid whatToPlot string.")
@@ -472,66 +483,130 @@ def fastBackgroundStates(phi):
 ###########################################################################
 
 def setGhostNodes(U):
+
+    if verticalCoordinate == "height":
     
-    #Enforce phi=g*z on bottom boundary:
-    U[4,0,:] = (g*zSurf - wIbot[1:stc].dot(U[4,1:stc,:])) / wIbot[0]
-    
-    #Enforce phi=g*z on top boundary:
-    U[4,-1,:] = (g*top - wItop[1:stc].dot(U[4,-2:-1-stc:-1,:])) / wItop[0]
-    
-    #Get background states on possibly changing geopotential levels:
-    Pbar, rhoBar, Tbar, drhoBarDz, dTbarDz = fastBackgroundStates(U[4,:,:])
-    
-    #extrapolate tangent velocity uT to bottom ghost nodes:
-    uT = U[0,1:stc+1,:] * TxBot + U[1,1:stc+1,:] * TzBot
-    uT = wEbot.dot(uT)
-    
-    #get normal velocity uN on bottom ghost nodes:
-    uN = U[0,1:stc,:] * NxBot + U[1,1:stc,:] * NzBot
-    uN = -wIbot[1:stc].dot(uN) / wIbot[0]
-    
-    #use uT and uN to get (u,w) on bottom ghost nodes:
-    U[0,0,:] = uT*TxBot[0,:] + uN*NxBot[0,:]
-    U[1,0,:] = uT*TzBot[0,:] + uN*NzBot[0,:]
-    
-    #get (u,w) on top ghost nodes (easier because it's flat):
-    U[0,-1,:] = wEtop.dot(U[0,-2:-2-stc:-1,:])
-    U[1,-1,:] = -wItop[1:stc].dot(U[1,-2:-1-stc:-1,:]) / wItop[0]
-    
-    #get pressure on interior nodes using the equation of state:
-    U[5,1:-1,:] = ((rhoBar+U[3,:,:]) * Rd * (Tbar+U[2,:,:]) - Pbar)[1:-1,:]
-    
-    #set pressure on bottom ghost nodes:
-    dPda = Wa.dot(wHbot.dot(U[5,1:stc+1,:]).T).T
-    rho = wHbot.dot(U[3,1:stc+1,:])
-    dphida = Wa.dot(wIbot.dot(U[4,0:stc,:]).T).T
-    dphids = wDbot.dot(U[4,0:stc,:])
-    dsdx = -dphida / dphids
-    dsdz = g / dphids
-    RHS = -rho * g * NzBot[0,:] - dPda * NxBot[0,:]
-    RHS = RHS / (NxBot[0,:] * dsdx + NzBot[0,:] * dsdz)
-    U[5,0,:] = (RHS - wDbot[1:stc].dot(U[5,1:stc,:])) / wDbot[0]
-    
-    #set pressure on top ghost nodes:
-    dPda = Wa.dot(wHtop.dot(U[5,-2:-2-stc:-1,:]).T).T
-    rho = wHtop.dot(U[3,-2:-2-stc:-1,:])
-    dphida = Wa.dot(wItop.dot(U[4,-1:-1-stc:-1,:]).T).T
-    dphids = wDtop.dot(U[4,-1:-1-stc:-1,:])
-    dsdx = -dphida / dphids
-    dsdz = g / dphids
-    RHS = -rho * g * NzTop[0,:] - dPda * NxTop[0,:]
-    RHS = RHS / (NxTop[0,:] * dsdx + NzTop[0,:] * dsdz)
-    U[5,-1,:] = (RHS - wDtop[1:stc].dot(U[5,-2:-1-stc:-1,:])) / wDtop[0]
-    
-    #extrapolate temperature to bottom and top ghost nodes:
-    U[2,0,:] = wEbot.dot(U[2,1:stc+1,:])
-    U[2,-1,:] = wEtop.dot(U[2,-2:-(stc+2):-1,:])
-    
-    #extrapolate density to bottom and top ghost nodes using EOS:
-    U[3,0,:] = (Pbar[0,:]+U[5,0,:]) / Rd / (Tbar[0,:]+U[2,0,:]) \
-    - rhoBar[0,:]
-    U[3,-1,:] = (Pbar[-1,:]+U[5,-1,:]) / Rd / (Tbar[-1,:]+U[2,-1,:]) \
-    - rhoBar[-1,:]
+        #Enforce phi=g*z on bottom boundary:
+        U[4,0,:] = (g*zSurf - wIbot[1:stc].dot(U[4,1:stc,:])) / wIbot[0]
+        
+        #Enforce phi=g*z on top boundary:
+        U[4,-1,:] = (g*top - wItop[1:stc].dot(U[4,-2:-1-stc:-1,:])) / wItop[0]
+        
+        #Get background states on possibly changing geopotential levels:
+        Pbar, rhoBar, Tbar, drhoBarDz, dTbarDz = fastBackgroundStates(U[4,:,:])
+        
+        #extrapolate tangent velocity uT to bottom ghost nodes:
+        uT = U[0,1:stc+1,:] * TxBot + U[1,1:stc+1,:] * TzBot
+        uT = wEbot.dot(uT)
+        
+        #get normal velocity uN on bottom ghost nodes:
+        uN = U[0,1:stc,:] * NxBot + U[1,1:stc,:] * NzBot
+        uN = -wIbot[1:stc].dot(uN) / wIbot[0]
+        
+        #use uT and uN to get (u,w) on bottom ghost nodes:
+        U[0,0,:] = uT*TxBot[0,:] + uN*NxBot[0,:]
+        U[1,0,:] = uT*TzBot[0,:] + uN*NzBot[0,:]
+        
+        #get (u,w) on top ghost nodes (easier because it's flat):
+        U[0,-1,:] = wEtop.dot(U[0,-2:-2-stc:-1,:])
+        U[1,-1,:] = -wItop[1:stc].dot(U[1,-2:-1-stc:-1,:]) / wItop[0]
+        
+        #get pressure on interior nodes using the equation of state:
+        U[5,1:-1,:] = ((rhoBar+U[3,:,:]) * Rd * (Tbar+U[2,:,:]) - Pbar)[1:-1,:]
+        
+        #set pressure on bottom ghost nodes:
+        dPda = Wa.dot(wHbot.dot(U[5,1:stc+1,:]).T).T
+        rho = wHbot.dot(U[3,1:stc+1,:])
+        dphida = Wa.dot(wIbot.dot(U[4,0:stc,:]).T).T
+        dphids = wDbot.dot(U[4,0:stc,:])
+        dsdx = -dphida / dphids
+        dsdz = g / dphids
+        RHS = -rho * g * NzBot[0,:] - dPda * NxBot[0,:]
+        RHS = RHS / (NxBot[0,:] * dsdx + NzBot[0,:] * dsdz)
+        U[5,0,:] = (RHS - wDbot[1:stc].dot(U[5,1:stc,:])) / wDbot[0]
+        
+        #set pressure on top ghost nodes:
+        dPda = Wa.dot(wHtop.dot(U[5,-2:-2-stc:-1,:]).T).T
+        rho = wHtop.dot(U[3,-2:-2-stc:-1,:])
+        dphida = Wa.dot(wItop.dot(U[4,-1:-1-stc:-1,:]).T).T
+        dphids = wDtop.dot(U[4,-1:-1-stc:-1,:])
+        dsdx = -dphida / dphids
+        dsdz = g / dphids
+        RHS = -rho * g * NzTop[0,:] - dPda * NxTop[0,:]
+        RHS = RHS / (NxTop[0,:] * dsdx + NzTop[0,:] * dsdz)
+        U[5,-1,:] = (RHS - wDtop[1:stc].dot(U[5,-2:-1-stc:-1,:])) / wDtop[0]
+        
+        #extrapolate temperature to bottom and top ghost nodes:
+        U[2,0,:] = wEbot.dot(U[2,1:stc+1,:])
+        U[2,-1,:] = wEtop.dot(U[2,-2:-(stc+2):-1,:])
+        
+        #extrapolate density to bottom and top ghost nodes using EOS:
+        U[3,0,:] = (Pbar[0,:]+U[5,0,:]) / Rd / (Tbar[0,:]+U[2,0,:]) \
+        - rhoBar[0,:]
+        U[3,-1,:] = (Pbar[-1,:]+U[5,-1,:]) / Rd / (Tbar[-1,:]+U[2,-1,:]) \
+        - rhoBar[-1,:]
+
+    else:
+        
+        #Enforce phi=g*z on bottom boundary:
+        U[4,-1,:] = (g*zSurf - wItop[1:stc].dot(U[4,-2:-1-stc:-1,:])) / wItop[0]
+        
+        #Enforce phi=g*z on top boundary:
+        U[4,0,:] = (g*top - wIbot[1:stc].dot(U[4,1:stc,:])) / wIbot[0]
+        
+        #Get background states on possibly changing geopotential levels:
+        Pbar, rhoBar, Tbar, drhoBarDz, dTbarDz = fastBackgroundStates(U[4,:,:])
+        
+        #extrapolate tangent velocity uT to bottom ghost nodes:
+        uT = U[0,-2:-stc-2:-1,:] * TxBot + U[1,-2:-stc-2:-1,:] * TzBot
+        uT = wEbot.dot(uT)
+        
+        #get normal velocity uN on bottom ghost nodes:
+        uN = U[0,-2:-1-stc:-1,:] * NxBot + U[1,-2:-1-stc:-1,:] * NzBot
+        uN = -wItop[1:stc].dot(uN) / wItop[0]
+        
+        #use uT and uN to get (u,w) on bottom ghost nodes:
+        U[0,-1,:] = uT*TxBot[0,:] + uN*NxBot[0,:]
+        U[1,-1,:] = uT*TzBot[0,:] + uN*NzBot[0,:]
+        
+        #get (u,w) on top ghost nodes (easier because it's flat):
+        U[0,0,:] = wEbot.dot(U[0,1:stc+1,:])
+        U[1,0,:] = -wIbot[1:stc].dot(U[1,1:stc,:]) / wIbot[0]
+        
+        #get pressure on interior nodes using the equation of state:
+        U[5,1:-1,:] = ((rhoBar+U[3,:,:]) * Rd * (Tbar+U[2,:,:]) - Pbar)[1:-1,:]
+        
+        #set pressure on bottom ghost nodes:
+        dPda = Wa.dot(wHtop.dot(U[5,-2:-2-stc:-1,:]).T).T
+        rho = wHtop.dot(U[3,-2:-2-stc:-1,:])
+        dphida = Wa.dot(wItop.dot(U[4,-1:-1-stc:-1,:]).T).T
+        dphids = wDtop.dot(U[4,-1:-1-stc:-1,:])
+        dsdx = -dphida / dphids
+        dsdz = g / dphids
+        RHS = -rho * g * NzBot[0,:] - dPda * NxBot[0,:]
+        RHS = RHS / (NxBot[0,:] * dsdx + NzBot[0,:] * dsdz)
+        U[5,-1,:] = (RHS - wDtop[1:stc].dot(U[5,-2:-1-stc:-1,:])) / wDtop[0]
+        
+        #set pressure on top ghost nodes:
+        dPda = Wa.dot(wHbot.dot(U[5,1:stc+1,:]).T).T
+        rho = wHbot.dot(U[3,1:stc+1,:])
+        dphida = Wa.dot(wIbot.dot(U[4,0:stc,:]).T).T
+        dphids = wDbot.dot(U[4,0:stc,:])
+        dsdx = -dphida / dphids
+        dsdz = g / dphids
+        RHS = -rho * g * NzTop[0,:] - dPda * NxTop[0,:]
+        RHS = RHS / (NxTop[0,:] * dsdx + NzTop[0,:] * dsdz)
+        U[5,0,:] = (RHS - wDbot[1:stc].dot(U[5,1:stc,:])) / wDbot[0]
+        
+        #extrapolate temperature to bottom and top ghost nodes:
+        U[2,-1,:] = wEtop.dot(U[2,-2:-(stc+2):-1,:])
+        U[2,0,:] = wEbot.dot(U[2,1:stc+1,:])
+        
+        #extrapolate density to bottom and top ghost nodes using EOS:
+        U[3,-1,:] = (Pbar[-1,:]+U[5,-1,:]) / Rd / (Tbar[-1,:]+U[2,-1,:]) \
+        - rhoBar[-1,:]
+        U[3,0,:] = (Pbar[0,:]+U[5,0,:]) / Rd / (Tbar[0,:]+U[2,0,:]) \
+        - rhoBar[0,:]
     
     return U, Pbar, rhoBar, Tbar, drhoBarDz, dTbarDz
 
@@ -580,8 +655,8 @@ def odefun(t, U, dUdt):
         if verticalCoordinate == "height":
             sDot = uDotGradS
         else:
-            raise ValueError("Still need to add this part, which will \
-require vertical integration with midpoint rule.")
+            raise ValueError("Still need to add this part, which will " \
+            + "require vertical integration with midpoint rule.")
     
     #Main part:
     
@@ -610,37 +685,60 @@ require vertical integration with midpoint rule.")
 
 #Main time-stepping loop:
 
+# U = setGhostNodes(U)[0]
+# plt.contourf(xx, zz, U[5,:,:], 20)
+# plt.colorbar()
+# plt.show()
+# sys.exit("Done for now.")
+
+if verticallyLagrangian and (verticalCoordinate == "pressure"):
+    print("\nWARNING: Vertical re-map is not yet implemented in " \
+    + "this case, so this formulation should only be used on the " \
+    + "inertia gravity waves test, since the vertical velocity " \
+    + "is very small.\n")
+
+pHydro = np.zeros((nLev+1, nCol))
+
 et = time.time()
 
 for i in np.arange( 0, nTimesteps+1 ) :
     
     #Vertical re-map:
-    if np.mod(i,4)==0 and verticallyLagrangian and not contourFromSaved :
-        U = setGhostNodes(U)[0]
+    if verticallyLagrangian and (testCase != "inertiaGravityWaves") \
+    and not contourFromSaved and (np.mod(i,4) == 1):
         if verticalCoordinate == "height":
+            U = setGhostNodes(U)[0]
             U[0:4,:,:] = verticalRemap(U[0:4,:,:], U[4,:,:], phiBar, V)
             U[4,:,:] = phiBar
         else:
-            integrand = - (rhoBar+U[3,:,:]) * Ds(U[4,:,:])
-            integrand = (integrand[0:-1,:] + integrand[1:,:]) / 2.
-            integrand = integrand[0:-1,:] - integrand[1:,:]
+            tmp = setGhostNodes(U)
+            U = tmp[0].copy()
+            rhoBar = tmp[2].copy()
+            # integrand = (-(rhoBar) * Ds(U[4,:,:]))[1:-1,:]
+            integrand = (-(rhoBar+U[3,:,:]) * Ds(U[4,:,:]))[1:-1,:]
             tmp = pTop * np.ones((nCol))
-            pHydro = np.zeros((nLev+1, nCol))
-            pHydro[-1,:] = tmp
-            for j in np.arange(nLev-1, -1, -1):
-                tmp = tmp + integrand[j] * ds
-                pHydro[j,:] = tmp.copy()
-            pHydroSurf = pHydro[0,:]
+            pHydro[0,:] = tmp.copy()
+            for j in range(nLev):
+                tmp = tmp + integrand[j,:] * ds
+                pHydro[j+1,:] = tmp.copy()
+            pHydroSurf = pHydro[-1,:]
             pHydro = np.vstack((3./2.*pHydro[0,:] - 1./2.*pHydro[1,:] \
             , (pHydro[0:-1,:] + pHydro[1:,:])/2. \
             , 3./2.*pHydro[-1,:] - 1./2.*pHydro[-2,:]))
-            
             pHydroNew = A(ss) * Po \
             + B(ss) * np.tile(pHydroSurf, (nLev+2, 1))
             U[0:5,:,:] = verticalRemap(U[0:5,:,:], pHydro, pHydroNew, V)
+            rhoBar = setGhostNodes(U)[2]
             U[3,:,:] = -Ds(pHydroNew) / Ds(U[4,:,:]) - rhoBar
+
+            # plt.clf()
+            # plt.contourf(xx, zz, pHydroNew-pHydro, 20)
+            # plt.colorbar()
+            # plt.axis('image')
+            # plt.show()
+            # sys.exit('Stop here for now.')
     
-    if np.mod( i, np.int(np.round(saveDel/dt)) ) == 0 :
+    if np.mod(i, np.int(np.round(saveDel/dt))) == 0 :
         
         print( "t = {0:5d} | et = {1:6.2f} | maxAbsRho = {2:.2e}" \
         . format( np.int(np.round(t)) \
@@ -676,8 +774,8 @@ for i in np.arange( 0, nTimesteps+1 ) :
         elif rks == 4:
             t, U = rk.rk4(t, U, odefun, dt, q1, q2, q3, q4)
         else:
-            raise ValueError("Please use RK3 or RK4 for this problem.  \
-RK1 and RK2 are unstable in time, since their stability regions have no \
-imaginary axis coverage.")
+            raise ValueError("Please use RK3 or RK4 for this problem.  " \
+            + "RK1 and RK2 are unstable in time, since their stability " \
+            + "regions have no imaginary axis coverage.")
 
 ###########################################################################
