@@ -18,10 +18,10 @@ testCase = "risingBubble"
 
 #Choose "pressure" or "height":
 verticalCoordinate   = "height"
-verticallyLagrangian = False
+verticallyLagrangian = True
 
 #Choose 0, 1, 2, 3, or 4:
-refinementLevel = 2
+refinementLevel = 1
 
 #Switches to control what happens:
 saveArrays       = True
@@ -233,10 +233,10 @@ phs = 11                                 #lateral PHS exponent (odd number)
 pol = 5                         #highest degree polynomial in lateral basis
 stc = 11                                              #lateral stencil size
 alp = 2.**-14. * 300.                      #lateral dissipation coefficient
-Wa   = phs1.getPeriodicDM(period=right-left, x=x, X=x, m=1 \
-, phsDegree=phs, polyDegree=pol, stencilSize=stc)
-Whva = phs1.getPeriodicDM(period=right-left, x=x, X=x, m=pol+1 \
-, phsDegree=phs, polyDegree=pol, stencilSize=stc)
+Wa   = phs1.getPeriodicDM(z=x, x=x, m=1 \
+, phs=phs, pol=pol, stc=stc, period=right-left)
+Whva = phs1.getPeriodicDM(z=x, x=x, m=pol+1 \
+, phs=phs, pol=pol, stc=stc, period=right-left)
 Whva = alp * dx**pol * Whva
 
 phs = 5                                              #vertical PHS exponent
@@ -246,21 +246,27 @@ if verticalCoordinate == "pressure":
     alp = -2.**-20. * 300.                #vertical dissipation coefficient
 else:
     alp = -2.**-10. * 300.           #much larger in height coordinate case
-Ws   = phs1.getDM(x=s, X=s,       m=1 \
-, phsDegree=phs, polyDegree=pol, stencilSize=stc)
-Whvs = phs1.getDM(x=s, X=s[1:-1], m=pol+1 \
-, phsDegree=phs, polyDegree=pol, stencilSize=stc)
+Ws   = phs1.getDM(z=s,       x=s, m=1,     phs=phs, pol=pol, stc=stc)
+Whvs = phs1.getDM(z=s[1:-1], x=s, m=pol+1, phs=phs, pol=pol, stc=stc)
 Whvs = alp * ds**pol * Whvs
 
-wIbot = phs1.getWeights((s[0]+s[1])/2.,   s[0:stc],        0, phs, pol)
-wEbot = phs1.getWeights(s[0],             s[1:stc+1],      0, phs, pol)
-wDbot = phs1.getWeights((s[0]+s[1])/2.,   s[0:stc],        1, phs, pol)
-wHbot = phs1.getWeights((s[0]+s[1])/2.,   s[1:stc+1],      0, phs, pol)
+wIbot = phs1.getWeights(z=(s[0]+s[1])/2.,   x=s[0:stc],        m=0 \
+, phs=phs, pol=pol)
+wEbot = phs1.getWeights(z=s[0],             x=s[1:stc+1],      m=0 \
+, phs=phs, pol=pol)
+wDbot = phs1.getWeights(z=(s[0]+s[1])/2.,   x=s[0:stc],        m=1 \
+, phs=phs, pol=pol)
+wHbot = phs1.getWeights(z=(s[0]+s[1])/2.,   x=s[1:stc+1],      m=0 \
+, phs=phs, pol=pol)
 
-wItop = phs1.getWeights((s[-2]+s[-1])/2., s[-1:-1-stc:-1], 0, phs, pol)
-wEtop = phs1.getWeights(s[-1],            s[-2:-2-stc:-1], 0, phs, pol)
-wDtop = phs1.getWeights((s[-2]+s[-1])/2., s[-1:-1-stc:-1], 1, phs, pol)
-wHtop = phs1.getWeights(s[-1],            s[-2:-2-stc:-1], 0, phs, pol)
+wItop = phs1.getWeights(z=(s[-2]+s[-1])/2., x=s[-1:-1-stc:-1], m=0 \
+, phs=phs, pol=pol)
+wEtop = phs1.getWeights(z=s[-1],            x=s[-2:-2-stc:-1], m=0 \
+, phs=phs, pol=pol)
+wDtop = phs1.getWeights(z=(s[-2]+s[-1])/2., x=s[-1:-1-stc:-1], m=1 \
+, phs=phs, pol=pol)
+wHtop = phs1.getWeights(z=s[-1],            x=s[-2:-2-stc:-1], m=0 \
+, phs=phs, pol=pol)
 
 def Da(U):
     return Wa.dot(U.T).T
