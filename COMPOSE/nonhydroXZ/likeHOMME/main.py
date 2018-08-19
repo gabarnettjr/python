@@ -14,14 +14,14 @@ from gab.nonhydro import common
 #to modify when running the code, unless they want to add a new test case.
 
 #Choose "risingBubble", "densityCurrent", or "inertiaGravityWaves":
-testCase = "inertiaGravityWaves"
+testCase = "risingBubble"
 
 #Choose "pressure" or "height":
-verticalCoordinate   = "pressure"
-verticallyLagrangian = True
+verticalCoordinate   = "height"
+verticallyLagrangian = False
 
 #Choose 0, 1, 2, 3, or 4:
-refinementLevel = 1
+refinementLevel = 2
 
 #Switches to control what happens:
 saveArrays       = True
@@ -31,7 +31,7 @@ plotNodesAndExit = False
 
 #Choose which variable to plot:
 #("u", "w", "T", "rho", "phi", "P", "theta", "pi", "phi")
-whatToPlot = "phi"
+whatToPlot = "P"
 
 #Choose either a number of contours, or a range of contours:
 contours = 20
@@ -462,7 +462,7 @@ if verticallyLagrangian:
     else:
         V = np.zeros((5, nLev+2, nCol))
 
-def verticalRemap( U, z, Z, V ) : #used only in vertically Lagrangian
+def verticalRemap(U, z, Z, V):          #used only in vertically Lagrangian
     """
     Interpolate columns of U from z to Z
     nLev is the number of interior levels of U
@@ -475,27 +475,27 @@ def verticalRemap( U, z, Z, V ) : #used only in vertically Lagrangian
     z2 = z[:,2,:]
     ZZ = Z[:,0,:]
     V[:,0,:] = \
-      ( ZZ - z1 ) * ( ZZ - z2 ) * U[:,0,:] / ( z0 - z1 ) / ( z0 - z2 ) \
-    + ( ZZ - z0 ) * ( ZZ - z2 ) * U[:,1,:] / ( z1 - z0 ) / ( z1 - z2 ) \
-    + ( ZZ - z0 ) * ( ZZ - z1 ) * U[:,2,:] / ( z2 - z0 ) / ( z2 - z1 )
+      (ZZ - z1) * (ZZ - z2) * U[:,0,:] / (z0 - z1) / (z0 - z2) \
+    + (ZZ - z0) * (ZZ - z2) * U[:,1,:] / (z1 - z0) / (z1 - z2) \
+    + (ZZ - z0) * (ZZ - z1) * U[:,2,:] / (z2 - z0) / (z2 - z1)
     #quadratic on interior:
     z0 = z[:,0:nLev+0,:]
     z1 = z[:,1:nLev+1,:]
     z2 = z[:,2:nLev+2,:]
     ZZ = Z[:,1:nLev+1,:]
     V[:,1:nLev+1,:] = \
-      ( ZZ - z1 ) * ( ZZ - z2 ) * U[:,0:nLev+0,:] / ( z0 - z1 ) / ( z0 - z2 ) \
-    + ( ZZ - z0 ) * ( ZZ - z2 ) * U[:,1:nLev+1,:] / ( z1 - z0 ) / ( z1 - z2 ) \
-    + ( ZZ - z0 ) * ( ZZ - z1 ) * U[:,2:nLev+2,:] / ( z2 - z0 ) / ( z2 - z1 )
+      (ZZ - z1) * (ZZ - z2) * U[:,0:nLev+0,:] / (z0 - z1) / (z0 - z2) \
+    + (ZZ - z0) * (ZZ - z2) * U[:,1:nLev+1,:] / (z1 - z0) / (z1 - z2) \
+    + (ZZ - z0) * (ZZ - z1) * U[:,2:nLev+2,:] / (z2 - z0) / (z2 - z1)
     #quadratic on top:
     z0 = z[:,nLev-1,:]
     z1 = z[:,nLev+0,:]
     z2 = z[:,nLev+1,:]
     ZZ = Z[:,nLev+1,:]
     V[:,nLev+1,:] = \
-      ( ZZ - z1 ) * ( ZZ - z2 ) * U[:,nLev-1,:] / ( z0 - z1 ) / ( z0 - z2 ) \
-    + ( ZZ - z0 ) * ( ZZ - z2 ) * U[:,nLev+0,:] / ( z1 - z0 ) / ( z1 - z2 ) \
-    + ( ZZ - z0 ) * ( ZZ - z1 ) * U[:,nLev+1,:] / ( z2 - z0 ) / ( z2 - z1 )
+      (ZZ - z1) * (ZZ - z2) * U[:,nLev-1,:] / (z0 - z1) / (z0 - z2) \
+    + (ZZ - z0) * (ZZ - z2) * U[:,nLev+0,:] / (z1 - z0) / (z1 - z2) \
+    + (ZZ - z0) * (ZZ - z1) * U[:,nLev+1,:] / (z2 - z0) / (z2 - z1)
     return V
 
 ###########################################################################
@@ -515,7 +515,7 @@ def fastBackgroundStates(phi):
     dpiBarDz = -g / Cp / thetaBar                    #hydrostatic condition
     dTbarDz = piBar * dthetaBarDz + thetaBar * dpiBarDz
     dPbarDz = Po * Cp/Rd * piBar**(Cp/Rd-1.) * dpiBarDz
-    drhoBarDz = ( dPbarDz - Rd*rhoBar*dTbarDz ) / ( Rd * Tbar )
+    drhoBarDz = (dPbarDz - Rd*rhoBar*dTbarDz) / (Rd * Tbar)
     
     return Pbar, rhoBar, Tbar, drhoBarDz, dTbarDz
 
@@ -529,10 +529,12 @@ def setGhostNodes(U):
         U[4,0,:] = (g*zSurf - wIbot[1:stc].dot(U[4,1:stc,:])) / wIbot[0]
         
         #Enforce phi=g*z on top boundary:
-        U[4,-1,:] = (g*top - wItop[1:stc].dot(U[4,-2:-1-stc:-1,:])) / wItop[0]
+        U[4,-1,:] = (g*top \
+        - wItop[1:stc].dot(U[4,-2:-1-stc:-1,:])) / wItop[0]
         
         #Get background states on possibly changing geopotential levels:
-        Pbar, rhoBar, Tbar, drhoBarDz, dTbarDz = fastBackgroundStates(U[4,:,:])
+        Pbar, rhoBar, Tbar, drhoBarDz, dTbarDz \
+        = fastBackgroundStates(U[4,:,:])
         
         #extrapolate tangent velocity uT to bottom ghost nodes:
         uT = U[0,1:stc+1,:] * TxBot + U[1,1:stc+1,:] * TzBot
@@ -551,7 +553,8 @@ def setGhostNodes(U):
         U[1,-1,:] = -wItop[1:stc].dot(U[1,-2:-1-stc:-1,:]) / wItop[0]
         
         #get pressure on interior nodes using the equation of state:
-        U[5,1:-1,:] = ((rhoBar+U[3,:,:]) * Rd * (Tbar+U[2,:,:]) - Pbar)[1:-1,:]
+        U[5,1:-1,:] = ((rhoBar+U[3,:,:]) * Rd \
+        * (Tbar+U[2,:,:]) - Pbar)[1:-1,:]
         
         #set pressure on bottom ghost nodes:
         dPda = Wa.dot(wHbot.dot(U[5,1:stc+1,:]).T).T
@@ -588,13 +591,15 @@ def setGhostNodes(U):
     else:
         
         #Enforce phi=g*z on bottom boundary:
-        U[4,-1,:] = (g*zSurf - wItop[1:stc].dot(U[4,-2:-1-stc:-1,:])) / wItop[0]
+        U[4,-1,:] = (g*zSurf - wItop[1:stc].dot(U[4,-2:-1-stc:-1,:])) \
+        / wItop[0]
         
         #Enforce phi=g*z on top boundary:
         U[4,0,:] = (g*top - wIbot[1:stc].dot(U[4,1:stc,:])) / wIbot[0]
         
         #Get background states on possibly changing geopotential levels:
-        Pbar, rhoBar, Tbar, drhoBarDz, dTbarDz = fastBackgroundStates(U[4,:,:])
+        Pbar, rhoBar, Tbar, drhoBarDz, dTbarDz \
+        = fastBackgroundStates(U[4,:,:])
         
         #extrapolate tangent velocity uT to bottom ghost nodes:
         uT = U[0,-2:-stc-2:-1,:] * TxBot + U[1,-2:-stc-2:-1,:] * TzBot
@@ -613,7 +618,8 @@ def setGhostNodes(U):
         U[1,0,:] = -wIbot[1:stc].dot(U[1,1:stc,:]) / wIbot[0]
         
         #get pressure on interior nodes using the equation of state:
-        U[5,1:-1,:] = ((rhoBar+U[3,:,:]) * Rd * (Tbar+U[2,:,:]) - Pbar)[1:-1,:]
+        U[5,1:-1,:] = ((rhoBar+U[3,:,:]) * Rd \
+        * (Tbar+U[2,:,:]) - Pbar)[1:-1,:]
         
         #set pressure on bottom ghost nodes:
         dPda = Wa.dot(wHtop.dot(U[5,-2:-2-stc:-1,:]).T).T
@@ -740,7 +746,7 @@ pHydro = np.zeros((nLev+1, nCol))
 
 et = time.time()
 
-for i in np.arange( 0, nTimesteps+1 ) :
+for i in np.arange(0, nTimesteps+1):
     
     #Vertical re-map:
     if verticallyLagrangian and (testCase != "inertiaGravityWaves") \
@@ -781,12 +787,12 @@ for i in np.arange( 0, nTimesteps+1 ) :
             # plt.show()
             # sys.exit('Stop here for now.')
     
-    if np.mod(i, np.int(np.round(saveDel/dt))) == 0 :
+    if np.mod(i, np.int(np.round(saveDel/dt))) == 0:
         
-        print( "t = {0:5d} | et = {1:6.2f} | maxAbsRho = {2:.2e}" \
-        . format( np.int(np.round(t)) \
+        print("t = {0:5d} | et = {1:6.2f} | maxAbsRho = {2:.2e}" \
+        . format(np.int(np.round(t)) \
         , time.time()-et \
-        , np.max(np.abs(U[3,:,:])) ) )
+        , np.max(np.abs(U[3,:,:]))))
         
         et = time.time()
         
@@ -794,7 +800,7 @@ for i in np.arange( 0, nTimesteps+1 ) :
             U[0:5,:,:] = np.load( saveString \
             + '{0:04d}'.format(np.int(np.round(t))) + '.npy' )
         
-        if saveArrays or saveContours :
+        if saveArrays or saveContours:
             U = setGhostNodes(U)[0]
             # if verticallyLagrangian :
             #     U[0:4,:,:] = verticalRemap( U[0:4,:,:], U[4,:,:], phiBar \
@@ -802,16 +808,16 @@ for i in np.arange( 0, nTimesteps+1 ) :
             #     U[4,:,:] = phiBar
             #     U = setGhostNodes(U)[0]
         
-        if saveArrays :
-            np.save( saveString \
-            + '{0:04d}'.format(np.int(np.round(t))) + '.npy', U[0:5,:,:] )
+        if saveArrays:
+            np.save(saveString \
+            + '{0:04d}'.format(np.int(np.round(t))) + '.npy', U[0:5,:,:])
         
-        if saveContours :
-            contourSomething( U, t )
+        if saveContours:
+            contourSomething(U, t)
     
-    if contourFromSaved :
+    if contourFromSaved:
         t = t + dt
-    else :
+    else:
         if rks == 3:
             t, U = rk.rk3(t, U, odefun, dt, q1, q2)
         elif rks == 4:
