@@ -14,14 +14,13 @@ from gab.nonhydro import common
 #to modify when running the code, unless they want to add a new test case.
 
 #Choose "risingBubble", "densityCurrent", or "inertiaGravityWaves":
-testCase = "risingBubble"
+testCase = "inertiaGravityWaves"
 
 #Choose "pressure" or "height":
-verticalCoordinate   = "height"
+verticalCoordinate = "pressure"
 verticallyLagrangian = True
 
-#Choose 0, 1, 2, 3, or 4:
-refinementLevel = 1
+refinementLevel = 1                                #Choose 0, 1, 2, 3, or 4
 
 #Switches to control what happens:
 saveArrays       = True
@@ -29,12 +28,13 @@ saveContours     = True
 contourFromSaved = False
 plotNodesAndExit = False
 
-#Choose which variable to plot:
-#("u", "w", "T", "rho", "phi", "P", "theta", "pi", "phi")
-whatToPlot = "P"
+#Choose which variable to plot
+#("u", "w", "T", "rho", "phi", "P", "theta", "pi", "phi"):
+whatToPlot = "theta"
 
 #Choose either a number of contours, or a range of contours:
 contours = 20
+# contours = np.arange(-.15, 2.25, .1)
 
 ###########################################################################
 
@@ -132,14 +132,11 @@ if testCase == "risingBubble":
     dx      = 400. / 2**refinementLevel
     nLev    = 25 * 2**refinementLevel
     dt      = 1./2. / 2**refinementLevel
-    tf      = 1200.
+    tf      = 1000.
     saveDel = 100
     def zSurf(x):
         # return np.zeros(np.shape(x))
         return 1000. * np.sin(2.*np.pi / 10000. * x)
-    def zSurfPrime(x):
-        # return np.zeros(np.shape(x))
-        return 1000. * 2.*np.pi/10000 * np.cos(2.*np.pi / 10000. * x)
     def thetaPtb(x, z):
         return 2. * np.exp(-1e-6*(x**2. + (z-4000.)**2.))
 elif testCase == "densityCurrent":
@@ -154,8 +151,6 @@ elif testCase == "densityCurrent":
     saveDel = 50
     def zSurf(x):
         return np.zeros(np.shape(x))
-    def zSurfPrime(x):
-        return np.zeros(np.shape(x))
     def thetaPtb(x, z):
         return -20. * np.exp(-7e-7*(x**2. + (z-3000.)**2.))
 elif testCase == "inertiaGravityWaves":
@@ -169,8 +164,6 @@ elif testCase == "inertiaGravityWaves":
     tf      = 3000.
     saveDel = 250
     def zSurf(x):
-        return np.zeros(np.shape(x))
-    def zSurfPrime(x):
         return np.zeros(np.shape(x))
     def thetaPtb(x, z):
         thetaC = .01
@@ -192,7 +185,6 @@ nCol = np.int(np.round((right - left) / dx))
 x = np.linspace(left+dx/2, right-dx/2, nCol)
 
 zSurf = zSurf(x)
-zSurfPrime = zSurfPrime(x)
 
 ###########################################################################
 
@@ -209,10 +201,10 @@ def getSvalues():
         
     else:
         
-        piSurf = exnerPressure(zSurf)
-        piTop  = exnerPressure(top)
-        pSurf = Po * piSurf ** (Cp/Rd)     #hydrostatic pressure at surface
-        pTop  = Po * piTop  ** (Cp/Rd)         #hydrostatic pressure at top
+        pExSurf = exnerPressure(zSurf)
+        pExTop  = exnerPressure(top)
+        pSurf = Po * pExSurf ** (Cp/Rd)    #hydrostatic pressure at surface
+        pTop  = Po * pExTop  ** (Cp/Rd)        #hydrostatic pressure at top
         sTop = pTop / Po                      #value of s on upper boundary
         ds = (1. - sTop) / nLev
         s = np.linspace(sTop-ds/2., 1.+ds/2., nLev+2)
@@ -232,7 +224,7 @@ xx, ss = np.meshgrid(x, s)
 phs = 11                                 #lateral PHS exponent (odd number)
 pol = 5                         #highest degree polynomial in lateral basis
 stc = 11                                              #lateral stencil size
-alp = 2.**-14. * 300.                      #lateral dissipation coefficient
+alp = 2.**-12. * 300.                      #lateral dissipation coefficient
 Wa   = phs1.getPeriodicDM(z=x, x=x, m=1 \
 , phs=phs, pol=pol, stc=stc, period=right-left)
 Whva = phs1.getPeriodicDM(z=x, x=x, m=pol+1 \
@@ -241,11 +233,11 @@ Whva = alp * dx**pol * Whva
 
 phs = 5                                              #vertical PHS exponent
 pol = 3                        #highest degree polynomial in vertical basis
-stc = 7                                              #vertical stencil size
+stc = 5                                              #vertical stencil size
 if verticalCoordinate == "pressure":
-    alp = -2.**-20. * 300.                #vertical dissipation coefficient
+    alp = -2.**-24. * 300.                #vertical dissipation coefficient
 else:
-    alp = -2.**-10. * 300.           #much larger in height coordinate case
+    alp = -2.**-10. * 300.           #much larger in height coordinate case?
 Ws   = phs1.getDM(z=s,       x=s, m=1,     phs=phs, pol=pol, stc=stc)
 Whvs = phs1.getDM(z=s[1:-1], x=s, m=pol+1, phs=phs, pol=pol, stc=stc)
 Whvs = alp * ds**pol * Whvs
@@ -297,7 +289,7 @@ def backgroundStatesAndPerturbations(zz):
 
 ###########################################################################
 
-def getVerticalLevels(pSurf, zSurf, top):
+def getVerticalLevels(zSurf, top):
 
     if verticalCoordinate == "height":
         
@@ -309,60 +301,58 @@ def getVerticalLevels(pSurf, zSurf, top):
 
         A = 0.
         B = 0.
-        pSurf = 0.
+        ssInt = 0.
         
     elif verticalCoordinate == "pressure":
         
         def A(s):
             return (1. - s) / (1. - sTop) * sTop
+        
         def Aprime(s):
             return -sTop / (1. - sTop)
 
         def B(s):
             return (s - sTop) / (1. - sTop)
+        
         def Bprime(s):
             return 1. / (1. - sTop)
+        
+        ssInt = (ss[0:-1,:] + ss[1:,:]) / 2.
+        p = A(ssInt) * Po + B(ssInt) * np.tile(pSurf,(nLev+1,1))
+        pEx = (p / Po) ** (Rd/Cp)
+        zz0 = inverseExnerPressure(pEx)
+        zz = zz0.copy()
+        for j in range(10):
+            T = exnerPressure(zz) * potentialTemperature(zz)
+            # T = exnerPressure(zz) \
+            # * (potentialTemperature(zz) + thetaPtb(xx[1:,:],zz))
+            integrand = -Rd * T / (A(ssInt) * Po + B(ssInt) * pSurf) \
+            * (Aprime(ssInt) * Po + Bprime(ssInt) * pSurf) / g
+            integrand = (integrand[0:-1,:] + integrand[1:,:]) / 2.
+            tmp = zz[0,:].copy()
+            for i in range(nLev):
+                tmp = tmp + integrand[i,:] * ds
+                zz[i+1,:] = tmp.copy()
+            # plt.figure()
+            # plt.clf()
+            # plt.contourf(xx[1:,:], zz0, zz-zz0, 20)
+            # plt.colorbar()
+            # # plt.axis("image")
+            # plt.title("{0:g}".format(np.max(np.abs(zSurf-zz[-1,:]))))
+            # plt.show()
+        top = zz[0,:]
+        zSurf = zz[-1,:]
+        zz = np.vstack((3./2.*zz[0,:] - 1./2.*zz[1,:] \
+        , (zz[0:-1,:] + zz[1:,:]) / 2. \
+        , 3./2.*zz[-1,:] - 1./2.*zz[-2,:]))
+        
+    zSurfPrime = Wa.dot(zSurf.T).T
 
-        p = A(ss) * Po + B(ss) * np.tile(pSurf,(nLev+2,1))
-        pi = (p / Po) ** (Rd/Cp)
-        zz = inverseExnerPressure(pi)
-        # tmp = backgroundStatesAndPerturbations(zz)
-        # rhoBar = tmp[4].copy()
-        # rhoPtb = tmp[7].copy()
-        # integrand = (-(rhoBar+rhoPtb) * Ds(g*zz))[1:-1,:]
-        # p = np.zeros((nLev+1, nCol))
-        # tmp = pTop * np.ones((nCol))
-        # p[0,:] = tmp.copy()
-        # for i in range(nLev):
-        #     tmp = tmp + integrand[i,:] * ds
-        #     p[i+1,:] = tmp.copy()
-        # pSurf = p[-1,:].copy()
-        # p = (p[0:-1,:] + p[1:,:])/2.
-        # p = np.vstack((2.*pSurf - p[0,:] \
-        # , p \
-        # , 2.*pTop - p[-1,:]))
-        
-        # tmp = backgroundStatesAndPerturbations(zz)
-        # rhoBar = tmp[4].copy()
-        # rhoPtb = tmp[7].copy()
-        # plt.clf()
-        # plt.contourf(xx, zz, -Ds(p)/Ds(g*zz) - (rhoBar+rhoPtb), 20)
-        # plt.colorbar()
-        # plt.show()
-        
-        piSurf = (pSurf / Po) ** (Rd/Cp)
-        piTop = (pTop / Po) ** (Rd/Cp)
-
-        zSurf = inverseExnerPressure(piSurf)
-        top = inverseExnerPressure(piTop)
-        
-    return zz, A, B, pSurf, zSurf, top
+    return zz, A, B, zSurf, top, zSurfPrime, ssInt
 
 #######################################################################
-zz, A, B, pSurf, zSurf, top = getVerticalLevels(pSurf, zSurf, top)
 
-# print(np.max(np.abs(pSurf - pSurfNew)))
-# sys.exit("Stop here for now.")
+zz, A, B, zSurf, top, zSurfPrime, ssInt = getVerticalLevels(zSurf, top)
 
 if plotNodesAndExit:
     plt.figure()
@@ -423,6 +413,8 @@ if saveContours :
     else:
         fig = plt.figure(figsize = (18,14))
 
+###########################################################################
+
 def contourSomething(U, t):
     
     if whatToPlot == "u":
@@ -452,21 +444,25 @@ def contourSomething(U, t):
     
     zz = U[4,:,:] / g
     
+    plt.clf()
     plt.contourf(xx, zz, tmp, contours)
     if testCase != "inertiaGravityWaves":
         plt.axis("image")
-    plt.colorbar(orientation='vertical')
-    fig.savefig( '{0:04d}'.format(np.int(np.round(t)+1e-12)) \
-    + '.png', bbox_inches = 'tight' )                 #save figure as a png
-    plt.clf()
+        plt.colorbar(orientation='vertical')
+    else:
+        plt.colorbar(orientation='horizontal')
+    fig.savefig( '{0:04d}.png'.format(np.int(np.round(t)+1e-12)) \
+    , bbox_inches = 'tight' )                 #save figure as a png
 
 ###########################################################################
 
 if verticallyLagrangian:
     if verticalCoordinate == "height":
-        V = np.zeros((4, nLev+2, nCol ))
+        V = np.zeros((5, nLev+2, nCol))
     else:
         V = np.zeros((5, nLev+2, nCol))
+
+###########################################################################
 
 def verticalRemap(U, z, Z, V):          #used only in vertically Lagrangian
     """
@@ -742,56 +738,57 @@ def odefun(t, U, dUdt):
 # plt.show()
 # sys.exit("Done for now.")
 
-if verticallyLagrangian and (verticalCoordinate == "pressure"):
-    print("\nWARNING: Vertical re-map is not yet implemented in " \
-    + "this case, so this formulation should only be used on the " \
-    + "inertia gravity waves test, since the vertical velocity " \
-    + "is very small.\n")
-
-pHydro = np.zeros((nLev+1, nCol))
-
 et = time.time()
 
 for i in np.arange(0, nTimesteps+1):
     
     #Vertical re-map:
-    if verticallyLagrangian and (testCase != "inertiaGravityWaves") \
-    and not contourFromSaved and (np.mod(i,4) == 0):
+    if verticallyLagrangian and not contourFromSaved \
+    and (np.mod(i,4) == 0):
         if verticalCoordinate == "height":
             U = setGhostNodes(U)[0]
-            U[0:4,:,:] = verticalRemap(U[0:4,:,:], U[4,:,:], phiBar, V)
-            U[4,:,:] = phiBar
+            U[0:5,:,:] = verticalRemap(U[0:5,:,:], U[4,:,:], phiBar, V)
+            # U[4,:,:] = phiBar.copy()
         else:
             tmp = setGhostNodes(U)
-            U = tmp[0].copy()
-            rhoBar = tmp[2].copy()
-            Pbar = tmp[1].copy()
+            U = tmp[0]
+            rhoBar = tmp[2]
             integrand = (-(rhoBar+U[3,:,:]) * Ds(U[4,:,:]))[1:-1,:]
+            # integrand = -(rhoBar + U[3,:,:])[1:-1,:]
+            # dPhi = (U[4,0:-1,:] + U[4,1:,:]) / 2.
+            # dPhi = dPhi[1:,:] - dPhi[0:-1,:]
             tmp = pTop * np.ones((nCol))
+            pHydro = np.zeros((nLev+1, nCol))
             pHydro[0,:] = tmp.copy()
             for j in range(nLev):
                 tmp = tmp + integrand[j,:] * ds
+                # tmp = tmp + integrand[j,:] * dPhi[j,:]
                 pHydro[j+1,:] = tmp.copy()
-            pHydroSurf = pHydro[-1,:]
+            pHydroSurf = tmp.copy()
             pHydro = (pHydro[0:-1,:] + pHydro[1:,:])/2.
             pHydro = np.vstack((2.*pTop - pHydro[0,:] \
             , pHydro \
             , 2.*pHydroSurf - pHydro[-1,:]))
             
-            Psurf = (Pbar[-1,:]+U[5,-1,:] + Pbar[-2,:]+U[5,-2,:]) / 2.
             pHydroNew = A(ss) * Po \
             + B(ss) * np.tile(pHydroSurf, (nLev+2, 1))
-            
+
+            # dP = A(ssInt) * Po \
+            # + B(ssInt) * np.tile(pHydroSurf, (nLev+1,1))
+            # dP = dP[1:,:] - dP[0:-1,:]
             U[0:5,:,:] = verticalRemap(U[0:5,:,:], pHydro, pHydroNew, V)
-            # rhoBar = setGhostNodes(U)[2]
-            # U[3,:,:] = -Ds(pHydroNew) / Ds(U[4,:,:]) - rhoBar
+            # tmp = setGhostNodes(U)
+            # U = tmp[0]
+            # rhoBar = tmp[2]
+            # dPhi = (U[4,0:-1,:] + U[4,1:,:]) / 2.
+            # dPhi = dPhi[1:,:] - dPhi[0:-1,:]
+            # U[3,1:-1,:] = -dP / dPhi - rhoBar[1:-1,:]
 
             # plt.clf()
             # plt.contourf(xx, zz, pHydro-pHydroNew, 20)
             # plt.colorbar()
             # plt.axis('image')
             # plt.show()
-            # sys.exit('Stop here for now.')
     
     if np.mod(i, np.int(np.round(saveDel/dt))) == 0:
         
@@ -808,11 +805,6 @@ for i in np.arange(0, nTimesteps+1):
         
         if saveArrays or saveContours:
             U = setGhostNodes(U)[0]
-            # if verticallyLagrangian :
-            #     U[0:4,:,:] = verticalRemap( U[0:4,:,:], U[4,:,:], phiBar \
-            #     , V )
-            #     U[4,:,:] = phiBar
-            #     U = setGhostNodes(U)[0]
         
         if saveArrays:
             np.save(saveString \
