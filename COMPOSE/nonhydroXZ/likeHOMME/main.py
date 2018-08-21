@@ -14,14 +14,14 @@ from gab.nonhydro import common
 #to modify when running the code, unless they want to add a new test case.
 
 #Choose "risingBubble", "densityCurrent", or "inertiaGravityWaves":
-testCase = "risingBubble"
+testCase = "densityCurrent"
 
 #Choose "pressure" or "height":
-verticalCoordinate = "pressure"
-verticallyLagrangian = True
+verticalCoordinate = "height"
+verticallyLagrangian = False
 
 #Choose 0, 1, 2, 3, or 4:
-refinementLevel = 1
+refinementLevel = 2
 
 #Switches to control what happens:
 saveArrays          = True
@@ -233,7 +233,7 @@ xx, ss = np.meshgrid(x, s)
 phs = 11                                 #lateral PHS exponent (odd number)
 pol = 5                         #highest degree polynomial in lateral basis
 stc = 11                                              #lateral stencil size
-alp = 2.**-12. * 300.                      #lateral dissipation coefficient
+alp = 2.**-9. * 300.                       #lateral dissipation coefficient
 Wa   = phs1.getPeriodicDM(z=x, x=x, m=1 \
 , phs=phs, pol=pol, stc=stc, period=right-left) #lateral derivative weights
 Whva = phs1.getPeriodicDM(z=x, x=x, m=pol+1 \
@@ -489,11 +489,14 @@ def contourSomething(U, t):
     
     plt.clf()
     plt.contourf(xx, zz, tmp, contours)
-    if testCase != "inertiaGravityWaves":
+    if testCase == "inertiaGravityWaves":
+        plt.colorbar(orientation="horizontal")
+    elif testCase == "densityCurrent":
+        plt.axis("image")
+        plt.colorbar(orientation="horizontal")
+    else:
         plt.axis("image")
         plt.colorbar(orientation="vertical")
-    else:
-        plt.colorbar(orientation="horizontal")
     if plotBackgroundState:
         plt.show()
         sys.exit("\nDone plotting the requested background state.")
@@ -725,7 +728,7 @@ def odefun(t, U, dUdt):
     + HV(U[3,:,:])                                                 #drho/dt
 
     dUdt[4,1:-1,:] = ((uDotGradS - sDot) * dphids)[1:-1,:] \
-    + HV(U[4,:,:] - phiBar)                                        #dphi/dt
+    + 0.*HV(U[4,:,:] - phiBar)                                     #dphi/dt
     
     return dUdt
 
