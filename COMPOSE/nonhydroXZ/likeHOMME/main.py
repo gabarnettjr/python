@@ -5,7 +5,7 @@ import time
 import matplotlib.pyplot as plt
 
 sys.path.append('../../../site-packages')
-from gab import rk, phs1
+from gab import rk
 from gab.nonhydro import common
 
 ###########################################################################
@@ -14,11 +14,12 @@ from gab.nonhydro import common
 #to modify when running the code, unless they want to add a new test case.
 
 #Choose "risingBubble", "densityCurrent", or "inertiaGravityWaves":
-testCase = "inertiaGravityWaves"
+testCase = "risingBubble"
 
 #Choose "pressure" or "height":
-verticalCoordinate = "pressure"
-verticallyLagrangian = True
+verticalCoordinate = "height"
+
+verticallyLagrangian = False
 
 #Choose 0, 1, 2, 3, or 4:
 refinementLevel = 1
@@ -26,17 +27,17 @@ refinementLevel = 1
 #Switches to control what happens:
 saveArrays          = True
 saveContours        = True
-contourFromSaved    = True
+contourFromSaved    = False
 plotNodesAndExit    = False
 plotBackgroundState = False
 
 #Choose which variable to plot
 #("u", "w", "T", "rho", "phi", "P", "theta", "pi", "phi"):
-whatToPlot = "rho"
+whatToPlot = "theta"
 
 #Choose either a number of contours, or a range of contours:
-contours = 20
-# contours = np.arange(-.15, 2.25, .1)
+# contours = 20
+contours = np.arange(-20.5, 1.5, 1)
 
 ###########################################################################
 
@@ -52,6 +53,8 @@ else:
 saveString = saveString + str(refinementLevel) + "/"
 
 ###########################################################################
+
+#Remove old files, and make new directories if necessary:
 
 if saveArrays and not contourFromSaved:
     if os.path.exists(saveString + '*.npy'):
@@ -71,113 +74,18 @@ if contourFromSaved:
 
 ###########################################################################
 
-#Definitions of constants:
+#Definitions of atmospheric constants:
+Cp, Cv, Rd, g, Po, th0, N = common.constants()
 
-Cp = 1004.                   #specific heat of dry air at constant pressure
-Cv = 717.                      #specific heat dry of air at constant volume
-Rd = Cp - Cv                                      #gas constant for dry air
-g  = 9.81                                           #gravitational constant
-Po = 10.**5.                                 #reference pressure in Pascals
+#Hydrostatic background state functions:
+potentialTemperature, potentialTemperatureDerivative \
+, exnerPressure, inverseExnerPressure \
+= common.hydrostaticProfiles(testCase, th0, g, Cp, N)
 
-th0 = 300.                       #reference potential temperature in kelvin
-N   = .01           #Brunt-Vaisala frequency for inertia gravity waves case
-
-###########################################################################
-
-#All of the test cases are defined in terms of hydrostatic background
-#states for potential temperature (th) and Exner pressure (pi), and these
-#are functions of z only.  In the pressure coordinate case, the initial
-#z-levels are defined using the inverse Exner pressure function.
-
-if (testCase == "risingBubble") or (testCase == "densityCurrent"):
-    
-    def potentialTemperature(z):
-        return th0 * np.ones(np.shape(z))
-    
-    def potentialTemperatureDerivative(z):
-        return np.zeros(np.shape(z))
-    
-    def exnerPressure(z):
-        return 1. - g/Cp/th0 * z
-    
-    def inverseExnerPressure(pi):
-        return (1. - pi) * Cp*th0/g
-    
-elif testCase == "inertiaGravityWaves":
-    
-    def potentialTemperature(z):
-        return th0 * np.exp(N**2/g * z)
-    
-    def potentialTemperatureDerivative(z):
-        return th0 * N**2/g * np.exp(N**2/g * z)
-    
-    def exnerPressure(z):
-        return 1. + g**2/Cp/th0/N**2 * (np.exp(-N**2/g*z) - 1.)
-    
-    def inverseExnerPressure(pi):
-        return -g/N**2. * np.log(1. + (pi-1.) * Cp*th0*N**2/g**2.)
-    
-else:
-    
-    raise ValueError("Invalid test case string.  Please choose " \
-    + "'risingBubble', 'densityCurrent', or 'inertiaGravityWaves'.")
-
-###########################################################################
-
-#Get some test-specific parameters, such as the size of the domain, the
-#horizontal node spacing dx, and the number of vertical levels nLev, the
-#time between saves saveDel, the topogrophy function zSurf(x), and the
-#initial perturbation in potential temperature thetaPtb(x,z):
-
-if testCase == "risingBubble":
-    left    = -5000.
-    right   = 5000.
-    bottom  = 0.
-    top     = 10000.
-    dx      = 400. / 2**refinementLevel
-    nLev    = 25 * 2**refinementLevel
-    dt      = 1./2. / 2**refinementLevel
-    tf      = 1000.
-    saveDel = 100
-    def zSurf(x):
-        return 1000. * np.sin(2.*np.pi / 10000. * x)
-    def thetaPtb(x, z):
-        return 2. * np.exp(-1e-6*(x**2. + (z-4000.)**2.))
-elif testCase == "densityCurrent":
-    left    = -25600.
-    right   = 25600.
-    bottom  = 0.
-    top     = 6400.
-    dx      = 400. / 2**refinementLevel
-    nLev    = 16 * 2**refinementLevel
-    dt      = 1./3. / 2**refinementLevel
-    tf      = 900.
-    saveDel = 50
-    def zSurf(x):
-        return np.zeros(np.shape(x))
-    def thetaPtb(x, z):
-        return -20. * np.exp(-7e-7*(x**2. + (z-3000.)**2.))
-elif testCase == "inertiaGravityWaves":
-    left    = -150000.
-    right   = 150000.
-    bottom  = 0.
-    top     = 10000.
-    dx      = 1000. / 2**refinementLevel
-    nLev    = 10 * 2**refinementLevel
-    dt      = 1. / 2**refinementLevel
-    tf      = 3000.
-    saveDel = 250
-    def zSurf(x):
-        return np.zeros(np.shape(x))
-    def thetaPtb(x, z):
-        thetaC = .01
-        hC = 10000.
-        aC = 5000.
-        xC = -50000.
-        return thetaC * np.sin(np.pi * z / hC) / (1. + ((x - xC) / aC)**2.)
-else:
-    raise ValueError("Invalid test case string.  Please choose " \
-    + "'risingBubble', 'densityCurrent', or 'inertiaGravityWaves'.")
+#Domain-specific parameters describing domain and initial perturbation:
+left, right, bottom, top, dx, nLev, dt, tf, saveDel \
+, zSurf, thetaPtb \
+= common.domainParameters(testCase, refinementLevel, exnerPressure)
 
 ###########################################################################
 
@@ -185,7 +93,7 @@ t = 0.
 
 nTimesteps = np.int(np.round(tf / dt))
 
-nCol = np.int(np.round((right - left) / dx))
+nCol = np.int(np.round((right - left) / dx))             #number of columns
 
 x = np.linspace(left+dx/2, right-dx/2, nCol)
 
@@ -193,172 +101,98 @@ zSurf = zSurf(x)            #over-write zSurf function with array of values
 
 ###########################################################################
 
-def getSvalues():
+#Equally spaced array of vertical coordinate values (s):
 
-    if verticalCoordinate == "height":
-        #This is a strange height coordinate, because it starts at zero
-        #at the top and goes up to 1 at the bottom.  This is so it mimics
-        #the behavior of the pressure coordinate, so that we can use the
-        #same setGhostNodes() function for both coordinates.
-        ds = 1. / nLev
-        sTop = 0.
-        s = np.linspace(sTop-ds/2, 1+ds/2, nLev+2)
-        #These are not explicitly needed in height coordinate case:
-        pSurf = []
-        pTop = []
-    elif verticalCoordinate == "pressure":
-        piTop  = exnerPressure(top)
-        piSurf = exnerPressure(zSurf)
-        pTop  = Po * piTop  ** (Cp/Rd)         #hydrostatic pressure at top
-        pSurf = Po * piSurf ** (Cp/Rd)     #hydrostatic pressure at surface
-        sTop = pTop / Po                      #value of s on upper boundary
-        ds = (1. - sTop) / nLev
-        s = np.linspace(sTop-ds/2, 1+ds/2, nLev+2)
-    else:
-        raise ValueError("Invalid verticalCoordinate string.  Please " \
-        + "choose either 'height' or 'pressure'.")
-
-    return s, ds, sTop, pTop, pSurf
+if verticalCoordinate == "height":
+    #This is a strange height coordinate, because it starts at zero
+    #at the top and goes up to 1 at the bottom.  This is so it mimics
+    #the behavior of the pressure coordinate, so that we can use the
+    #same setGhostNodes() function for both coordinates.
+    ds = 1. / nLev
+    sTop = 0.
+    s = np.linspace(sTop-ds/2, 1+ds/2, nLev+2)
+elif verticalCoordinate == "pressure":
+    piTop  = exnerPressure(top)
+    piSurf = exnerPressure(zSurf)
+    pTop  = Po * piTop  ** (Cp/Rd)             #hydrostatic pressure at top
+    pSurf = Po * piSurf ** (Cp/Rd)         #hydrostatic pressure at surface
+    sTop = pTop / Po                          #value of s on upper boundary
+    ds = (1. - sTop) / nLev
+    s = np.linspace(sTop-ds/2, 1+ds/2, nLev+2)
+else:
+    raise ValueError("Invalid verticalCoordinate string.  Please " \
+    + "choose either 'height' or 'pressure'.")
 
 ###########################################################################
-
-s, ds, sTop, pTop, pSurf = getSvalues()
 
 xx, ss = np.meshgrid(x, s)
 
 ###########################################################################
 
-#All of the polyharmonic spline radial basis function weights:
+#All of the weights and functions associated with derivative approximation:
 
-phs = 11                                 #lateral PHS exponent (odd number)
-pol = 5                         #highest degree polynomial in lateral basis
-stc = 11                                              #lateral stencil size
-alp = 2.**-9. * 300.                       #lateral dissipation coefficient
-Wa   = phs1.getPeriodicDM(z=x, x=x, m=1 \
-, phs=phs, pol=pol, stc=stc, period=right-left) #lateral derivative weights
-Whva = phs1.getPeriodicDM(z=x, x=x, m=pol+1 \
-, phs=phs, pol=pol, stc=stc, period=right-left)
-Whva = alp * dx**pol * Whva                    #lateral dissipation weights
-
-phs = 5                                              #vertical PHS exponent
-pol = 2                        #highest degree polynomial in vertical basis
-stc = 5                                              #vertical stencil size
-if verticalCoordinate == "pressure":
-    alp = -2.**-22. * 300.                #vertical dissipation coefficient
-else:
-    alp = -2.**-22. * 300.          #much larger in height coordinate case?
-Ws   = phs1.getDM(z=s,       x=s, m=1 \
-, phs=phs, pol=pol, stc=stc)                   #vertical derivative weights
-Whvs = phs1.getDM(z=s[1:-1], x=s, m=4 \
-, phs=phs, pol=pol, stc=stc)
-Whvs = alp * ds**3 * Whvs                     #vertical dissipation weights
-
-wItop = phs1.getWeights(z=sTop,  x=s[0:stc],        m=0 \
-, phs=phs, pol=pol)                            #interpolate to top boundary
-wEtop = phs1.getWeights(z=s[0],  x=s[1:stc+1],      m=0 \
-, phs=phs, pol=pol)                         #extrapolate to top ghost nodes
-wDtop = phs1.getWeights(z=sTop,  x=s[0:stc],        m=1 \
-, phs=phs, pol=pol)                             #derivative on top boundary
-wHtop = phs1.getWeights(z=sTop,  x=s[1:stc+1],      m=0 \
-, phs=phs, pol=pol)                            #extrapolate to top boundary
-
-wIbot = phs1.getWeights(z=1.,    x=s[-1:-1-stc:-1], m=0 \
-, phs=phs, pol=pol)                         #interpolate to bottom boundary
-wEbot = phs1.getWeights(z=s[-1], x=s[-2:-2-stc:-1], m=0 \
-, phs=phs, pol=pol)                      #extrapolate to bottom ghost nodes
-wDbot = phs1.getWeights(z=1.,    x=s[-1:-1-stc:-1], m=1 \
-, phs=phs, pol=pol)                          #derivative on bottom boundary
-wHbot = phs1.getWeights(z=1.,    x=s[-2:-2-stc:-1], m=0 \
-, phs=phs, pol=pol)                         #extrapolate to bottom boundary
-
-#Lateral derivative on all levels:
-def Da(U):
-    return Wa.dot(U.T).T
-
-#Vertical first derivative on all levels:
-def Ds(U):
-    return Ws.dot(U)
-
-#Total dissipation on non-ghost levels:
-def HV(U):
-    return Whva.dot(U[1:-1,:].T).T + Whvs.dot(U)
+Wa, stc, wItop, wEtop, wDtop, wHtop, wIbot, wEbot, wDbot, wHbot \
+, Da, Ds, HV \
+= common.derivativeApproximations(x, dx, left, right, s, ds)
 
 ###########################################################################
 
-def getVerticalLevels(zSurf, top):
+#Initial vertical levels zz (easy in height coord, hard in pressure coord):
 
-    if verticalCoordinate == "height":
-        
-        zz = np.zeros((nLev+2, nCol))
-        
-        for j in range(nCol):
-            dz = (zSurf[j] - top) * ds               #Note:  dz is negative
-            zz[:,j] \
-            = np.flipud(np.linspace(zSurf[j]+dz/2, top-dz/2, nLev+2))
+if verticalCoordinate == "height":
 
-        #These are not explicitly needed in the height coordinate case:
-        A = 0.
-        B = 0.
-        ssInt = 0.
-        
-    elif verticalCoordinate == "pressure":
-        
-        def A(s):
-            return (1. - s) / (1. - sTop) * sTop
-        
-        def Aprime(s):
-            return -sTop / (1. - sTop)
+    zz = np.zeros((nLev+2, nCol))
 
-        def B(s):
-            return (s - sTop) / (1. - sTop)
-        
-        def Bprime(s):
-            return 1. / (1. - sTop)
-        
-        ssInt = (ss[0:-1,:] + ss[1:,:]) / 2.          #s-mesh on interfaces
-        p = A(ssInt) * Po + B(ssInt) * np.tile(pSurf,(nLev+1,1))
-        pi = (p / Po) ** (Rd/Cp)
-        zz0 = inverseExnerPressure(pi)
-        zz = zz0.copy()
+    for j in range(nCol):
+        dz = (top - zSurf[j]) * ds
+        zz[:,j] = np.flipud(np.linspace(zSurf[j]-dz/2, top+dz/2, nLev+2))
 
-        #Iterate to satisfy initial conditions and hydrostatic condition:
-        for j in range(10):
-            T = exnerPressure(zz) * potentialTemperature(zz)
-            # T = exnerPressure(zz) \
-            # * (potentialTemperature(zz) + thetaPtb(xx[1:,:],zz))
-            integrand = -Rd * T / (A(ssInt) * Po + B(ssInt) * pSurf) \
-            * (Aprime(ssInt) * Po + Bprime(ssInt) * pSurf) / g
-            integrand = (integrand[0:-1,:] + integrand[1:,:]) / 2.
-            tmp = zz[0,:].copy()
-            for i in range(nLev):
-                tmp = tmp + integrand[i,:] * ds        #midpoint quadrature
-                zz[i+1,:] = tmp.copy()
-            # plt.figure()
-            # plt.clf()
-            # plt.contourf(xx[1:,:], zz0, zz-zz0, 20)
-            # plt.colorbar()
-            # # plt.axis("image")
-            # plt.title("{0:g}".format(np.max(np.abs(zSurf-zz[-1,:]))))
-            # plt.show()
+elif verticalCoordinate == "pressure":
+    
+    def A(s):
+        return (1. - s) / (1. - sTop) * sTop
+    
+    def Aprime(s):
+        return -sTop / (1. - sTop)
 
-        top = zz[0,:]                     #slightly different top of domain
-        zSurf = zz[-1,:]               #slightly different bottom of domain
+    def B(s):
+        return (s - sTop) / (1. - sTop)
+    
+    def Bprime(s):
+        return 1. / (1. - sTop)
+    
+    ssInt = (ss[0:-1,:] + ss[1:,:]) / 2.              #s-mesh on interfaces
+    p = A(ssInt) * Po + B(ssInt) * np.tile(pSurf,(nLev+1,1))
+    pi = (p / Po) ** (Rd/Cp)
+    zz0 = inverseExnerPressure(pi)
+    zz = zz0.copy()
 
-        tmp = np.zeros((nLev+2, nCol))
-        tmp[1:-1,:] = (zz[0:-1,:] + zz[1:,:]) / 2.
-        tmp[-1,:] = (zSurf - wIbot[1:stc].dot(tmp[-2:-1-stc:-1,:])) \
-        / wIbot[0]
-        tmp[0,:] = (top - wItop[1:stc].dot(tmp[1:stc,:])) \
-        / wItop[0]
-        zz = tmp.copy()
+    #Iterate to satisfy initial conditions and hydrostatic condition:
+    for j in range(10):
+        T = exnerPressure(zz) * potentialTemperature(zz)
+        # T = exnerPressure(zz) \
+        # * (potentialTemperature(zz) + thetaPtb(xx[1:,:],zz))
+        integrand = -Rd * T / (A(ssInt) * Po + B(ssInt) * pSurf) \
+        * (Aprime(ssInt) * Po + Bprime(ssInt) * pSurf) / g
+        integrand = (integrand[0:-1,:] + integrand[1:,:]) / 2.
+        tmp = zz[0,:].copy()
+        for i in range(nLev):
+            tmp = tmp + integrand[i,:] * ds            #midpoint quadrature
+            zz[i+1,:] = tmp.copy()
 
-    zSurfPrime = Wa.dot(zSurf.T).T #approximate derivative of topo function
+    top = zz[0,:]                         #slightly different top of domain
+    zSurf = zz[-1,:]                   #slightly different bottom of domain
 
-    return zz, A, B, zSurf, top, zSurfPrime, ssInt
+    #move zz from interfaces to midpoints:
+    tmp = np.zeros((nLev+2, nCol))
+    tmp[1:-1,:] = (zz[0:-1,:] + zz[1:,:]) / 2.
+    tmp[-1,:] = (zSurf - wIbot[1:stc].dot(tmp[-2:-1-stc:-1,:])) / wIbot[0]
+    tmp[0,:] = (top - wItop[1:stc].dot(tmp[1:stc,:])) / wItop[0]
+    zz = tmp.copy()
 
 ###########################################################################
 
-zz, A, B, zSurf, top, zSurfPrime, ssInt = getVerticalLevels(zSurf, top)
+zSurfPrime = Wa.dot(zSurf.T).T      #consistent derivative of topo function
 
 ###########################################################################
 
@@ -373,29 +207,23 @@ if plotNodesAndExit:
 
 ###########################################################################
 
-def backgroundStatesAndPerturbations(zz):
+#Assignment of hydrostatic background states and initial perturbations:
     
-    thetaBar = potentialTemperature(zz)
-    piBar = exnerPressure(zz)
-    piPtb = np.zeros((nLev+2, nCol))
-    Tbar = piBar * thetaBar
-    Tptb = (piBar + piPtb) * (thetaBar + thetaPtb(xx,zz)) - Tbar
-    Pbar = Po * piBar ** (Cp/Rd)
-    Pptb = Po * (piBar + piPtb) ** (Cp/Rd) - Pbar
-    rhoBar = Pbar / Rd / Tbar
-    rhoPtb = (Pbar + Pptb) / Rd / (Tbar + Tptb) - rhoBar
-    phiBar = g * zz
+thetaBar = potentialTemperature(zz)
+piBar = exnerPressure(zz)
+piPtb = np.zeros((nLev+2, nCol))
+Tbar = piBar * thetaBar
+Tptb = (piBar + piPtb) * (thetaBar + thetaPtb(xx,zz)) - Tbar
+Pbar = Po * piBar ** (Cp/Rd)
+Pptb = Po * (piBar + piPtb) ** (Cp/Rd) - Pbar
+rhoBar = Pbar / Rd / Tbar
+rhoPtb = (Pbar + Pptb) / Rd / (Tbar + Tptb) - rhoBar
+phiBar = g * zz
     
-    return thetaBar, piBar, Tbar, Pbar, rhoBar, phiBar \
-    , Tptb, rhoPtb
-
 ###########################################################################
 
-#Assignment of hydrostatic background states and initial perturbations:
-thetaBar, piBar, Tbar, Pbar, rhoBar, phiBar \
-, Tptb, rhoPtb = backgroundStatesAndPerturbations(zz)
-
 #Assignment of initial conditions:
+
 U = np.zeros((6, nLev+2, nCol))
 if testCase == "inertiaGravityWaves":
     U[0,:,:] =  20. * np.ones((nLev+2, nCol))          #horizontal velocity
@@ -405,38 +233,19 @@ U[3,:,:] = rhoPtb                                     #density perturbation
 U[4,:,:] = phiBar.copy()                                      #geopotential
 U[5,:,:] = np.zeros((nLev+2, nCol))                  #pressure perturbation
 
-###########################################################################
-
-#Unit tangent and unit normal vectors along bottom and top boundaries:
-
-TzBot = zSurfPrime
-TxBot = np.ones((nCol))
-tmp = np.sqrt(TxBot**2 + TzBot**2)
-TxBot = TxBot / tmp                  #x-component of unit tangent on bottom
-TzBot = TzBot / tmp                  #z-component of unit tangent on bottom
-
-NxBot = np.tile(-TzBot, (stc-1,1))    #x-component of unit normal on bottom
-NzBot = np.tile(TxBot, (stc-1,1))     #z-component of unit normal on bottom
-
-#Tile the tangent and normal vectors vertically according to the stencil
-#size, so that they can be more effectively used inside the
-#setGhostNodes() function below.  Inside this function, the tangent
-#velocity will be extrapolated to the ghost nodes, while the normal
-#velocity will be found by forcing the boundary value to be zero (no-flux
-#boundary condition):
-
-TxBot = np.tile(TxBot, (stc,1))
-TzBot = np.tile(TzBot, (stc,1))
-
-NxTop = np.zeros((stc-1, nCol))
-NzTop = np.ones((stc-1, nCol))
-
-TxTop = np.ones((stc, nCol))
-TzTop = np.zeros((stc, nCol))
+mass0 = np.sum(U[3,1:-1,:]*Ds(U[4,:,:])[1:-1,:]/g*ds*dx)
 
 ###########################################################################
 
-if saveContours :
+#Tangent and normal vectors on bottom and top boundaries:
+
+TxBot, TzBot, NxBot, NzBot \
+, TxTop, TzTop, NxTop, NzTop \
+= common.tangentsAndNormals(zSurfPrime, stc)
+
+###########################################################################
+
+if saveContours:
     #Initialize a figure of the appropriate size:
     if testCase == "inertiaGravityWaves":
         fig = plt.figure(figsize = (18,3))
@@ -510,61 +319,17 @@ def contourSomething(U, t):
 
 ###########################################################################
 
+#Initialize the output array for the vertical re-map function:
+
 if verticallyLagrangian:
-    if verticalCoordinate == "height":
-        V = np.zeros((5, nLev+2, nCol))
-    else:
-        V = np.zeros((5, nLev+2, nCol))
+    V = np.zeros((5, nLev+2, nCol))
 
 ###########################################################################
 
-def verticalRemap(U, z, Z, V):          #used only in vertically Lagrangian
-    """
-    Interpolate columns of 3D array U from z to Z using quadratics
-    nLev is the number of interior levels of U
-    z and Z are 2D arrays such that each row is a new z-level
-    V is the output array
-    """
-    z = np.tile(z, (np.shape(U)[0], 1, 1))
-    Z = np.tile(Z, (np.shape(U)[0], 1, 1))
+#This will be used inside the setGhostNodes() function to quickly find
+#background states on possibly changing vertical levels:
 
-    #quadratic on bottom:
-    z0 = z[:,0,:]                                               #first node
-    z1 = z[:,1,:]                                              #second node
-    z2 = z[:,2,:]                                               #third node
-    ZZ = Z[:,0,:]                                         #evaluation point
-    V[:,0,:] = \
-      (ZZ - z1) * (ZZ - z2) * U[:,0,:] / (z0 - z1) / (z0 - z2) \
-    + (ZZ - z0) * (ZZ - z2) * U[:,1,:] / (z1 - z0) / (z1 - z2) \
-    + (ZZ - z0) * (ZZ - z1) * U[:,2,:] / (z2 - z0) / (z2 - z1)
-
-    #quadratic on interior:
-    z0 = z[:,0:nLev+0,:]
-    z1 = z[:,1:nLev+1,:]
-    z2 = z[:,2:nLev+2,:]
-    ZZ = Z[:,1:nLev+1,:]
-    V[:,1:nLev+1,:] = \
-      (ZZ - z1) * (ZZ - z2) * U[:,0:nLev+0,:] / (z0 - z1) / (z0 - z2) \
-    + (ZZ - z0) * (ZZ - z2) * U[:,1:nLev+1,:] / (z1 - z0) / (z1 - z2) \
-    + (ZZ - z0) * (ZZ - z1) * U[:,2:nLev+2,:] / (z2 - z0) / (z2 - z1)
-
-    #quadratic on top:
-    z0 = z[:,nLev-1,:]
-    z1 = z[:,nLev+0,:]
-    z2 = z[:,nLev+1,:]
-    ZZ = Z[:,nLev+1,:]
-    V[:,nLev+1,:] = \
-      (ZZ - z1) * (ZZ - z2) * U[:,nLev-1,:] / (z0 - z1) / (z0 - z2) \
-    + (ZZ - z0) * (ZZ - z2) * U[:,nLev+0,:] / (z1 - z0) / (z1 - z2) \
-    + (ZZ - z0) * (ZZ - z1) * U[:,nLev+1,:] / (z2 - z0) / (z2 - z1)
-
-    return V
-
-###########################################################################
-
-def fastBackgroundStates(phi):
-    
-    zz = phi / g
+def fastBackgroundStates(zz):
     
     thetaBar = potentialTemperature(zz)
     piBar = exnerPressure(zz)
@@ -593,9 +358,9 @@ def setGhostNodes(U):
     U[4,0,:] = (g*top - wItop[1:stc].dot(U[4,1:stc,:])) \
     / wItop[0]
     
-    #Get background states on possibly changing geopotential levels:
+    #Get background states on possibly changing vertical levels:
     Pbar, rhoBar, Tbar, drhoBarDz, dTbarDz \
-    = fastBackgroundStates(U[4,:,:])
+    = fastBackgroundStates(U[4,:,:] / g)
     
     #extrapolate tangent velocity uT to bottom ghost nodes:
     uT = U[0,-2:-stc-2:-1,:] * TxBot + U[1,-2:-stc-2:-1,:] * TzBot
@@ -735,19 +500,13 @@ def odefun(t, U, dUdt):
     + HV(U[3,:,:])                                                 #drho/dt
 
     dUdt[4,1:-1,:] = ((uDotGradS - sDot) * dphids)[1:-1,:] \
-    + 0.*HV(U[4,:,:] - phiBar)                                     #dphi/dt
+    + HV(U[4,:,:] - phiBar)                                        #dphi/dt
     
     return dUdt
 
 ###########################################################################
 
 #Main time-stepping loop:
-
-# U = setGhostNodes(U)[0]
-# plt.contourf(xx, zz, U[5,:,:], 20)
-# plt.colorbar()
-# plt.show()
-# sys.exit("Done for now.")
 
 et = time.time()
 
@@ -758,8 +517,8 @@ for i in np.arange(0, nTimesteps+1):
     and (np.mod(i,4) == 0) and (testCase != "inertiaGravityWaves"):
         if verticalCoordinate == "height":
             U = setGhostNodes(U)[0]
-            U[0:5,:,:] = verticalRemap(U[0:5,:,:], U[4,:,:], phiBar, V)
-            # U[4,:,:] = phiBar.copy()
+            U[0:5,:,:] = common.verticalRemap(U[0:5,:,:] \
+            , U[4,:,:], phiBar, V)
         else:
             tmp = setGhostNodes(U)
             U = tmp[0]
@@ -780,21 +539,10 @@ for i in np.arange(0, nTimesteps+1):
             pHydro = np.vstack((2.*pTop - pHydro[0,:] \
             , pHydro \
             , 2.*pHydroSurf - pHydro[-1,:]))
-            
             pHydroNew = A(ss) * Po \
             + B(ss) * np.tile(pHydroSurf, (nLev+2, 1))
-
-            # dP = A(ssInt) * Po \
-            # + B(ssInt) * np.tile(pHydroSurf, (nLev+1,1))
-            # dP = dP[1:,:] - dP[0:-1,:]
-            U[0:5,:,:] = verticalRemap(U[0:5,:,:], pHydro, pHydroNew, V)
-            # tmp = setGhostNodes(U)
-            # U = tmp[0]
-            # rhoBar = tmp[2]
-            # dPhi = (U[4,0:-1,:] + U[4,1:,:]) / 2.
-            # dPhi = dPhi[1:,:] - dPhi[0:-1,:]
-            # U[3,1:-1,:] = -dP / dPhi - rhoBar[1:-1,:]
-
+            U[0:5,:,:] = common.verticalRemap(U[0:5,:,:] \
+            , pHydro, pHydroNew, V)
             # plt.clf()
             # plt.contourf(xx, zz, pHydro-pHydroNew, 20)
             # plt.colorbar()
@@ -803,19 +551,27 @@ for i in np.arange(0, nTimesteps+1):
     
     if np.mod(i, np.int(np.round(saveDel/dt))) == 0:
         
-        print("t = {0:5d} | et = {1:6.2f} | maxAbsRho = {2:.2e}" \
+        U = setGhostNodes(U)[0]
+
+        print("t = {0:5d},  et = {1:6.2f},  MAX:  |u| = {2:.2e},  \
+|w| = {3:.2e},  |T| = {4:.2e},  |rho| = {5:.2e},  \
+|phi| = {6:.2e},  |P| = {7:.2e},  |massDiff| = {8:.2e}" \
         . format(np.int(np.round(t)) \
         , time.time()-et \
-        , np.max(np.abs(U[3,:,:]))))
+        , np.max(np.abs(U[0,:,:])) \
+        , np.max(np.abs(U[1,:,:])) \
+        , np.max(np.abs(U[2,:,:])) \
+        , np.max(np.abs(U[3,:,:])) \
+        , np.max(np.abs(U[4,:,:]-phiBar)) \
+        , np.max(np.abs(U[5,:,:])) \
+        , np.abs(np.sum(U[3,1:-1,:]*Ds(U[4,:,:])[1:-1,:]/g*ds*dx)-mass0) \
+        / mass0))
         
         et = time.time()
         
         if contourFromSaved :
             U[0:5,:,:] = np.load( saveString \
             + '{0:04d}'.format(np.int(np.round(t))) + '.npy' )
-        
-        if saveArrays or saveContours:
-            U = setGhostNodes(U)[0]
         
         if saveArrays:
             np.save(saveString \
