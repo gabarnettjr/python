@@ -14,25 +14,25 @@ from gab.nonhydro import common
 #to modify when running the code, unless they want to add a new test case.
 
 #Choose "risingBubble", "densityCurrent", or "inertiaGravityWaves":
-testCase = "densityCurrent"
+testCase = "inertiaGravityWaves"
 
 #Choose "pressure" or "height":
-verticalCoordinate = "height"
-verticallyLagrangian = False
+verticalCoordinate = "pressure"
+verticallyLagrangian = True
 
 #Choose 0, 1, 2, 3, or 4:
-refinementLevel = 2
+refinementLevel = 1
 
 #Switches to control what happens:
 saveArrays          = True
 saveContours        = True
-contourFromSaved    = False
+contourFromSaved    = True
 plotNodesAndExit    = False
 plotBackgroundState = False
 
 #Choose which variable to plot
 #("u", "w", "T", "rho", "phi", "P", "theta", "pi", "phi"):
-whatToPlot = "P"
+whatToPlot = "rho"
 
 #Choose either a number of contours, or a range of contours:
 contours = 20
@@ -201,19 +201,19 @@ def getSvalues():
         #the behavior of the pressure coordinate, so that we can use the
         #same setGhostNodes() function for both coordinates.
         ds = 1. / nLev
-        s = np.linspace(-ds/2, 1+ds/2, nLev+2)
-        #These are not explicitly needed in height coordinate case:
-        pSurf = 0.
         sTop = 0.
-        pTop = 0.
+        s = np.linspace(sTop-ds/2, 1+ds/2, nLev+2)
+        #These are not explicitly needed in height coordinate case:
+        pSurf = []
+        pTop = []
     elif verticalCoordinate == "pressure":
         piTop  = exnerPressure(top)
         piSurf = exnerPressure(zSurf)
-        pSurf = Po * piSurf ** (Cp/Rd)     #hydrostatic pressure at surface
         pTop  = Po * piTop  ** (Cp/Rd)         #hydrostatic pressure at top
+        pSurf = Po * piSurf ** (Cp/Rd)     #hydrostatic pressure at surface
         sTop = pTop / Po                      #value of s on upper boundary
         ds = (1. - sTop) / nLev
-        s = np.linspace(sTop-ds/2., 1.+ds/2., nLev+2)
+        s = np.linspace(sTop-ds/2, 1+ds/2, nLev+2)
     else:
         raise ValueError("Invalid verticalCoordinate string.  Please " \
         + "choose either 'height' or 'pressure'.")
@@ -241,7 +241,7 @@ Whva = phs1.getPeriodicDM(z=x, x=x, m=pol+1 \
 Whva = alp * dx**pol * Whva                    #lateral dissipation weights
 
 phs = 5                                              #vertical PHS exponent
-pol = 3                        #highest degree polynomial in vertical basis
+pol = 2                        #highest degree polynomial in vertical basis
 stc = 5                                              #vertical stencil size
 if verticalCoordinate == "pressure":
     alp = -2.**-22. * 300.                #vertical dissipation coefficient
@@ -249,26 +249,26 @@ else:
     alp = -2.**-22. * 300.          #much larger in height coordinate case?
 Ws   = phs1.getDM(z=s,       x=s, m=1 \
 , phs=phs, pol=pol, stc=stc)                   #vertical derivative weights
-Whvs = phs1.getDM(z=s[1:-1], x=s, m=pol+1 \
+Whvs = phs1.getDM(z=s[1:-1], x=s, m=4 \
 , phs=phs, pol=pol, stc=stc)
-Whvs = alp * ds**pol * Whvs                   #vertical dissipation weights
+Whvs = alp * ds**3 * Whvs                     #vertical dissipation weights
 
-wItop = phs1.getWeights(z=(s[0]+s[1])/2.,   x=s[0:stc],        m=0 \
+wItop = phs1.getWeights(z=sTop,  x=s[0:stc],        m=0 \
 , phs=phs, pol=pol)                            #interpolate to top boundary
-wEtop = phs1.getWeights(z=s[0],             x=s[1:stc+1],      m=0 \
+wEtop = phs1.getWeights(z=s[0],  x=s[1:stc+1],      m=0 \
 , phs=phs, pol=pol)                         #extrapolate to top ghost nodes
-wDtop = phs1.getWeights(z=(s[0]+s[1])/2.,   x=s[0:stc],        m=1 \
+wDtop = phs1.getWeights(z=sTop,  x=s[0:stc],        m=1 \
 , phs=phs, pol=pol)                             #derivative on top boundary
-wHtop = phs1.getWeights(z=(s[0]+s[1])/2.,   x=s[1:stc+1],      m=0 \
+wHtop = phs1.getWeights(z=sTop,  x=s[1:stc+1],      m=0 \
 , phs=phs, pol=pol)                            #extrapolate to top boundary
 
-wIbot = phs1.getWeights(z=(s[-2]+s[-1])/2., x=s[-1:-1-stc:-1], m=0 \
+wIbot = phs1.getWeights(z=1.,    x=s[-1:-1-stc:-1], m=0 \
 , phs=phs, pol=pol)                         #interpolate to bottom boundary
-wEbot = phs1.getWeights(z=s[-1],            x=s[-2:-2-stc:-1], m=0 \
+wEbot = phs1.getWeights(z=s[-1], x=s[-2:-2-stc:-1], m=0 \
 , phs=phs, pol=pol)                      #extrapolate to bottom ghost nodes
-wDbot = phs1.getWeights(z=(s[-2]+s[-1])/2., x=s[-1:-1-stc:-1], m=1 \
+wDbot = phs1.getWeights(z=1.,    x=s[-1:-1-stc:-1], m=1 \
 , phs=phs, pol=pol)                          #derivative on bottom boundary
-wHbot = phs1.getWeights(z=s[-1],            x=s[-2:-2-stc:-1], m=0 \
+wHbot = phs1.getWeights(z=1.,    x=s[-2:-2-stc:-1], m=0 \
 , phs=phs, pol=pol)                         #extrapolate to bottom boundary
 
 #Lateral derivative on all levels:
@@ -343,10 +343,14 @@ def getVerticalLevels(zSurf, top):
 
         top = zz[0,:]                     #slightly different top of domain
         zSurf = zz[-1,:]               #slightly different bottom of domain
-        zz = (zz[0:-1,:] + zz[1:,:]) / 2.
-        zz = np.vstack((2.*top - zz[0,:] \
-        , zz \
-        , 2.*zSurf - zz[-1,:]))     #interfaces -> layer midpts
+
+        tmp = np.zeros((nLev+2, nCol))
+        tmp[1:-1,:] = (zz[0:-1,:] + zz[1:,:]) / 2.
+        tmp[-1,:] = (zSurf - wIbot[1:stc].dot(tmp[-2:-1-stc:-1,:])) \
+        / wIbot[0]
+        tmp[0,:] = (top - wItop[1:stc].dot(tmp[1:stc,:])) \
+        / wItop[0]
+        zz = tmp.copy()
 
     zSurfPrime = Wa.dot(zSurf.T).T #approximate derivative of topo function
 
@@ -586,7 +590,8 @@ def setGhostNodes(U):
     / wIbot[0]
     
     #Enforce phi=g*z on top boundary (s=sTop):
-    U[4,0,:] = (g*top - wItop[1:stc].dot(U[4,1:stc,:])) / wItop[0]
+    U[4,0,:] = (g*top - wItop[1:stc].dot(U[4,1:stc,:])) \
+    / wItop[0]
     
     #Get background states on possibly changing geopotential levels:
     Pbar, rhoBar, Tbar, drhoBarDz, dTbarDz \
@@ -643,6 +648,8 @@ def setGhostNodes(U):
     - rhoBar[-1,:]
     U[3,0,:] = (Pbar[0,:]+U[5,0,:]) / Rd / (Tbar[0,:]+U[2,0,:]) \
     - rhoBar[0,:]
+    # U[3,-1,:] = wEbot.dot(U[3,-2:-2-stc:-1,:])
+    # U[3,0,:] = wEtop.dot(U[3,1:stc+1,:])
     
     return U, Pbar, rhoBar, Tbar, drhoBarDz, dTbarDz
 
