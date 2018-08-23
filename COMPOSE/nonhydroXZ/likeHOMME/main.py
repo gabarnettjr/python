@@ -14,7 +14,7 @@ from gab.nonhydro import common
 #to modify when running the code, unless they want to add a new test case.
 
 #Choose "risingBubble", "densityCurrent", or "inertiaGravityWaves":
-testCase = "risingBubble"
+testCase = "densityCurrent"
 
 #Choose "pressure" or "height":
 verticalCoordinate = "height"
@@ -22,7 +22,7 @@ verticalCoordinate = "height"
 verticallyLagrangian = False
 
 #Choose 0, 1, 2, 3, or 4:
-refinementLevel = 1
+refinementLevel = 3
 
 #Switches to control what happens:
 saveArrays          = True
@@ -32,12 +32,12 @@ plotNodesAndExit    = False
 plotBackgroundState = False
 
 #Choose which variable to plot
-#("u", "w", "T", "rho", "phi", "P", "theta", "pi", "phi"):
+#("u", "w", "T", "rho", "phi", "P", "theta", "pi"):
 whatToPlot = "theta"
 
 #Choose either a number of contours, or a range of contours:
-# contours = 20
-contours = np.arange(-20.5, 1.5, 1)
+contours = 20
+# contours = np.arange(-20.5, 1.5, 1)
 
 ###########################################################################
 
@@ -77,27 +77,26 @@ if contourFromSaved:
 #Definitions of atmospheric constants:
 Cp, Cv, Rd, g, Po, th0, N = common.constants()
 
+#Test-specific parameters describing domain and initial perturbation:
+left, right, bottom, top, dx, nLev, dt, tf, saveDel \
+, zSurf, thetaPtb \
+= common.domainParameters(testCase, refinementLevel, g, Cp, th0)
+
+#Some other important parameters:
+nCol = np.int(np.round((right - left) / dx))             #number of columns
+t = 0.                                                        #initial time
+nTimesteps = np.int(np.round(tf / dt))                #number of time-steps
+x = np.linspace(left+dx/2, right-dx/2, nCol)        #array of x-coordinates
+zSurf = zSurf(x)            #over-write zSurf function with array of values
+
+#ones and zeros to avoid repeated initialization:
+e = np.ones((nLev+2, nCol))
+null = np.zeros((nLev+2, nCol))
+
 #Hydrostatic background state functions:
 potentialTemperature, potentialTemperatureDerivative \
 , exnerPressure, inverseExnerPressure \
-= common.hydrostaticProfiles(testCase, th0, g, Cp, N)
-
-#Domain-specific parameters describing domain and initial perturbation:
-left, right, bottom, top, dx, nLev, dt, tf, saveDel \
-, zSurf, thetaPtb \
-= common.domainParameters(testCase, refinementLevel, exnerPressure)
-
-###########################################################################
-
-t = 0.
-
-nTimesteps = np.int(np.round(tf / dt))
-
-nCol = np.int(np.round((right - left) / dx))             #number of columns
-
-x = np.linspace(left+dx/2, right-dx/2, nCol)
-
-zSurf = zSurf(x)            #over-write zSurf function with array of values
+= common.hydrostaticProfiles(testCase, th0, g, Cp, N, e, null)
 
 ###########################################################################
 
@@ -209,9 +208,9 @@ if plotNodesAndExit:
 
 #Assignment of hydrostatic background states and initial perturbations:
     
-thetaBar = potentialTemperature(zz)
-piBar = exnerPressure(zz)
-piPtb = np.zeros((nLev+2, nCol))
+thetaBar = potentialTemperature(zz, e, null)
+piBar = exnerPressure(zz, e, null)
+piPtb = null
 Tbar = piBar * thetaBar
 Tptb = (piBar + piPtb) * (thetaBar + thetaPtb(xx,zz)) - Tbar
 Pbar = Po * piBar ** (Cp/Rd)
@@ -233,7 +232,7 @@ U[3,:,:] = rhoPtb                                     #density perturbation
 U[4,:,:] = phiBar.copy()                                      #geopotential
 U[5,:,:] = np.zeros((nLev+2, nCol))                  #pressure perturbation
 
-mass0 = np.sum(U[3,1:-1,:]*Ds(U[4,:,:])[1:-1,:]/g*ds*dx)
+mass0 = np.sum(U[3,1:-1,:] * Ds(U[4,:,:])[1:-1,:] / g * ds * dx)
 
 ###########################################################################
 
@@ -331,9 +330,9 @@ if verticallyLagrangian:
 
 def fastBackgroundStates(zz):
     
-    thetaBar = potentialTemperature(zz)
-    piBar = exnerPressure(zz)
-    dthetaBarDz = potentialTemperatureDerivative(zz)
+    thetaBar = potentialTemperature(zz, e, null)
+    piBar = exnerPressure(zz, e, null)
+    dthetaBarDz = potentialTemperatureDerivative(zz, e, null)
     
     Tbar = piBar * thetaBar
     Pbar = Po * piBar ** (Cp/Rd)
@@ -434,6 +433,8 @@ if rks == 4:
     q3 = np.zeros((6, nLev+2, nCol))
     q4 = np.zeros((6, nLev+2, nCol))
 
+sDotNull = np.zeros((nLev+2, nCol))
+
 ###########################################################################
 
 #This describes the RHS of the system of ODEs in time that will be solved:
@@ -466,20 +467,22 @@ def odefun(t, U, dUdt):
             #please see this overleaf document for a complete derivation,
             #starting from the governing equation for pseudo-density dpids:
             #https://www.overleaf.com/read/gcfkprynxvkw
-            sDot = np.zeros((nLev+1, nCol))
+            sDot = sDotNull
             dpids = -(rhoBar+U[3,:,:]) * Ds(U[4,:,:])#hydrostatic condition
             integrand = Da(dpids * U[0,:,:])[1:-1,:]
             dpids = (dpids[0:-1,:] + dpids[1:,:]) / 2.   #avg to interfaces
-            sDot = B(ssInt) * np.tile(np.sum(integrand*ds,0), (nLev+1,1))
+            sDot[0:-1,:] = B(ssInt) \
+            * np.tile(np.sum(integrand*ds,0), (nLev+1,1))
             tmp = 0.
             for j in range(nLev):
                 tmp = tmp + integrand[j,:] * ds
                 sDot[j+1,:] = sDot[j+1,:] - tmp
-            sDot = sDot / dpids
-            sDot = (sDot[0:-1,:] + sDot[1:,:]) / 2.
-            sDot = np.vstack((2. * 0. - sDot[0,:] \
-            , sDot \
-            , 2. * 0. - sDot[-1,:]))   #sDot=0 on bottom and top boundaries
+            sDot[0:-1,:] = sDot[0:-1,:] / dpids
+            sDot[1:-1,:] = (sDot[0:-2,:] + sDot[1:-1,:]) / 2.#avg to midpts
+            sDot[-1,:] = (0. - wIbot[1:stc].dot(sDot[-2:-1-stc:-1,:])) \
+            / wIbot[0]                                    #sDot=0 on bottom
+            sDot[0,:] = (0. - wItop[1:stc].dot(sDot[1:stc,:])) \
+            / wItop[0]                                       #sDot=0 on top
     
     #Main part:
     
@@ -534,13 +537,28 @@ for i in np.arange(0, nTimesteps+1):
                 tmp = tmp + integrand[j,:] * ds
                 # tmp = tmp + integrand[j,:] * dPhi[j,:]
                 pHydro[j+1,:] = tmp.copy()
+
             pHydroSurf = tmp.copy()
+
             pHydro = (pHydro[0:-1,:] + pHydro[1:,:])/2.
-            pHydro = np.vstack((2.*pTop - pHydro[0,:] \
-            , pHydro \
-            , 2.*pHydroSurf - pHydro[-1,:]))
-            pHydroNew = A(ss) * Po \
-            + B(ss) * np.tile(pHydroSurf, (nLev+2, 1))
+            tmp = np.zeros((nLev+2, nCol))
+            tmp[1:-1,:] = pHydro
+            tmp[-1,:] = (pHydroSurf \
+            - wIbot[1:stc].dot(tmp[-2:-1-stc:-1,:])) / wIbot[0]
+            tmp[0,:] = (pTop - wItop[1:stc].dot(tmp[1:stc,:])) / wItop[0]
+            pHydro = tmp.copy()
+
+            pHydroNew = A(ssInt) * Po \
+            + B(ssInt) * np.tile(pHydroSurf, (nLev+1, 1))
+
+            pHydroNew = (pHydroNew[0:-1,:] + pHydroNew[1:,:]) / 2.
+            tmp = np.zeros((nLev+2, nCol))
+            tmp[1:-1,:] = pHydroNew
+            tmp[-1,:] = (pHydroSurf \
+            - wIbot[1:stc].dot(tmp[-2:-1-stc:-1,:])) / wIbot[0]
+            tmp[0,:] = (pTop - wItop[1:stc].dot(tmp[1:stc,:])) / wItop[0]
+            pHydroNew = tmp.copy()
+
             U[0:5,:,:] = common.verticalRemap(U[0:5,:,:] \
             , pHydro, pHydroNew, V)
             # plt.clf()
@@ -553,19 +571,11 @@ for i in np.arange(0, nTimesteps+1):
         
         U = setGhostNodes(U)[0]
 
-        print("t = {0:5d},  et = {1:6.2f},  MAX:  |u| = {2:.2e},  \
-|w| = {3:.2e},  |T| = {4:.2e},  |rho| = {5:.2e},  \
-|phi| = {6:.2e},  |P| = {7:.2e},  |massDiff| = {8:.2e}" \
-        . format(np.int(np.round(t)) \
-        , time.time()-et \
-        , np.max(np.abs(U[0,:,:])) \
-        , np.max(np.abs(U[1,:,:])) \
-        , np.max(np.abs(U[2,:,:])) \
-        , np.max(np.abs(U[3,:,:])) \
-        , np.max(np.abs(U[4,:,:]-phiBar)) \
-        , np.max(np.abs(U[5,:,:])) \
-        , np.abs(np.sum(U[3,1:-1,:]*Ds(U[4,:,:])[1:-1,:]/g*ds*dx)-mass0) \
-        / mass0))
+        common.printMinAndMax(t, time.time()-et, U, phiBar)
+
+        # print("|massDiff| = {0:.2e}" \
+        # . format(np.abs(np.sum(U[3,1:-1,:] * Ds(U[4,:,:])[1:-1,:] \
+        # / g * ds * dx) - mass0) / mass0))
         
         et = time.time()
         
