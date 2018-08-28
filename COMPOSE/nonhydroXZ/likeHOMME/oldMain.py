@@ -20,7 +20,7 @@ testCase = "inertiaGravityWaves"
 #Choose "pressure" or "height":
 verticalCoordinate = "pressure"
 
-verticallyLagrangian = True
+verticallyLagrangian = False
 
 #Choose 0, 1, 2, 3, or 4:
 refinementLevel = 1
@@ -44,7 +44,7 @@ contours = 20
 
 #Get string for saving results:
 
-saveString = "./results/" + testCase + "_" + verticalCoordinate + "_"
+saveString = "./oldResults/" + testCase + "_" + verticalCoordinate + "_"
 
 if verticallyLagrangian:
     saveString = saveString + "vLag" + "_"
@@ -233,11 +233,11 @@ if testCase == "inertiaGravityWaves":
     U[0,:,:] =  20. * np.ones((nLev+2, nCol))          #horizontal velocity
 U[1,:,:] = np.zeros((nLev+2, nCol))                      #vertical velocity
 U[2,:,:] = Tptb                                   #temperature perturbation
-U[3,:,:] = rhoBar + rhoPtb                                         #density
+U[3,:,:] = rhoPtb                                                  #density
 U[4,:,:] = phiBar.copy()                                      #geopotential
 U[5,:,:] = np.zeros((nLev+2, nCol))                  #pressure perturbation
 
-mass0 = np.sum(U[3,1:-1,:] * Ds(U[4,:,:])[1:-1,:] / g * ds * dx)
+mass0 = -np.sum(((rhoBar+U[3,:,:]) * Ds(U[4,:,:]))[1:-1,:] / g * ds * dx)
 
 ###########################################################################
 
@@ -261,7 +261,7 @@ if saveContours:
 
 #Create and save a contour plot of the field specified by whatToPlot:
 
-def contourSomething(U, t, rhoBar):
+def contourSomething(U, t):
 
     if plotBackgroundState:
         if whatToPlot == "u":
@@ -290,7 +290,7 @@ def contourSomething(U, t, rhoBar):
         elif whatToPlot == "T":
             tmp = U[2,:,:]
         elif whatToPlot == "rho":
-            tmp = U[3,:,:] - rhoBar
+            tmp = U[3,:,:]
         elif whatToPlot == "phi":
             tmp = U[4,:,:] - phiBar
         elif whatToPlot == "P":
@@ -384,11 +384,11 @@ def setGhostNodes(U):
     U[1,0,:] = -wItop[1:stc].dot(U[1,1:stc,:]) / wItop[0]
     
     #get pressure on interior nodes using the equation of state:
-    U[5,1:-1,:] = (U[3,:,:] * Rd * (Tbar+U[2,:,:]) - Pbar)[1:-1,:]
+    U[5,1:-1,:] = ((rhoBar+U[3,:,:]) * Rd * (Tbar+U[2,:,:]) - Pbar)[1:-1,:]
     
     #set pressure on bottom ghost nodes:
     dPda = Da(wHbot.dot(U[5,-2:-2-stc:-1,:]))
-    rho = wHbot.dot(U[3,-2:-2-stc:-1,:] - rhoBar[-2:-2-stc:-1,:])
+    rho = wHbot.dot(U[3,-2:-2-stc:-1,:])
     dphida = Da(wIbot.dot(U[4,-1:-1-stc:-1,:]))
     dphids = wDbot.dot(U[4,-1:-1-stc:-1,:])
     dsdx = -dphida / dphids
@@ -399,7 +399,7 @@ def setGhostNodes(U):
     
     #set pressure on top ghost nodes:
     dPda = Da(wHtop.dot(U[5,1:stc+1,:]))
-    rho = wHtop.dot(U[3,1:stc+1,:] - rhoBar[1:stc+1,:])
+    rho = wHtop.dot(U[3,1:stc+1,:])
     dphida = Da(wItop.dot(U[4,0:stc,:]))
     dphids = wDtop.dot(U[4,0:stc,:])
     dsdx = -dphida / dphids
@@ -413,10 +413,10 @@ def setGhostNodes(U):
     U[2,0,:] = wEtop.dot(U[2,1:stc+1,:])
     
     #extrapolate density to bottom and top ghost nodes using EOS:
-    U[3,-1,:] = (Pbar[-1,:]+U[5,-1,:]) / Rd / (Tbar[-1,:]+U[2,-1,:])
-    # - rhoBar[-1,:]
-    U[3,0,:] = (Pbar[0,:]+U[5,0,:]) / Rd / (Tbar[0,:]+U[2,0,:])
-    # - rhoBar[0,:]
+    U[3,-1,:] = (Pbar[-1,:]+U[5,-1,:]) / Rd / (Tbar[-1,:]+U[2,-1,:]) \
+    - rhoBar[-1,:]
+    U[3,0,:] = (Pbar[0,:]+U[5,0,:]) / Rd / (Tbar[0,:]+U[2,0,:]) \
+    - rhoBar[0,:]
     
     return U, Pbar, rhoBar, Tbar, drhoBarDz, dTbarDz
 
@@ -448,8 +448,7 @@ def odefun(t, U, dUdt):
     
     U, Pbar, rhoBar, Tbar, drhoBarDz, dTbarDz = setGhostNodes(U)
     
-    rhoInv = 1. / U[3,:,:]
-    # rhoInv = 1. / (rhoBar + U[3,:,:])
+    rhoInv = 1. / (rhoBar + U[3,:,:])
     duda   = Da(U[0,:,:])
     duds   = Ds(U[0,:,:])
     dwda   = Da(U[1,:,:])
@@ -472,8 +471,7 @@ def odefun(t, U, dUdt):
             #starting from the governing equation for pseudo-density dpids:
             #https://www.overleaf.com/read/gcfkprynxvkw
             sDot = sDotNull
-            dpids = -U[3,:,:] * Ds(U[4,:,:])#hydrostatic condition
-            # dpids = -(rhoBar+U[3,:,:]) * Ds(U[4,:,:])#hydrostatic condition
+            dpids = -(rhoBar+U[3,:,:]) * Ds(U[4,:,:])#hydrostatic condition
             integrand = Da(dpids * U[0,:,:])[1:-1,:]
             dpids = (dpids[0:-1,:] + dpids[1:,:]) / 2.   #avg to interfaces
             sDot[0:-1,:] = B(ssInt) \
@@ -496,7 +494,7 @@ def odefun(t, U, dUdt):
     + HV(U[0,:,:])                                                   #du/dt
     
     dUdt[1,1:-1,:] = (-U[0,:,:] * dwda - sDot * dwds \
-    - rhoInv * (dPds * dsdz + (U[3,:,:]-rhoBar) * g))[1:-1,:] \
+    - rhoInv * (dPds * dsdz + U[3,:,:] * g))[1:-1,:] \
     + HV(U[1,:,:])                                                   #dw/dt
 
     dUdt[2,1:-1,:] = (-U[0,:,:] * Da(U[2,:,:]) - sDot * Ds(U[2,:,:]) \
@@ -504,11 +502,8 @@ def odefun(t, U, dUdt):
     + HV(U[2,:,:])                                                   #dT/dt
 
     dUdt[3,1:-1,:] = (-U[0,:,:] * Da(U[3,:,:]) - sDot * Ds(U[3,:,:]) \
-    - U[3,:,:] * divU)[1:-1,:] \
-    + HV(U[3,:,:] - rhoBar)                                        #drho/dt
-    # dUdt[3,1:-1,:] = (-U[0,:,:] * Da(U[3,:,:]) - sDot * Ds(U[3,:,:]) \
-    # - U[1,:,:] * drhoBarDz - (rhoBar + U[3,:,:]) * divU)[1:-1,:] \
-    # + HV(U[3,:,:])                                                 #drho/dt
+    - U[1,:,:] * drhoBarDz - (rhoBar + U[3,:,:]) * divU)[1:-1,:] \
+    + HV(U[3,:,:])                                                 #drho/dt
 
     dUdt[4,1:-1,:] = ((uDotGradS - sDot) * dphids)[1:-1,:] \
     + HV(U[4,:,:] - phiBar)                                        #dphi/dt
@@ -534,8 +529,7 @@ for i in np.arange(0, nTimesteps+1):
             tmp = setGhostNodes(U)
             U = tmp[0]
             rhoBar = tmp[2]
-            integrand = (-U[3,:,:] * Ds(U[4,:,:]))[1:-1,:]
-            # integrand = (-(rhoBar+U[3,:,:]) * Ds(U[4,:,:]))[1:-1,:]
+            integrand = (-(rhoBar+U[3,:,:]) * Ds(U[4,:,:]))[1:-1,:]
             tmp = pTop * np.ones((nCol))
             pHydro = np.zeros((nLev+1, nCol))
             pHydro[0,:] = tmp.copy()
@@ -555,13 +549,9 @@ for i in np.arange(0, nTimesteps+1):
 
             pHydroNew = A(ss) * Po \
             + B(ss) * np.tile(pHydroSurf, (nLev+2, 1))
-            pHydroNew[-1,:] = (pHydroSurf \
-            - wIbot[1:stc].dot(pHydroNew[-2:-1-stc:-1,:])) / wIbot[0]
-            pHydroNew[0,:] = (pTop - wItop[1:stc].dot(pHydroNew[1:stc,:])) / wItop[0]
 
             U[0:5,:,:] = common.verticalRemap(U[0:5,:,:] \
             , pHydro, pHydroNew, V)
-            U[3,:,:] = -Ds(pHydroNew) / Ds(U[4,:,:])
     
     if np.mod(i, np.int(np.round(saveDel/dt))) == 0:
         
@@ -571,8 +561,8 @@ for i in np.arange(0, nTimesteps+1):
 
         common.printMinAndMax(t, time.time()-et, U, rhoBar, phiBar)
 
-        # print("|massDiff| = {0:.2e}" \
-        # . format(np.abs(np.sum(U[3,1:-1,:] * Ds(U[4,:,:])[1:-1,:] \
+        # print("relativeMassChange = {0:.2e}" \
+        # . format((-np.sum(((rhoBar+U[3,:,:]) * Ds(U[4,:,:]))[1:-1,:] \
         # / g * ds * dx) - mass0) / mass0))
         
         et = time.time()
@@ -586,7 +576,7 @@ for i in np.arange(0, nTimesteps+1):
             + '{0:04d}'.format(np.int(np.round(t))) + '.npy', U[0:5,:,:])
         
         if saveContours:
-            contourSomething(U, t, rhoBar)
+            contourSomething(U, t)
     
     if contourFromSaved:
         t = t + dt
