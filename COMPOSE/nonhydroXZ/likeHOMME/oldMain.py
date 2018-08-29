@@ -13,32 +13,47 @@ from gab.nonhydro import common
 #This block contains the only variables that the user should be required
 #to modify when running the code, unless they want to add a new test case.
 
-#Choose "risingBubble", "densityCurrent", "inertiaGravityWaves", or
-#"steadyState":
-testCase = "inertiaGravityWaves"
+#Choose "risingBubble", "densityCurrent", "inertiaGravityWaves",
+#"steadyState", or "scharMountainWaves":
+testCase = sys.argv[1]
 
 #Choose "pressure" or "height":
-verticalCoordinate = "pressure"
+verticalCoordinate = sys.argv[2]
 
-verticallyLagrangian = False
+if sys.argv[3] == "vLag":
+    verticallyLagrangian = True
+elif sys.argv[3] == "vEul":
+    verticallyLagrangian = False
+else:
+    raise ValueError("The third argument should be either 'vLag' " \
+    + "or 'vEul'.")
 
 #Choose 0, 1, 2, 3, or 4:
-refinementLevel = 1
+refinementLevel = np.int64(sys.argv[4])
 
 #Switches to control what happens:
 saveArrays          = True
 saveContours        = True
-contourFromSaved    = False
+contourFromSaved    = True
 plotNodesAndExit    = False
 plotBackgroundState = False
 
 #Choose which variable to plot
 #("u", "w", "T", "rho", "phi", "P", "theta", "pi"):
-whatToPlot = "rho"
+try:
+    whatToPlot = sys.argv[5]
+except:
+    whatToPlot = "theta"
 
 #Choose either a number of contours, or a range of contours:
-contours = 20
-# contours = np.arange(-20.5, 1.5, 1)
+# contours = 20
+contours = np.arange(-1.025, 1.075, .05)
+
+###########################################################################
+
+if contourFromSaved:
+    saveArrays = False
+    saveContours = True
 
 ###########################################################################
 
@@ -69,14 +84,10 @@ if saveContours:
         if item.endswith(".png"):
             os.remove(os.path.join(os.getcwd(), item))
 
-if contourFromSaved:
-    saveArrays = False
-    saveContours = True
-
 ###########################################################################
 
 #Definitions of atmospheric constants:
-Cp, Cv, Rd, g, Po, th0, N = common.constants()
+Cp, Cv, Rd, g, Po, th0, N = common.constants(testCase)
 
 #Test-specific parameters describing domain and initial perturbation:
 left, right, bottom, top, dx, nLev, dt, tf, saveDel \
@@ -227,10 +238,14 @@ phiBar = g * zz
 
 #Assignment of initial conditions:
 
-U = np.zeros((6, nLev+2, nCol))
+U = np.zeros((6, nLev+2, nCol))                       #3D array of unknowns
 
 if testCase == "inertiaGravityWaves":
-    U[0,:,:] =  20. * np.ones((nLev+2, nCol))          #horizontal velocity
+    U[0,:,:] =  20. * np.ones((nLev+2, nCol))
+elif testCase == "scharMountainWaves":
+    U[0,:,:] = 10. * np.ones((nLev+2, nCol))
+else:
+    U[0,:,:] = np.zeros((nLev+2, nCol))                #horizontal velocity
 U[1,:,:] = np.zeros((nLev+2, nCol))                      #vertical velocity
 U[2,:,:] = Tptb                                   #temperature perturbation
 U[3,:,:] = rhoPtb                                                  #density
@@ -306,15 +321,22 @@ def contourSomething(U, t):
     zz = U[4,:,:] / g                           #possibly changing z-levels
     
     plt.clf()
-    plt.contourf(xx, zz, tmp, contours)
+    # plt.contourf(xx, zz, tmp, contours)
+    plt.contourf(xx[1:-1,:], zz[1:-1,:], tmp[1:-1,:], contours)
     if testCase == "inertiaGravityWaves":
         plt.colorbar(orientation="horizontal")
     elif testCase == "densityCurrent":
         plt.axis("image")
         plt.colorbar(orientation="horizontal")
+    elif testCase == "scharMountainWaves":
+        plt.axis("image")
+        plt.axis([-25000,25000,-250,20000])
+        plt.colorbar(orientation="horizontal")
     else:
         plt.axis("image")
         plt.colorbar(orientation="vertical")
+    plt.plot(x, zSurf, linestyle="-", color="black")
+    plt.plot(x, top*np.ones(np.shape(x)), linestyle="-", color="black")
     if plotBackgroundState:
         plt.show()
         sys.exit("\nDone plotting the requested background state.")
@@ -512,7 +534,7 @@ def odefun(t, U, dUdt):
 
 ###########################################################################
 
-#Main time-stepping loop:
+#Time-stepping loop:
 
 et = time.time()
 
@@ -532,10 +554,10 @@ for i in np.arange(0, nTimesteps+1):
             integrand = (-(rhoBar+U[3,:,:]) * Ds(U[4,:,:]))[1:-1,:]
             tmp = pTop * np.ones((nCol))
             pHydro = np.zeros((nLev+1, nCol))
-            pHydro[0,:] = tmp.copy()
+            pHydro[0,:] = tmp
             for j in range(nLev):
                 tmp = tmp + integrand[j,:] * ds
-                pHydro[j+1,:] = tmp.copy()
+                pHydro[j+1,:] = tmp
 
             pHydroSurf = tmp.copy()
 
@@ -555,21 +577,23 @@ for i in np.arange(0, nTimesteps+1):
     
     if np.mod(i, np.int(np.round(saveDel/dt))) == 0:
         
+        if contourFromSaved:
+            U[0:5,:,:] = np.load(saveString \
+            + '{0:04d}'.format(np.int(np.round(t))) + '.npy')
+        
         tmp = setGhostNodes(U)
         U = tmp[0]
         rhoBar = tmp[2]
 
         common.printMinAndMax(t, time.time()-et, U, rhoBar, phiBar)
 
-        # print("relativeMassChange = {0:.2e}" \
-        # . format((-np.sum(((rhoBar+U[3,:,:]) * Ds(U[4,:,:]))[1:-1,:] \
+        # print("t = {0:5d},  et = {1:6.2f},  relativeMassChange = {2:.2e}" \
+        # . format(np.int(np.round(t)) \
+        # , time.time() - et \
+        # , (-np.sum(((rhoBar+U[3,:,:]) * Ds(U[4,:,:]))[1:-1,:] \
         # / g * ds * dx) - mass0) / mass0))
         
         et = time.time()
-        
-        if contourFromSaved :
-            U[0:5,:,:] = np.load(saveString \
-            + '{0:04d}'.format(np.int(np.round(t))) + '.npy')
         
         if saveArrays:
             np.save(saveString \
