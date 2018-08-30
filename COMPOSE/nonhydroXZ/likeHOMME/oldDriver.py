@@ -1,6 +1,6 @@
 import os
 
-testCase = "inertiaGravityWaves"
+testCase = "densityCurrent"
 
 for refinementLevel in range(3):
 

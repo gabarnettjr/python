@@ -33,8 +33,8 @@ refinementLevel = np.int64(sys.argv[4])
 
 #Switches to control what happens:
 saveArrays          = True
-saveContours        = True
-contourFromSaved    = True
+saveContours        = False
+contourFromSaved    = False
 plotNodesAndExit    = False
 plotBackgroundState = False
 
@@ -46,8 +46,8 @@ except:
     whatToPlot = "theta"
 
 #Choose either a number of contours, or a range of contours:
-# contours = 20
-contours = np.arange(-1.025, 1.075, .05)
+contours = 20
+# contours = np.arange(-1.025, 1.075, .05)
 
 ###########################################################################
 
@@ -143,7 +143,7 @@ xx, ss = np.meshgrid(x, s)
 #All of the weights and functions associated with derivative approximation:
 
 Wa, stc, wItop, wEtop, wDtop, wHtop, wIbot, wEbot, wDbot, wHbot \
-, Da, Ds, HV \
+, Da, Ds, HV, rayleighDamping, numDampedLayers \
 = common.derivativeApproximations(x, dx, left, right, s, ds)
 
 ###########################################################################
@@ -483,6 +483,8 @@ def odefun(t, U, dUdt):
     divU = (duda + duds * dsdx) + (dwds * dsdz)
     uDotGradS = U[0,:,:] * dsdx + U[1,:,:] * dsdz
     
+    #Get sDot:
+
     if verticallyLagrangian:
         sDot = sDotNull
     else:
@@ -529,6 +531,13 @@ def odefun(t, U, dUdt):
 
     dUdt[4,1:-1,:] = ((uDotGradS - sDot) * dphids)[1:-1,:] \
     + HV(U[4,:,:] - phiBar)                                        #dphi/dt
+
+    #Rayleigh damping in scharMountainWaves test case:
+
+    if testCase == "scharMountainWaves":
+        for k in range(5):
+            dUdt[k,1:numDampedLayers,:] = dUdt[k,1:numDampedLayers,:] \
+            + rayleighDamping(U[k,:,:])
     
     return dUdt
 
