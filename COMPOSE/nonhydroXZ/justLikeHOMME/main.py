@@ -18,13 +18,13 @@ from gab.nonhydro import common
 testCase = "inertiaGravityWaves"
 
 #Choose True or False:
-verticallyLagrangian = True
+verticallyLagrangian = False
 
 #Choose 0, 1, 2, 3, or 4:
 refinementLevel = 1
 
 #Switches to control what happens:
-saveArrays          = True
+saveArrays          = False
 saveContours        = True
 contourFromSaved    = False
 plotNodesAndExit    = False
@@ -121,6 +121,25 @@ Wa, stc, wItop, wEtop, wDtop, wHtop, wIbot, wEbot, wDbot, wHbot \
 , Da, Ds, HV \
 = common.derivativeApproximations(x, dx, left, right, s, ds)
 
+Wa = getPeriodicDM(z=x, x=x, m=1 \
+, phs=7, pol=6, stc=7, period=right-left)
+
+Whva = getPeriodicDM(z=x, x=x, m=6 \
+, phs=7, pol=6, stc=7, period=right-left)
+Whva = dx**5./120. * Whva
+
+def Ds(U):
+    return (U[2:,:] - U[0:-2,:]) / (2.*ds)
+
+def HVs(U):
+    return (U[0:-2,:] - 2.*U[1:-1,:] + U[2:,:]) / 2. / ds
+
+def Da(U):
+    return Wa.dot(U[1:-1,:].T).T
+
+def HVa(U):
+    return Whva.dot(U[1:-1,:].T).T
+
 ###########################################################################
 
 #Initial vertical levels zz:
@@ -197,8 +216,8 @@ Pptb = Po * (piBar + piPtb) ** (Cp/Rd) - Pbar
 rhoBar = Pbar / Rd / Tbar
 rhoPtb = (Pbar + Pptb) / Rd / (Tbar + Tptb) - rhoBar
 phiBar = g * zz
-dpiBar = -rhoBar * (phiBar[2:,:] - phiBar[0:-2,:]) / 2.
-dpiPtb = -rhoPtb * (phiBar[2:,:] - phiBar[0:-2,:]) / 2.
+dpidsBar = -rhoBar * Ds(phiBar)
+dpidsPtb = -rhoPtb * Ds(phiBar)
     
 ###########################################################################
 
@@ -210,7 +229,7 @@ if testCase == "inertiaGravityWaves":
     U[0,:,:] =  20. * np.ones((nLev+2, nCol))          #horizontal velocity
 U[1,:,:] = np.zeros((nLev+2, nCol))                      #vertical velocity
 U[2,:,:] = thetaBar + thetaPtb(xx,zz)   #potential temperature perturbation
-U[3,:,:] = dpiBar + dpiPtb                  #hydrostatic pressure thickness
+U[3,:,:] = dpidsBar + dpidsPtb                              #pseudo-density
 U[4,:,:] = phiBar.copy()                                      #geopotential
 U[5,:,:] = np.zeros((nLev+2, nCol))                               #pressure
 
