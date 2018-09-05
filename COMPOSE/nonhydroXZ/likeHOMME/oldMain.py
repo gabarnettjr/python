@@ -32,8 +32,8 @@ else:
 refinementLevel = np.int64(sys.argv[4])
 
 #Switches to control what happens:
-saveArrays          = True
-saveContours        = False
+saveArrays          = False
+saveContours        = True
 contourFromSaved    = False
 plotNodesAndExit    = False
 plotBackgroundState = False
@@ -323,6 +323,8 @@ def contourSomething(U, t):
     plt.clf()
     # plt.contourf(xx, zz, tmp, contours)
     plt.contourf(xx[1:-1,:], zz[1:-1,:], tmp[1:-1,:], contours)
+    plt.plot(x, top*np.ones(np.shape(x)), linestyle="-", color="red")
+    plt.plot(x,zSurf, linestyle="-", color="red")
     if testCase == "inertiaGravityWaves":
         plt.colorbar(orientation="horizontal")
     elif testCase == "densityCurrent":
@@ -335,8 +337,8 @@ def contourSomething(U, t):
     else:
         plt.axis("image")
         plt.colorbar(orientation="vertical")
-    plt.plot(x, zSurf, linestyle="-", color="black")
-    plt.plot(x, top*np.ones(np.shape(x)), linestyle="-", color="black")
+    plt.plot(x, zSurf, linestyle="-", color="red")
+    plt.plot(x, top*np.ones(np.shape(x)), linestyle="-", color="red")
     if plotBackgroundState:
         plt.show()
         sys.exit("\nDone plotting the requested background state.")
@@ -583,7 +585,7 @@ for i in np.arange(0, nTimesteps+1):
 
             U[0:5,:,:] = common.verticalRemap(U[0:5,:,:] \
             , pHydro, pHydroNew, V)
-    
+
     if np.mod(i, np.int(np.round(saveDel/dt))) == 0:
         
         if contourFromSaved:
