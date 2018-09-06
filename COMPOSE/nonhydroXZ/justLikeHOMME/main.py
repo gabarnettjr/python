@@ -15,13 +15,13 @@ from gab.nonhydro import common
 
 #Choose "risingBubble", "densityCurrent", "inertiaGravityWaves", or
 #"steadyState":
-testCase = "risingBubble"
+testCase = "steadyState"
 
 #Choose True or False:
-verticallyLagrangian = False
+verticallyLagrangian = True
 
 #Choose 0, 1, 2, 3, or 4:
-refinementLevel = 2
+refinementLevel = 1
 
 #Switches to control what happens:
 saveArrays          = False
@@ -78,21 +78,21 @@ Cp, Cv, Rd, g, Po, th0, N = common.constants(testCase)
 
 #Test-specific parameters describing domain and initial perturbation:
 left, right, bottom, top, dx, nLev, dt, tf, saveDel \
-, zSurf, thetaPtb \
+, zSurfFunc, thetaPtb \
 = common.domainParameters(testCase, refinementLevel, g, Cp, th0)
 
 #TEMPORARY OVER-WRITE OF SOME VARIABLES FOR TESTING PURPOSES:
-tf = 50.
-saveDel = 5
-def zSurf(x):
-    return np.zeros(np.shape(x))
+# tf = 50.
+# saveDel = 5
+# def zSurf(x):
+#     return np.zeros(np.shape(x))
 
 #Some other important parameters:
 nCol = np.int(np.round((right - left) / dx))             #number of columns
 t = 0.                                                        #initial time
 nTimesteps = np.int(np.round(tf / dt))                #number of time-steps
 x = np.linspace(left+dx/2, right-dx/2, nCol)        #array of x-coordinates
-zSurf = zSurf(x)            #over-write zSurf function with array of values
+zSurf = zSurfFunc(x)                 #array of values along bottom boundary
 
 #ones and zeros to avoid repeated initialization getting background states:
 e = np.ones((nLev+2, nCol))
@@ -128,7 +128,7 @@ Wa = phs1.getPeriodicDM(z=x, x=x, m=1 \
 
 Whva = phs1.getPeriodicDM(z=x, x=x, m=6 \
 , phs=7, pol=6, stc=7, period=right-left)
-Whva = dx**5./120. * Whva
+Whva = 2.**-7000 * dx**5. * Whva
 
 def Ds(U):
     V = np.zeros((nLev+2, nCol))
@@ -138,7 +138,7 @@ def Ds(U):
     return V
 
 def HVs(U):
-    return 1./2. * (U[0:-2,:] - 2.*U[1:-1,:] + U[2:,:]) / ds
+    return  2.**-7 * (U[0:-2,:] - 2.*U[1:-1,:] + U[2:,:]) / ds
 
 def Da(U):
     return Wa.dot(U.T).T
@@ -172,24 +172,21 @@ zz = zz0.copy()
 tmp1 = np.ones(np.shape(zz))
 tmp2 = np.zeros(np.shape(zz))
 for j in range(10):
-    T = exnerPressure(zz, tmp1, tmp2) \
-    * potentialTemperature(zz, tmp1, tmp2)
-    # T = exnerPressure(zz, tmp1, tmp2) \
-    # * (potentialTemperature(zz, tmp1, tmp2) + thetaPtb(xx[1:,:],zz))
-    integrand = -Rd * T / (A(ssInt) * Po + B(ssInt) * pSurf) \
-    * (Aprime(ssInt) * Po + Bprime(ssInt) * pSurf) / g
+    T = exnerPressure(zz, tmp1, tmp2) * potentialTemperature(zz, tmp1, tmp2)
+    integrand = -Rd * T * (Aprime(ssInt) * Po + Bprime(ssInt) * pSurf) \
+    / (A(ssInt) * Po + B(ssInt) * pSurf) / g
     integrand = (integrand[0:-1,:] + integrand[1:,:]) / 2.
     tmp = zz[0,:].copy()
     for i in range(nLev):
-        tmp = tmp + integrand[i,:] * ds            #midpoint quadrature
+        tmp = tmp + integrand[i,:] * ds                #midpoint quadrature
         zz[i+1,:] = tmp
 
-zTop = zz[0,:]                            #slightly different top of domain
+top = zz[0,0]                             #slightly different top of domain
 zSurf = zz[-1,:]                       #slightly different bottom of domain
 
 #move zz from interfaces to midpoints, and get (x,z) mesh:
 zz = (zz[0:-1,:] + zz[1:,:]) / 2.
-zz = np.vstack(( 2.*zTop - zz[0,:] \
+zz = np.vstack(( 2.*top - zz[0,:] \
 , zz \
 , 2.*zSurf - zz[-1,:]))
 xx = np.tile(x, (nLev+2, 1))
@@ -204,7 +201,11 @@ if plotNodesAndExit:
     plt.figure()
     plt.plot(xx.flatten(), zz.flatten(), marker=".", linestyle="none")
     plt.plot(x, zSurf, color="red", linestyle="-")
-    plt.plot(x, zTop, color="red", linestyle="-")
+    plt.plot(x, top*np.ones(np.shape(x)), color="red", linestyle="-")
+    plt.plot([left,left], [zSurfFunc(left),top], color="red" \
+    , linestyle="-")
+    plt.plot([right,right], [zSurfFunc(right),top], color="red" \
+    , linestyle="-")
     plt.axis("image")
     plt.show()
     sys.exit("Finished plotting.")
@@ -303,11 +304,14 @@ def contourSomething(U, t, thetaBar, dpidsBar, Pbar):
         elif whatToPlot == "theta":
             tmp = U[2,1:-1,:] - thetaBar[1:-1,:]
         elif whatToPlot == "dpids":
-            tmp = U[3,1:-1,:] - dpidsBar[1:-1,:]
+            tmp = U[3,1:-1,:]
         elif whatToPlot == "phi":
             tmp = U[4,1:-1,:] - phiBar[1:-1,:]
         elif whatToPlot == "P":
+            # tmp = U[5,1:-1,:]
             tmp = U[5,1:-1,:] - Pbar[1:-1,:]
+        elif whatToPlot == "rho":
+            tmp = -U[3,1:-1,:] / Ds(U[4,:,:])[1:-1,:]
         else:
             raise ValueError("Invalid whatToPlot string.")
 
@@ -316,7 +320,7 @@ def contourSomething(U, t, thetaBar, dpidsBar, Pbar):
     plt.clf()
     plt.contourf(xx[1:-1,:], zz[1:-1,:], tmp, contours)
     plt.plot(x, zSurf, linestyle="-", color="red")
-    plt.plot(x, zTop, linestyle="-", color="red")
+    plt.plot(x, top*np.ones(np.shape(x)), linestyle="-", color="red")
     if testCase == "inertiaGravityWaves":
         plt.colorbar(orientation="horizontal")
     elif testCase == "densityCurrent":
@@ -371,7 +375,7 @@ def setGhostNodes(U):
     U[4,-1,:] = 2. * g*zSurf - U[4,-2,:]
     
     #Enforce phi=g*z on top boundary (s=sTop):
-    U[4,0,:] = 2. * g*zTop - U[4,1,:]
+    U[4,0,:] = 2. * g*top - U[4,1,:]
     
     #Get background states on possibly changing vertical levels:
     thetaBar, dpidsBar, Pbar = fastBackgroundStates(U[4,:,:] / g)
@@ -447,53 +451,45 @@ def odefun(t, U, dUdt):
             sDot[j+1,:] = sDot[j+1,:] - tmp
         sDot = sDot / dpids
     
-    absU = np.abs(U[0,1:-1,:])
-    absSdot = np.abs((sDot[0:-1,:] + sDot[1:,:]) / 2.)
-
     #Main part:
 
-    tmp1 = -U[0,1:-1,:] * Da(U[0,1:-1,:])           #-u*du/da on mid-levels
-    tmp2 = (U[0,1:,:] - U[0,0:-1,:]) / ds              #du/ds on interfaces
-    tmp2 = -sDot * tmp2                          #-sDot*du/ds on interfaces
-    tmp2 = (tmp2[0:-1,:] + tmp2[1:,:]) / 2.      #-sDot*du/ds on mid-levels
-    dUdt[0,1:-1,:] = tmp1 + tmp2 \
+    tmp = (U[0,1:,:] - U[0,0:-1,:]) / ds               #du/ds on interfaces
+    tmp = sDot * tmp                              #sDot*du/ds on interfaces
+    tmp = (tmp[0:-1,:] + tmp[1:,:]) / 2.          #sDot*du/ds on mid-levels
+    dUdt[0,1:-1,:] = -U[0,1:-1,:] * Da(U[0,1:-1,:]) - tmp \
     + 1./U[3,1:-1,:] * (Ds(U[4,:,:])[1:-1,:] * Da(U[5,1:-1,:]) \
     - Ds(U[5,:,:])[1:-1,:] * Da(U[4,1:-1,:])) \
-    + absU * HVa(U[0,1:-1,:]) \
-    + absSdot * HVs(U[0,:,:])                                        #du/dt
+    + HVa(U[0,1:-1,:]) \
+    + HVs(U[0,:,:])                                                  #du/dt
     
-    tmp1 = -U[0,1:-1,:] * Da(U[1,1:-1,:])           #-u*dw/da on mid-levels
-    tmp2 = (U[1,1:,:] - U[1,0:-1,:]) / ds              #dw/ds on interfaces
-    tmp2 = -sDot * tmp2                          #-sDot*dw/ds on interfaces
-    tmp2 = (tmp2[0:-1,:] + tmp2[1:,:]) / 2.      #-sDot*dw/ds on mid-levels
-    dUdt[1,1:-1,:] = tmp1 + tmp2 \
+    tmp = (U[1,1:,:] - U[1,0:-1,:]) / ds               #dw/ds on interfaces
+    tmp = sDot * tmp                              #sDot*dw/ds on interfaces
+    tmp = (tmp[0:-1,:] + tmp[1:,:]) / 2.          #sDot*dw/ds on mid-levels
+    dUdt[1,1:-1,:] = -U[0,1:-1,:] * Da(U[1,1:-1,:]) - tmp \
     - g * (1. - Ds(U[5,:,:])[1:-1,:] / U[3,1:-1,:]) \
-    + absU * HVa(U[1,1:-1,:]) \
-    + absSdot * HVs(U[1,:,:])                                        #dw/dt
+    + HVa(U[1,1:-1,:]) \
+    + HVs(U[1,:,:])                                                  #dw/dt
 
-    tmp1 = -U[0,1:-1,:] * Da(U[2,1:-1,:])          #-u*dth/da on mid-levels
-    tmp2 = (U[2,1:,:] - U[2,0:-1,:]) / ds             #dth/ds on interfaces
-    tmp2 = -sDot * tmp2                         #-sDot*dth/ds on interfaces
-    tmp2 = (tmp2[0:-1,:] + tmp2[1:,:]) / 2.     #-sDot*dth/ds on mid-levels
-    dUdt[2,1:-1,:] = tmp1 + tmp2 \
-    + absU * HVa(U[2,1:-1,:]) \
-    + absSdot * HVs(U[2,:,:])                                       #dth/dt
+    tmp = (U[2,1:,:] - U[2,0:-1,:]) / ds              #dth/ds on interfaces
+    tmp = sDot * tmp                             #sDot*dth/ds on interfaces
+    tmp = (tmp[0:-1,:] + tmp[1:,:]) / 2.         #sDot*dth/ds on mid-levels
+    dUdt[2,1:-1,:] = -U[0,1:-1,:] * Da(U[2,1:-1,:]) - tmp \
+    + HVa(U[2,1:-1,:] - thetaBar[1:-1,:]) \
+    + HVs(U[2,:,:] - thetaBar)                                      #dth/dt
 
-    tmp1 = -Da(U[3,1:-1,:] * U[0,1:-1,:])     #-d(dpids*u)/da on mid-levels
-    tmp2 = sDot * dpids                           #sDot*dpids on interfaces
-    tmp2 = -(tmp2[1:,:] - tmp2[0:-1,:]) / ds #-d(sDot*dpids)/ds on mid-lvls
-    dUdt[3,1:-1,:] = tmp1 + tmp2 \
-    + absU * HVa(U[3,1:-1,:]) \
-    + absSdot * HVs(U[3,:,:])                                  #d(dpids)/dt
+    tmp = sDot * dpids                            #sDot*dpids on interfaces
+    tmp = (tmp[1:,:] - tmp[0:-1,:]) / ds      #d(sDot*dpids)/ds on mid-lvls
+    dUdt[3,1:-1,:] = -Da(U[3,1:-1,:] * U[0,1:-1,:]) - tmp \
+    + HVa(U[3,1:-1,:]) \
+    + HVs(U[3,:,:])                                            #d(dpids)/dt
 
-    tmp1 = -U[0,1:-1,:] * Da(U[4,1:-1,:])         #-u*dphi/da on mid-levels
-    tmp2 = (U[4,1:,:] - U[4,0:-1,:]) / ds            #dphi/ds on interfaces
-    tmp2 = -sDot * tmp2                        #-sDot*dphi/ds on interfaces
-    tmp2 = (tmp2[0:-1,:] + tmp2[1:,:]) / 2.    #-sDot*dphi/ds on mid-levels
-    dUdt[4,1:-1,:] = tmp1 + tmp2 \
+    tmp = (U[4,1:,:] - U[4,0:-1,:]) / ds             #dphi/ds on interfaces
+    tmp = sDot * tmp                            #sDot*dphi/ds on interfaces
+    tmp = (tmp[0:-1,:] + tmp[1:,:]) / 2.        #sDot*dphi/ds on mid-levels
+    dUdt[4,1:-1,:] = -U[0,1:-1,:] * Da(U[4,1:-1,:]) - tmp \
     + g*U[1,1:-1,:] \
-    + absU * HVa(U[4,1:-1,:]) \
-    + absSdot * HVs(U[4,:,:])                                      #dphi/dt
+    + HVa(U[4,1:-1,:] - phiBar[1:-1,:]) \
+    + HVs(U[4,:,:] - phiBar)                                       #dphi/dt
 
     return dUdt
 
@@ -509,7 +505,7 @@ phi = {6:+.2e},  P = {7:+.2e}" \
     , np.min(U[0,1:-1,:]) \
     , np.min(U[1,1:-1,:]) \
     , np.min(U[2,1:-1,:] - thetaBar[1:-1,:]) \
-    , np.min(U[3,1:-1,:] - dpidsBar[1:-1,:]) \
+    , np.min(U[3,1:-1,:]) \
     , np.min(U[4,1:-1,:] - phiBar[1:-1,:]) \
     , np.min(U[5,1:-1,:] - Pbar[1:-1,:])))
 
@@ -519,7 +515,7 @@ phi = {4:+.2e},  P = {5:+.2e}\n" \
     . format(np.max(U[0,1:-1,:]) \
     , np.max(U[1,1:-1,:]) \
     , np.max(U[2,1:-1,:] - thetaBar[1:-1,:]) \
-    , np.max(U[3,1:-1,:] - dpidsBar[1:-1,:]) \
+    , np.max(U[3,1:-1,:]) \
     , np.max(U[4,1:-1,:] - phiBar[1:-1,:]) \
     , np.max(U[5,1:-1,:] - Pbar[1:-1,:])))
 
@@ -554,7 +550,7 @@ for i in np.arange(0, nTimesteps+1):
         U[0:5,:,:] = common.verticalRemap(U[0:5,:,:] \
         , pHydro, pHydroNew, V)
 
-        U[3,:,:] = Ds(pHydroNew)
+        U[3,:,:] = Ds(pHydroNew)                     #re-set pseudo-density
     
     if np.mod(i, np.int(np.round(saveDel/dt))) == 0:
         
@@ -576,7 +572,7 @@ for i in np.arange(0, nTimesteps+1):
             np.save(saveString \
             + '{0:04d}'.format(np.int(np.round(t))) + '.npy', U[0:5,:,:])
         
-        if saveContours:
+        if saveContours or plotBackgroundState:
             contourSomething(U, t, thetaBar, dpidsBar, Pbar)
     
     if contourFromSaved:

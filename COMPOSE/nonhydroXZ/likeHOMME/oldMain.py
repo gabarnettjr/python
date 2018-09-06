@@ -43,11 +43,17 @@ plotBackgroundState = False
 try:
     whatToPlot = sys.argv[5]
 except:
-    whatToPlot = "theta"
+    if testCase == "scharMountainWaves":
+        whatToPlot = "w"
+    else:
+        whatToPlot = "theta"
 
 #Choose either a number of contours, or a range of contours:
-contours = 20
-# contours = np.arange(-1.025, 1.075, .05)
+# contours = 20
+contours = np.arange(-.15, 2.25, .1)                          #risingBubble
+# contours = np.arange(-.0015, .0037, .0002)             #inertiaGravityWaves
+# contours = np.arange(-17.5, 2.5, 1)                         #densityCurrent
+# contours = np.arange(-1.325, 1.375, .05)
 
 ###########################################################################
 
@@ -91,7 +97,7 @@ Cp, Cv, Rd, g, Po, th0, N = common.constants(testCase)
 
 #Test-specific parameters describing domain and initial perturbation:
 left, right, bottom, top, dx, nLev, dt, tf, saveDel \
-, zSurf, thetaPtb \
+, zSurfFunc, thetaPtb \
 = common.domainParameters(testCase, refinementLevel, g, Cp, th0)
 
 #Some other important parameters:
@@ -99,7 +105,7 @@ nCol = np.int(np.round((right - left) / dx))             #number of columns
 t = 0.                                                        #initial time
 nTimesteps = np.int(np.round(tf / dt))                #number of time-steps
 x = np.linspace(left+dx/2, right-dx/2, nCol)        #array of x-coordinates
-zSurf = zSurf(x)            #over-write zSurf function with array of values
+zSurf = zSurfFunc(x)             #array of topo values along bottom surface
 
 #ones and zeros to avoid repeated initialization getting background states:
 e = np.ones((nLev+2, nCol))
@@ -194,7 +200,7 @@ elif verticalCoordinate == "pressure":
             tmp = tmp + integrand[i,:] * ds            #midpoint quadrature
             zz[i+1,:] = tmp.copy()
 
-    top = zz[0,:]                         #slightly different top of domain
+    top = zz[0,0]                         #slightly different top of domain
     zSurf = zz[-1,:]                   #slightly different bottom of domain
 
     #move zz from interfaces to midpoints:
@@ -215,6 +221,10 @@ if plotNodesAndExit:
     plt.plot(xx.flatten(), zz.flatten(), marker=".", linestyle="none")
     plt.plot(x, zSurf, color="red", linestyle="-")
     plt.plot(x, top*np.ones(np.shape(x)), color="red", linestyle="-")
+    plt.plot([left,left], [zSurfFunc(left),top], color="red" \
+    , linestyle="-")
+    plt.plot([right,right], [zSurfFunc(right),top], color="red" \
+    , linestyle="-")
     plt.axis("image")
     plt.show()
     sys.exit("Finished plotting.")
@@ -321,10 +331,17 @@ def contourSomething(U, t):
     zz = U[4,:,:] / g                           #possibly changing z-levels
     
     plt.clf()
-    # plt.contourf(xx, zz, tmp, contours)
     plt.contourf(xx[1:-1,:], zz[1:-1,:], tmp[1:-1,:], contours)
-    plt.plot(x, top*np.ones(np.shape(x)), linestyle="-", color="red")
-    plt.plot(x,zSurf, linestyle="-", color="red")
+    lw = .75
+    plt.plot([np.min(x),np.max(x)], [top,top], linestyle="-", color="red" \
+    , linewidth=lw)
+    plt.plot(x,zSurf, linestyle="-", color="red", linewidth=lw)
+    plt.plot([left,left], [zSurfFunc(left),top], linestyle="-" \
+    , color="red", linewidth=lw)
+    plt.plot([right,right], [zSurfFunc(right),top], linestyle="-" \
+    , color="red", linewidth=lw)
+    # plt.plot(xx[1:-1,:].flatten(), zz[1:-1,:].flatten(), marker="." \
+    # , linestyle="none", color="black", markersize=1)
     if testCase == "inertiaGravityWaves":
         plt.colorbar(orientation="horizontal")
     elif testCase == "densityCurrent":
@@ -337,8 +354,6 @@ def contourSomething(U, t):
     else:
         plt.axis("image")
         plt.colorbar(orientation="vertical")
-    plt.plot(x, zSurf, linestyle="-", color="red")
-    plt.plot(x, top*np.ones(np.shape(x)), linestyle="-", color="red")
     if plotBackgroundState:
         plt.show()
         sys.exit("\nDone plotting the requested background state.")
@@ -348,10 +363,16 @@ def contourSomething(U, t):
 
 ###########################################################################
 
-#Initialize the output array for the vertical re-map function:
+#Initialize the output array for the vertical re-map function.  For some
+#reason, re-setting the mapping variable (phi in height coord, rho in
+#pressure coord) works fine for the height coordinate, but causes problems
+#in the pressure coordinate.  Not sure why.
 
 if verticallyLagrangian:
-    V = np.zeros((5, nLev+2, nCol))
+    if verticalCoordinate == "pressure":
+        V = np.zeros((5, nLev+2, nCol))
+    else:
+        V = np.zeros((4, nLev+2, nCol))
 
 ###########################################################################
 
@@ -556,8 +577,9 @@ for i in np.arange(0, nTimesteps+1):
     and (np.mod(i,4) == 0) and (testCase != "inertiaGravityWaves"):
         if verticalCoordinate == "height":
             U = setGhostNodes(U)[0]
-            U[0:5,:,:] = common.verticalRemap(U[0:5,:,:] \
+            U[0:4,:,:] = common.verticalRemap(U[0:4,:,:] \
             , U[4,:,:], phiBar, V)
+            U[4,:,:] = phiBar
         else:
             tmp = setGhostNodes(U)
             U = tmp[0]
@@ -610,7 +632,7 @@ for i in np.arange(0, nTimesteps+1):
             np.save(saveString \
             + '{0:04d}'.format(np.int(np.round(t))) + '.npy', U[0:5,:,:])
         
-        if saveContours:
+        if saveContours or plotBackgroundStates:
             contourSomething(U, t)
     
     if contourFromSaved:
