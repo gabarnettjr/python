@@ -32,8 +32,8 @@ else:
 refinementLevel = np.int64(sys.argv[4])
 
 #Switches to control what happens:
-saveArrays          = False
-saveContours        = True
+saveArrays          = True
+saveContours        = False
 contourFromSaved    = False
 plotNodesAndExit    = False
 plotBackgroundState = False
@@ -50,8 +50,8 @@ except:
 
 #Choose either a number of contours, or a range of contours:
 # contours = 20
-contours = np.arange(-.15, 2.25, .1)                          #risingBubble
-# contours = np.arange(-.0015, .0037, .0002)             #inertiaGravityWaves
+# contours = np.arange(-.15, 2.25, .1)                          #risingBubble
+contours = np.arange(-.0015, .0037, .0002)             #inertiaGravityWaves
 # contours = np.arange(-17.5, 2.5, 1)                         #densityCurrent
 # contours = np.arange(-1.325, 1.375, .05)
 
@@ -99,6 +99,13 @@ Cp, Cv, Rd, g, Po, th0, N = common.constants(testCase)
 left, right, bottom, top, dx, nLev, dt, tf, saveDel \
 , zSurfFunc, thetaPtb \
 = common.domainParameters(testCase, refinementLevel, g, Cp, th0)
+
+
+
+# tf = 30.
+# saveDel = 3
+
+
 
 #Some other important parameters:
 nCol = np.int(np.round((right - left) / dx))             #number of columns
@@ -632,7 +639,7 @@ for i in np.arange(0, nTimesteps+1):
             np.save(saveString \
             + '{0:04d}'.format(np.int(np.round(t))) + '.npy', U[0:5,:,:])
         
-        if saveContours or plotBackgroundStates:
+        if saveContours or plotBackgroundState:
             contourSomething(U, t)
     
     if contourFromSaved:
