@@ -32,8 +32,8 @@ else:
 refinementLevel = np.int64(sys.argv[4])
 
 #Switches to control what happens:
-saveArrays          = True
-saveContours        = False
+saveArrays          = False
+saveContours        = True
 contourFromSaved    = False
 plotNodesAndExit    = False
 plotBackgroundState = False
@@ -49,9 +49,9 @@ except:
         whatToPlot = "theta"
 
 #Choose either a number of contours, or a range of contours:
-# contours = 20
+contours = 20
 # contours = np.arange(-.15, 2.25, .1)                          #risingBubble
-contours = np.arange(-.0015, .0037, .0002)             #inertiaGravityWaves
+# contours = np.arange(-.0015, .0037, .0002)             #inertiaGravityWaves
 # contours = np.arange(-17.5, 2.5, 1)                         #densityCurrent
 # contours = np.arange(-1.325, 1.375, .05)
 
@@ -615,6 +615,12 @@ for i in np.arange(0, nTimesteps+1):
             U[0:5,:,:] = common.verticalRemap(U[0:5,:,:] \
             , pHydro, pHydroNew, V)
 
+            # rhoBar = setGhostNodes(U)[2]
+            # rho = Aprime(ss) * Po \
+            # + Bprime(ss) * np.tile(pHydroSurf, (nLev+2, 1))
+            # rho = -rho / Ds(U[4,:,:])
+            # U[3,:,:] = rho - rhoBar
+
     if np.mod(i, np.int(np.round(saveDel/dt))) == 0:
         
         if contourFromSaved:
@@ -624,7 +630,7 @@ for i in np.arange(0, nTimesteps+1):
         tmp = setGhostNodes(U)
         U = tmp[0]
         rhoBar = tmp[2]
-
+        
         common.printMinAndMax(t, time.time()-et, U, rhoBar, phiBar)
 
         # print("t = {0:5d},  et = {1:6.2f},  relativeMassChange = {2:.2e}" \
@@ -640,7 +646,16 @@ for i in np.arange(0, nTimesteps+1):
             + '{0:04d}'.format(np.int(np.round(t))) + '.npy', U[0:5,:,:])
         
         if saveContours or plotBackgroundState:
+            # tmp = U[3,:,:].copy()
+            # dpids = -((rhoBar+U[3,:,:]) * Ds(U[4,:,:]))[1:-1,:]
+            # pHydroSurf = pTop * np.ones((nCol))
+            # for j in range(nLev):
+            #     pHydroSurf = pHydroSurf + dpids[j,:] * ds
+            # dpidsBar = Aprime(ss) * Po \
+            # + Bprime(ss) * np.tile(pHydroSurf, (nLev+2, 1))
+            # U[3,:,:] = -(rhoBar+U[3,:,:])*Ds(U[4,:,:]) - dpidsBar
             contourSomething(U, t)
+            # U[3,:,:] = tmp
     
     if contourFromSaved:
         t = t + dt
