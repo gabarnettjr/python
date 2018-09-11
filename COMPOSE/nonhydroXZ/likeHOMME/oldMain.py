@@ -32,8 +32,8 @@ else:
 refinementLevel = np.int64(sys.argv[4])
 
 #Switches to control what happens:
-saveArrays          = False
-saveContours        = True
+saveArrays          = True
+saveContours        = False
 contourFromSaved    = False
 plotNodesAndExit    = False
 plotBackgroundState = False
@@ -45,15 +45,26 @@ try:
 except:
     if testCase == "scharMountainWaves":
         whatToPlot = "w"
-    else:
+        contours = np.arange(-1.325, 1.375, .05)
+    elif testCase == "risingBubble":
         whatToPlot = "theta"
-
-#Choose either a number of contours, or a range of contours:
-contours = 20
-# contours = np.arange(-.15, 2.25, .1)                          #risingBubble
-# contours = np.arange(-.0015, .0037, .0002)             #inertiaGravityWaves
-# contours = np.arange(-17.5, 2.5, 1)                         #densityCurrent
-# contours = np.arange(-1.325, 1.375, .05)
+        contours = np.arange(-.15, 2.25, .1)
+    elif testCase == "inertiaGravityWaves":
+        whatToPlot = "theta"
+        contours = np.arange(-.0015, .0037, .0002)
+    elif testCase == "densityCurrent":
+        whatToPlot = "theta"
+        contours = np.arange(-17.5, 2.5, 1)
+    elif testCase == "steadyState":
+        whatToPlot = "P"
+        contours = 20
+    else:
+        raise ValueError("Invalid testCase string.")
+else:
+    try:
+        contours = eval(sys.argv[6])
+    except:
+        contours = 20
 
 ###########################################################################
 
@@ -353,6 +364,7 @@ def contourSomething(U, t):
         plt.colorbar(orientation="horizontal")
     elif testCase == "densityCurrent":
         plt.axis("image")
+        plt.axis([0.,19200.,0.,4800.])
         plt.colorbar(orientation="horizontal")
     elif testCase == "scharMountainWaves":
         plt.axis("image")
@@ -564,10 +576,10 @@ def odefun(t, U, dUdt):
 
     #Rayleigh damping in scharMountainWaves test case:
 
-    if testCase == "scharMountainWaves":
-        for k in range(5):
-            dUdt[k,1:numDampedLayers,:] = dUdt[k,1:numDampedLayers,:] \
-            + rayleighDamping(U[k,:,:])
+    # if testCase == "scharMountainWaves":
+    #     for k in range(5):
+    #         dUdt[k,1:numDampedLayers,:] = dUdt[k,1:numDampedLayers,:] \
+    #         + rayleighDamping(U[k,:,:])
     
     return dUdt
 

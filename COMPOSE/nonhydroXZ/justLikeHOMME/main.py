@@ -15,16 +15,16 @@ from gab.nonhydro import common
 
 #Choose "risingBubble", "densityCurrent", "inertiaGravityWaves", or
 #"steadyState":
-testCase = "risingBubble"
+testCase = "inertiaGravityWaves"
 
 #Choose True or False:
-verticallyLagrangian = False
+verticallyLagrangian = True
 
 #Choose 0, 1, 2, 3, or 4:
 refinementLevel = 1
 
 #Switches to control what happens:
-saveArrays          = False
+saveArrays          = True
 saveContours        = True
 contourFromSaved    = False
 plotNodesAndExit    = False
@@ -32,7 +32,7 @@ plotBackgroundState = False
 
 #Choose which variable to plot
 #("u", "w", "theta", "dpids", "phi", "P"):
-whatToPlot = "dpids"
+whatToPlot = "theta"
 
 #Choose either a number of contours, or a range of contours:
 contours = 20
@@ -219,7 +219,7 @@ if plotNodesAndExit:
     
 thetaBar = potentialTemperature(zz, e, null)
 piBar = exnerPressure(zz, e, null)
-piPtb = null
+piPtb = null.copy()
 Tbar = piBar * thetaBar
 Tptb = (piBar + piPtb) * (thetaBar + thetaPtb(xx,zz)) - Tbar
 Pbar = Po * piBar ** (Cp/Rd)
@@ -228,7 +228,8 @@ rhoBar = Pbar / Rd / Tbar
 rhoPtb = (Pbar + Pptb) / Rd / (Tbar + Tptb) - rhoBar
 phiBar = g * zz
 dpidsBar = Aprime(ss) * Po + Bprime(ss) * np.tile(pSurf, (nLev+2,1))
-dpidsPtb = -rhoPtb * Ds(phiBar)
+# dpidsBar = -rhoBar * Ds(phiBar)
+# dpidsPtb = -rhoPtb * Ds(phiBar)
 
 ###########################################################################
 
@@ -243,7 +244,7 @@ U[1,:,:] = np.zeros((nLev+2, nCol))                      #vertical velocity
 
 U[2,:,:] = thetaBar + thetaPtb(xx,zz)                #potential temperature
 
-U[3,:,:] = dpidsBar + dpidsPtb                              #pseudo-density
+U[3,:,:] = dpidsBar                                         #pseudo-density
 
 U[4,:,:] = phiBar.copy()                                      #geopotential
 
@@ -307,8 +308,8 @@ def contourSomething(U, t, thetaBar, dpidsBar, Pbar):
         elif whatToPlot == "theta":
             tmp = U[2,1:-1,:] - thetaBar[1:-1,:]
         elif whatToPlot == "dpids":
-            tmp = U[3,1:-1,:]
-            # tmp = U[3,1:-1,:] - dpidsBar[1:-1,:]
+            # tmp = U[3,1:-1,:]
+            tmp = U[3,1:-1,:] - dpidsBar[1:-1,:]
         elif whatToPlot == "phi":
             tmp = U[4,1:-1,:] - phiBar[1:-1,:]
         elif whatToPlot == "P":
@@ -369,11 +370,11 @@ def fastBackgroundStates(zz, dpids):
 
 def setGhostNodes(U):
     
-    #Extrapolate dpids to bottom ghost nodes(possibly unnecessary):
-    U[3,-1,:] = 2. * U[3,-2,:] - U[3,-3,:]
+    # #Extrapolate dpids to bottom ghost nodes(possibly unnecessary):
+    # U[3,-1,:] = 2. * U[3,-2,:] - U[3,-3,:]
 
-    #Extrapolate dpids to top ghost nodes(possibly unnecessary):
-    U[3,0,:] = 2. * U[3,1,:] - U[3,2,:]
+    # #Extrapolate dpids to top ghost nodes(possibly unnecessary):
+    # U[3,0,:] = 2. * U[3,1,:] - U[3,2,:]
 
     #Enforce phi=g*z on bottom boundary (s=1):
     U[4,-1,:] = 2. * g*zSurf - U[4,-2,:]
@@ -397,7 +398,7 @@ def setGhostNodes(U):
     RHS = RHS / (g - NxBot/NzBot * dphida)
     U[5,-1,:] = U[5,-2,:] + ds * RHS
     
-    #set pressure on top ghost nodes:
+    #set pressure on top ghost nodes using Neumann BC:
     dPda = Da(3./2.*U[5,1,:] - 1./2.*U[5,2,:])
     dpids = 3./2.*U[3,1,:] - 1./2.*U[3,2,:]
     dphida = Da((U[4,0,:] + U[4,1,:]) / 2.)

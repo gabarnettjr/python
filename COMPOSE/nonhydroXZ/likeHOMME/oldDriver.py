@@ -1,8 +1,9 @@
 import os
+import sys
 
-testCase = "inertiaGravityWaves"
+testCase = sys.argv[1]
 
-for refinementLevel in range(3):
+for refinementLevel in range(3,4):
 
     s = testCase + " height vEul " + str(refinementLevel)
     print("\n\n\n" + s + "\n")
