@@ -32,8 +32,8 @@ else:
 refinementLevel = np.int64(sys.argv[4])
 
 #Switches to control what happens:
-saveArrays          = True
-saveContours        = False
+saveArrays          = False
+saveContours        = True
 contourFromSaved    = False
 plotNodesAndExit    = False
 plotBackgroundState = False
@@ -148,8 +148,8 @@ if verticalCoordinate == "height":
     s = np.linspace(sTop-ds/2, 1+ds/2, nLev+2)
 elif verticalCoordinate == "pressure":
     piTop  = exnerPressure(top, 1., 0.)
-    piSurf = exnerPressure(zSurf, e[0,:], null[0,:])
     pTop  = Po * piTop  ** (Cp/Rd)             #hydrostatic pressure at top
+    piSurf = exnerPressure(zSurf, e[0,:], null[0,:])
     pSurf = Po * piSurf ** (Cp/Rd)         #hydrostatic pressure at surface
     sTop = pTop / Po                          #value of s on upper boundary
     ds = (1. - sTop) / nLev
@@ -571,6 +571,9 @@ def odefun(t, U, dUdt):
     - U[1,:,:] * drhoBarDz - (rhoBar + U[3,:,:]) * divU)[1:-1,:] \
     + HV(U[3,:,:])                                                 #drho/dt
 
+    # dUdt[4,1:-1,:] = (-U[0,:,:] * Da(U[4,:,:]) - sDot * Ds(U[4,:,:]) \
+    # + g * U[1,:,:])[1:-1,:] \
+    # + HV(U[4,:,:] - phiBar)                                        #dphi/dt
     dUdt[4,1:-1,:] = ((uDotGradS - sDot) * dphids)[1:-1,:] \
     + HV(U[4,:,:] - phiBar)                                        #dphi/dt
 
