@@ -3,6 +3,7 @@ import os
 import numpy as np
 import time
 import matplotlib.pyplot as plt
+import matplotlib
 
 sys.path.append('../../../site-packages')
 from gab import rk
@@ -32,9 +33,9 @@ else:
 refinementLevel = np.int64(sys.argv[4])
 
 #Switches to control what happens:
-saveArrays          = False
+saveArrays          = True
 saveContours        = True
-contourFromSaved    = False
+contourFromSaved    = True
 plotNodesAndExit    = False
 plotBackgroundState = False
 
@@ -45,7 +46,7 @@ try:
 except:
     if testCase == "scharMountainWaves":
         whatToPlot = "w"
-        contours = np.arange(-1.325, 1.375, .05)
+        contours = np.arange(-.725, .775, .05)
     elif testCase == "risingBubble":
         whatToPlot = "theta"
         contours = np.arange(-.15, 2.25, .1)
@@ -348,6 +349,11 @@ def contourSomething(U, t):
 
     zz = U[4,:,:] / g                           #possibly changing z-levels
     
+    if testCase != "inertiaGravityWaves":
+        matplotlib.rcParams.update({'font.size': 22})#not igw
+    else:
+        matplotlib.rcParams.update({'font.size': 14})#igw
+
     plt.clf()
     plt.contourf(xx[1:-1,:], zz[1:-1,:], tmp[1:-1,:], contours)
     lw = .75
