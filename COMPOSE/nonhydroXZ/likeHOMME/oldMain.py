@@ -14,34 +14,81 @@ from gab.nonhydro import common
 #This block contains the only variables that the user should be required
 #to modify when running the code, unless they want to add a new test case.
 
-#Choose "risingBubble", "densityCurrent", "inertiaGravityWaves",
-#"steadyState", or "scharMountainWaves":
-testCase = sys.argv[1]
-
-#Choose "pressure" or "height":
-verticalCoordinate = sys.argv[2]
-
-if sys.argv[3] == "vLag":
-    verticallyLagrangian = True
-elif sys.argv[3] == "vEul":
-    verticallyLagrangian = False
-else:
-    raise ValueError("The third argument should be either 'vLag' " \
-    + "or 'vEul'.")
-
-#Choose 0, 1, 2, 3, or 4:
-refinementLevel = np.int64(sys.argv[4])
-
 #Switches to control what happens:
-saveArrays          = True
+saveArrays          = False
 saveContours        = True
-contourFromSaved    = True
+contourFromSaved    = False
 plotNodesAndExit    = False
 plotBackgroundState = False
 
-#Choose which variable to plot
-#("u", "w", "T", "rho", "phi", "P", "theta", "pi"):
+###########################################################################
+
+def printHelp():
+    sys.exit("\n\
+REQUIRED ARGUMENTS\n\n\
+arg 1 (name of test case)\n\
+        risingBubble\n\
+        densityCurrent\n\
+        inertiaGravityWaves\n\
+        steadyState\n\
+        scharMountainWaves\n\n\
+arg 2 (type of vertical coordinate)\n\
+        height\n\
+        pressure\n\n\
+arg 3 (vertical frame of reference, Lagrangian or Eulerian)\n\
+        vEul\n\
+        vLag\n\n\
+arg 4 (refinement level)\n\
+        0\n\
+        1\n\
+        2\n\
+        3\n\
+        4\n\n\
+OPTIONAL ARGUMENTS\n\n\
+arg 5 (what to plot)\n\
+        u\n\
+        w\n\
+        T\n\
+        rho\n\
+        P\n\
+        theta\n\
+        pi\n\n\
+arg 6 (contour levels)\n\
+        number of contours (integer)\n\
+        range of contours (using np.arange or np.linspace for example)\n\n\
+EXAMPLE\n\n\
+python oldMain.py risingBubble height vEul 1 P np.arange(-51,23,2)")
+
+###########################################################################
+
+#Parse required inputs:
+
 try:
+    #Choose "risingBubble", "densityCurrent", "inertiaGravityWaves",
+    #"steadyState", or "scharMountainWaves":
+    testCase = sys.argv[1]
+    #Choose "pressure" or "height":
+    verticalCoordinate = sys.argv[2]
+    #Choose "vEul" or "vLag":
+    if sys.argv[3] == "vLag":
+        verticallyLagrangian = True
+    elif sys.argv[3] == "vEul":
+        verticallyLagrangian = False
+    else:
+        raise ValueError("The third argument should be either 'vLag' " \
+        + "or 'vEul'.")
+    #Choose 0, 1, 2, 3, or 4:
+    refinementLevel = np.int64(sys.argv[4])
+except:
+    printHelp()
+
+###########################################################################
+
+#Parse optional inputs:
+
+try:
+    #Choose which variable to plot
+    #("u", "w", "T", "rho", "phi", "P", "theta", "pi"):
     whatToPlot = sys.argv[5]
 except:
     if testCase == "scharMountainWaves":
@@ -402,7 +449,7 @@ if verticallyLagrangian:
 ###########################################################################
 
 #This will be used inside the setGhostNodes() function to quickly find
-#background states on possibly changing vertical levels:
+#exact background states on possibly changing vertical levels:
 
 def fastBackgroundStates(zz):
     
@@ -574,14 +621,14 @@ def odefun(t, U, dUdt):
     + HV(U[2,:,:])                                                   #dT/dt
 
     dUdt[3,1:-1,:] = (-U[0,:,:] * Da(U[3,:,:]) - sDot * Ds(U[3,:,:]) \
-    - U[1,:,:] * drhoBarDz - (rhoBar + U[3,:,:]) * divU)[1:-1,:] \
-    + HV(U[3,:,:])                                                 #drho/dt
+    - U[1,:,:] * drhoBarDz - (rhoBar + U[3,:,:]) * divU)[1:-1,:]
+    # + HV(U[3,:,:])                                                 #drho/dt
 
     # dUdt[4,1:-1,:] = (-U[0,:,:] * Da(U[4,:,:]) - sDot * Ds(U[4,:,:]) \
     # + g * U[1,:,:])[1:-1,:] \
     # + HV(U[4,:,:] - phiBar)                                        #dphi/dt
-    dUdt[4,1:-1,:] = ((uDotGradS - sDot) * dphids)[1:-1,:] \
-    + HV(U[4,:,:] - phiBar)                                        #dphi/dt
+    dUdt[4,1:-1,:] = ((uDotGradS - sDot) * dphids)[1:-1,:]
+    # + HV(U[4,:,:] - phiBar)                                        #dphi/dt
 
     #Rayleigh damping in scharMountainWaves test case:
 
