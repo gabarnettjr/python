@@ -254,10 +254,10 @@ elif verticalCoordinate == "pressure":
     tmp1 = np.ones(np.shape(zz))
     tmp2 = np.zeros(np.shape(zz))
     for j in range(10):
-        T = exnerPressure(zz, tmp1, tmp2) \
-        * potentialTemperature(zz, tmp1, tmp2)
         # T = exnerPressure(zz, tmp1, tmp2) \
-        # * (potentialTemperature(zz, tmp1, tmp2) + thetaPtb(xx[1:,:],zz))
+        # * potentialTemperature(zz, tmp1, tmp2)
+        T = exnerPressure(zz, tmp1, tmp2) \
+        * (potentialTemperature(zz, tmp1, tmp2) + thetaPtb(xx[1:,:],zz))
         integrand = -Rd * T / (A(ssInt) * Po + B(ssInt) * pSurf) \
         * (Aprime(ssInt) * Po + Bprime(ssInt) * pSurf) / g
         integrand = (integrand[0:-1,:] + integrand[1:,:]) / 2.
@@ -324,8 +324,8 @@ else:
     U[0,:,:] = np.zeros((nLev+2, nCol))                #horizontal velocity
 U[1,:,:] = np.zeros((nLev+2, nCol))                      #vertical velocity
 U[2,:,:] = Tptb                                   #temperature perturbation
-U[3,:,:] = rhoPtb                                                  #density
-U[4,:,:] = phiBar.copy()                                      #geopotential
+U[3,:,:] = rhoPtb                                     #density perturbation
+U[4,:,:] = phiBar                                             #geopotential
 U[5,:,:] = np.zeros((nLev+2, nCol))                  #pressure perturbation
 
 mass0 = -np.sum(((rhoBar+U[3,:,:]) * Ds(U[4,:,:]))[1:-1,:] / g * ds * dx)
@@ -621,14 +621,15 @@ def odefun(t, U, dUdt):
     + HV(U[2,:,:])                                                   #dT/dt
 
     dUdt[3,1:-1,:] = (-U[0,:,:] * Da(U[3,:,:]) - sDot * Ds(U[3,:,:]) \
-    - U[1,:,:] * drhoBarDz - (rhoBar + U[3,:,:]) * divU)[1:-1,:]
-    # + HV(U[3,:,:])                                                 #drho/dt
+    - U[1,:,:] * drhoBarDz - (rhoBar + U[3,:,:]) * divU)[1:-1,:] \
+    + HV(U[3,:,:])                                                 #drho/dt
 
     # dUdt[4,1:-1,:] = (-U[0,:,:] * Da(U[4,:,:]) - sDot * Ds(U[4,:,:]) \
+    # - U[0,:,:] * Da(phiBar) - sDot * Ds(phiBar) \
     # + g * U[1,:,:])[1:-1,:] \
-    # + HV(U[4,:,:] - phiBar)                                        #dphi/dt
-    dUdt[4,1:-1,:] = ((uDotGradS - sDot) * dphids)[1:-1,:]
-    # + HV(U[4,:,:] - phiBar)                                        #dphi/dt
+    # + HV(U[4,:,:])                                                 #dphi/dt
+    dUdt[4,1:-1,:] = ((uDotGradS - sDot) * dphids)[1:-1,:] \
+    + HV(U[4,:,:] - phiBar)                                        #dphi/dt
 
     #Rayleigh damping in scharMountainWaves test case:
 
@@ -654,7 +655,7 @@ for i in np.arange(0, nTimesteps+1):
             U = setGhostNodes(U)[0]
             U[0:4,:,:] = common.verticalRemap(U[0:4,:,:] \
             , U[4,:,:], phiBar, V)
-            U[4,:,:] = phiBar
+            U[4,:,:] = phiBar.copy()
         else:
             tmp = setGhostNodes(U)
             U = tmp[0]
@@ -683,7 +684,9 @@ for i in np.arange(0, nTimesteps+1):
             U[0:5,:,:] = common.verticalRemap(U[0:5,:,:] \
             , pHydro, pHydroNew, V)
 
-            # rhoBar = setGhostNodes(U)[2]
+            # tmp = setGhostNodes(U)
+            # U = tmp[0]
+            # rhoBar = tmp[2]
             # rho = Aprime(ss) * Po \
             # + Bprime(ss) * np.tile(pHydroSurf, (nLev+2, 1))
             # rho = -rho / Ds(U[4,:,:])
