@@ -15,7 +15,7 @@ from gab.nonhydro import common
 #to modify when running the code, unless they want to add a new test case.
 
 #Switches to control what happens:
-saveArrays          = False
+saveArrays          = True
 saveContours        = True
 contourFromSaved    = False
 plotNodesAndExit    = False
@@ -254,10 +254,8 @@ elif verticalCoordinate == "pressure":
     tmp1 = np.ones(np.shape(zz))
     tmp2 = np.zeros(np.shape(zz))
     for j in range(10):
-        # T = exnerPressure(zz, tmp1, tmp2) \
-        # * potentialTemperature(zz, tmp1, tmp2)
         T = exnerPressure(zz, tmp1, tmp2) \
-        * (potentialTemperature(zz, tmp1, tmp2) + thetaPtb(xx[1:,:],zz))
+        * potentialTemperature(zz, tmp1, tmp2)
         integrand = -Rd * T / (A(ssInt) * Po + B(ssInt) * pSurf) \
         * (Aprime(ssInt) * Po + Bprime(ssInt) * pSurf) / g
         integrand = (integrand[0:-1,:] + integrand[1:,:]) / 2.
@@ -440,11 +438,11 @@ def contourSomething(U, t):
 #pressure coord) works fine for the height coordinate, but causes problems
 #in the pressure coordinate.  Not sure why.
 
-if verticallyLagrangian:
-    if verticalCoordinate == "pressure":
-        V = np.zeros((5, nLev+2, nCol))
-    else:
-        V = np.zeros((4, nLev+2, nCol))
+# if verticallyLagrangian:
+#     if verticalCoordinate == "pressure":
+V = np.zeros((5, nLev+2, nCol))
+#     else:
+#         V = np.zeros((5, nLev+2, nCol))
 
 ###########################################################################
 
@@ -653,9 +651,11 @@ for i in np.arange(0, nTimesteps+1):
     and (np.mod(i,4) == 0) and (testCase != "inertiaGravityWaves"):
         if verticalCoordinate == "height":
             U = setGhostNodes(U)[0]
-            U[0:4,:,:] = common.verticalRemap(U[0:4,:,:] \
+            U[0:5,:,:] = common.verticalRemap(U[0:5,:,:] \
             , U[4,:,:], phiBar, V)
-            U[4,:,:] = phiBar.copy()
+            # U[4,:,:] = phiBar.copy()
+            # if np.max(np.abs(U[4,:,:] - phiBar)) > 1e-10:
+            #     print("discrepancy")
         else:
             tmp = setGhostNodes(U)
             U = tmp[0]
@@ -680,17 +680,14 @@ for i in np.arange(0, nTimesteps+1):
 
             pHydroNew = A(ss) * Po \
             + B(ss) * np.tile(pHydroSurf, (nLev+2, 1))
-
+            
             U[0:5,:,:] = common.verticalRemap(U[0:5,:,:] \
             , pHydro, pHydroNew, V)
 
-            # tmp = setGhostNodes(U)
-            # U = tmp[0]
-            # rhoBar = tmp[2]
-            # rho = Aprime(ss) * Po \
-            # + Bprime(ss) * np.tile(pHydroSurf, (nLev+2, 1))
-            # rho = -rho / Ds(U[4,:,:])
-            # U[3,:,:] = rho - rhoBar
+            # rhoBar = fastBackgroundStates(U[4,:,:]/g)[1]
+            # dpids = Aprime(ss) * Po \
+            # + Bprime(ss) * np.tile(pHydroSurf, (nLev+2,1))
+            # U[3,:,:] = -dpids / Ds(U[4,:,:]) - rhoBar
 
     if np.mod(i, np.int(np.round(saveDel/dt))) == 0:
         

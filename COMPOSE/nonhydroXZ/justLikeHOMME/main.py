@@ -15,13 +15,13 @@ from gab.nonhydro import common
 
 #Choose "risingBubble", "densityCurrent", "inertiaGravityWaves", or
 #"steadyState":
-testCase = "inertiaGravityWaves"
+testCase = "risingBubble"
 
 #Choose True or False:
-verticallyLagrangian = True
+verticallyLagrangian = False
 
 #Choose 0, 1, 2, 3, or 4:
-refinementLevel = 1
+refinementLevel = 2
 
 #Switches to control what happens:
 saveArrays          = True
@@ -236,7 +236,7 @@ Pbar = Po * piBar ** (Cp/Rd)
 Pptb = Po * (piBar + piPtb) ** (Cp/Rd) - Pbar
 rhoBar = Pbar / Rd / Tbar
 rhoPtb = (Pbar + Pptb) / Rd / (Tbar + Tptb) - rhoBar
-phiBar = g * zz
+phiBar = g * (zz[0:-1,:] + zz[1:,:]) / 2.
 # dpidsBar = -rhoBar * Ds(phiBar)
 # dpidsPtb = -rhoPtb * Ds(phiBar)
 dpidsBar = Aprime(ss) * Po + Bprime(ss) * np.tile(pSurf, (nLev+2,1))
@@ -258,7 +258,7 @@ U[2,:,:] = thetaBar + thetaPtb(xx,zz)                #potential temperature
 
 U[3,:,:] = dpidsBar                                         #pseudo-density
 
-U[4,:,:] = phiBar                                             #geopotential
+U[4,:-1,:] = phiBar                             #geopotential on interfaces
 
 U[5,:,:] = np.zeros((nLev+2, nCol))                               #pressure
 
@@ -320,18 +320,23 @@ def contourSomething(U, t, thetaBar, rhoBar, Pbar):
         elif whatToPlot == "theta":
             tmp = U[2,:,:] - thetaBar
         elif whatToPlot == "rho":
-            tmp = -U[3,:,:] / Ds(U[4,:,:]) - rhoBar
+            tmp = -U[3,:,:] / ((U[4,1:-1,:]-U[4,0:-2,:])/ds) - rhoBar
         elif whatToPlot == "phi":
-            tmp = U[4,:,:] - phiBar
+            tmp = U[4,0:-1,:] - phiBar
         elif whatToPlot == "P":
             tmp = U[5,:,:] - Pbar
         else:
             raise ValueError("Invalid whatToPlot string.")
 
-    zz = U[4,:,:] / g                                    #changing z-levels
+    if whatToPlot == "phi":
+        xxTmp = xx[0:-1,:]
+        zzTmp = U[4,0:-1,:] / g                          #changing z-levels
+    else:
+        xxTmp = xx
+        zzTmp = (U[4,0:-2,:]+U[4,1:-1,:])/2. / g
     
     plt.clf()
-    plt.contourf(xx, zz, tmp, contours)
+    plt.contourf(xxTmp, zzTmp, tmp, contours)
     plt.plot(x, zSurf, linestyle="-", color="red")
     plt.plot(x, top*np.ones(np.shape(x)), linestyle="-", color="red")
     if testCase == "inertiaGravityWaves":
@@ -391,14 +396,15 @@ def setGhostNodes(U):
     #Extrapolate dpids to top ghost nodes:
     U[3,0,:] = 2. * U[3,1,:] - U[3,2,:]
 
+    phi = null
+    phi[1:-1,:] = (U[4,0:-2,:] + U[4,1:-1,:]) / 2.
     #Enforce phi=g*z on bottom boundary (s=1):
-    U[4,-1,:] = 2.*g*zSurf - U[4,-2,:]
-    
+    phi[-1,:] = 2.*g*zSurf - phi[-2,:]
     #Enforce phi=g*z on top boundary (s=sTop):
-    U[4,0,:] = 2.*g*top - U[4,1,:]
+    phi[0,:] = 2.*g*top - phi[1,:]
 
     #Get background states on possibly changing z levels:
-    thetaBar, rhoBar, Pbar, dpidsBar = fastBackgroundStates(U[4,:,:] / g \
+    thetaBar, rhoBar, Pbar, dpidsBar = fastBackgroundStates(phi \
     , U[3,1:-1,:])
     
     # #get pressure on all mid-levels using equation of state:
@@ -406,14 +412,14 @@ def setGhostNodes(U):
     # * U[2,:,:] / Po**(Rd/Cp)) ** (Cp/Cv)
 
     #get pressure on interior mid-levels using equation of state:
-    U[5,1:-1,:] = (-U[3,1:-1,:] / Ds(U[4,:,:])[1:-1,:] * Rd \
+    U[5,1:-1,:] = (-U[3,1:-1,:] / ((U[4,1:-1,:]-U[4,0:-2,:])/ds) * Rd \
     * U[2,1:-1,:] / Po**(Rd/Cp)) ** (Cp/Cv)
 
-    dphida = Da((U[4,-1,:] + U[4,-2,:]) / 2.)
+    dphida = Da(U[4,-2,:])
     #set pressure on bottom ghost nodes using Neumann BC:
     dPda = Da(3./2.*U[5,-2,:] - 1./2.*U[5,-3,:])
     dpids = 3./2.*U[3,-2,:] - 1./2.*U[3,-3,:]
-    dphids = (U[4,-1,:] - U[4,-2,:]) / ds
+    dphids = (U[4,-2,:] - U[4,-3,:]) / ds
     RHS = g * dpids * NzBot - dPda * dphids * NxBot
     RHS = RHS / (g*NzBot - dphida*NxBot)
     U[5,-1,:] = U[5,-2,:] + ds * RHS
@@ -422,7 +428,7 @@ def setGhostNodes(U):
     #get w on bottom ghost nodes:
     U[1,-1,:] = 2.*(U[0,-1,:] + U[0,-2,:])/2. / g * dphida - U[1,-2,:]
 
-    dphida = Da((U[4,0,:] + U[4,1,:]) / 2.)
+    dphida = Da(U[4,0,:])
     #set pressure on top ghost nodes using Neumann BC:
     dPda = Da(3./2.*U[5,1,:] - 1./2.*U[5,2,:])
     dpids = 3./2.*U[3,1,:] - 1./2.*U[3,2,:]
@@ -492,8 +498,9 @@ def odefun(t, U, dUdt):
     tmp = sDot * tmp                              #sDot*du/ds on interfaces
     tmp = (tmp[0:-1,:] + tmp[1:,:]) / 2.          #sDot*du/ds on mid-levels
     dUdt[0,1:-1,:] = -U[0,1:-1,:] * Da(U[0,1:-1,:]) - tmp \
-    + 1./(U[3,1:-1,:]) * (Ds(U[4,:,:])[1:-1,:] * Da(U[5,:,:])[1:-1,:] \
-    - Ds(U[5,:,:])[1:-1,:] * Da(U[4,:,:])[1:-1,:]) \
+    + 1./(U[3,1:-1,:]) \
+    * (((U[4,1:-1,:]-U[4,0:-2,:])/ds) * Da(U[5,:,:])[1:-1,:] \
+    - Ds(U[5,:,:])[1:-1,:] * Da((U[4,0:-2,:]+U[4,1:-1,:])/2.)) \
     + HVa(U[0,1:-1,:]) \
     + HVs(U[0,:,:])                                                  #du/dt
     
@@ -518,13 +525,13 @@ def odefun(t, U, dUdt):
     + HVa(U[3,1:-1,:] - dpidsBar[1:-1,:]) \
     + HVs(U[3,:,:] - dpidsBar)                                 #d(dpids)/dt
 
-    tmp = (U[4,1:,:] - U[4,0:-1,:]) / ds             #dphi/ds on interfaces
-    tmp = sDot * tmp                            #sDot*dphi/ds on interfaces
-    tmp = (tmp[0:-1,:] + tmp[1:,:]) / 2.        #sDot*dphi/ds on mid-levels
-    dUdt[4,1:-1,:] = -U[0,1:-1,:] * Da(U[4,1:-1,:]) - tmp \
-    + g * U[1,1:-1,:] \
-    + HVa(U[4,1:-1,:] - phiBar[1:-1,:]) \
-    + HVs(U[4,:,:] - phiBar)                                       #dphi/dt
+    tmp = (U[4,1:,:] - U[4,0:-1,:]) / ds             #dphi/ds on mid-levels
+    tmp = (tmp[0:-1,:] + tmp[1:,:]) / 2.             #dphi/ds on interfaces
+    tmp = sDot[1:-1,:] * tmp                    #sDot*dphi/ds on interfaces
+    dUdt[4,1:-2,:] = -(U[0,1:-2,:]+U[0,2:-1,:])/2. * Da(U[4,1:-1,:]) - tmp \
+    + g * (U[1,1:-2,:]+U[1,2:-1,:])/2.
+    # + HVa(U[4,1:-1,:] - phiBar[1:-1,:]) \
+    # + HVs(U[4,:,:] - phiBar)                                       #dphi/dt
 
     return dUdt
 
@@ -540,8 +547,8 @@ phi = {6:+.2e},  P = {7:+.2e}" \
     , np.min(U[0,1:-1,:]) \
     , np.min(U[1,1:-1,:]) \
     , np.min(U[2,1:-1,:] - thetaBar[1:-1,:]) \
-    , np.min(-U[3,1:-1,:] / Ds(U[4,:,:])[1:-1,:] - rhoBar[1:-1,:]) \
-    , np.min(U[4,1:-1,:] - phiBar[1:-1,:]) \
+    , np.min(-U[3,1:-1,:] / ((U[4,1:-1,:]-U[4,0:-2,:])/ds) - rhoBar[1:-1,:]) \
+    , np.min(U[4,0:-1,:] - phiBar) \
     , np.min(U[5,1:-1,:] - Pbar[1:-1,:])))
 
     print("                          MAX:  u = {0:+.2e},  \
@@ -550,8 +557,8 @@ phi = {4:+.2e},  P = {5:+.2e}\n" \
     . format(np.max(U[0,1:-1,:]) \
     , np.max(U[1,1:-1,:]) \
     , np.max(U[2,1:-1,:] - thetaBar[1:-1,:]) \
-    , np.max(-U[3,1:-1,:] / Ds(U[4,:,:])[1:-1,:] - rhoBar[1:-1,:]) \
-    , np.max(U[4,1:-1,:] - phiBar[1:-1,:]) \
+    , np.max(-U[3,1:-1,:] / ((U[4,1:-1,:]-U[4,0:-2,:])/ds) - rhoBar[1:-1,:]) \
+    , np.max(U[4,0:-1,:] - phiBar) \
     , np.max(U[5,1:-1,:] - Pbar[1:-1,:])))
 
 ###########################################################################
@@ -601,7 +608,6 @@ for i in np.arange(0, nTimesteps+1):
 
         # print("|massDiff| = {0:.2e}" \
         # . format(np.abs(np.sum(U[3,1:-1,:] \
-        # * Ds(U[4,:,:])[1:-1,:] \
         # / g * ds * dx) - mass0) / mass0))
         
         et = time.time()
