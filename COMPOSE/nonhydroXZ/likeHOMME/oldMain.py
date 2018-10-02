@@ -19,7 +19,7 @@ saveArrays          = True
 saveContours        = True
 contourFromSaved    = False
 plotNodesAndExit    = False
-plotBackgroundState = False
+plotBackgroundState = True
 
 ###########################################################################
 
@@ -246,6 +246,7 @@ elif verticalCoordinate == "pressure":
     
     ssInt = (ss[0:-1,:] + ss[1:,:]) / 2.              #s-mesh on interfaces
     p = A(ssInt) * Po + B(ssInt) * np.tile(pSurf,(nLev+1,1))
+    dpds = Aprime(ssInt) * Po + Bprime(ssInt) * np.tile(pSurf,(nLev+1,1))
     pi = (p / Po) ** (Rd/Cp)
     zz0 = inverseExnerPressure(pi)
     zz = zz0.copy()
@@ -256,8 +257,7 @@ elif verticalCoordinate == "pressure":
     for j in range(10):
         T = exnerPressure(zz, tmp1, tmp2) \
         * potentialTemperature(zz, tmp1, tmp2)
-        integrand = -Rd * T / (A(ssInt) * Po + B(ssInt) * pSurf) \
-        * (Aprime(ssInt) * Po + Bprime(ssInt) * pSurf) / g
+        integrand = -Rd * T * dpds / p / g
         integrand = (integrand[0:-1,:] + integrand[1:,:]) / 2.
         tmp = zz[0,:].copy()
         for i in range(nLev):
@@ -400,7 +400,8 @@ def contourSomething(U, t):
         matplotlib.rcParams.update({'font.size': 14})#igw
 
     plt.clf()
-    plt.contourf(xx[1:-1,:], zz[1:-1,:], tmp[1:-1,:], contours)
+    plt.contourf(xx, zz, tmp, contours)
+    # plt.contourf(xx[1:-1,:], zz[1:-1,:], tmp[1:-1,:], contours)
     lw = .75
     plt.plot([np.min(x),np.max(x)], [top,top], linestyle="-", color="red" \
     , linewidth=lw)
@@ -648,7 +649,7 @@ for i in np.arange(0, nTimesteps+1):
     
     #Vertical re-map:
     if verticallyLagrangian and not contourFromSaved \
-    and (np.mod(i,4) == 0) and (testCase != "inertiaGravityWaves"):
+    and (np.mod(i,1) == 0) and (testCase != "inertiaGravityWaves"):
         if verticalCoordinate == "height":
             U = setGhostNodes(U)[0]
             U[0:5,:,:] = common.verticalRemap(U[0:5,:,:] \
