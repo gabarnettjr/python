@@ -15,10 +15,10 @@ from gab.nonhydro import common
 
 #Choose "risingBubble", "densityCurrent", "inertiaGravityWaves", or
 #"steadyState":
-testCase = "inertiaGravityWaves"
+testCase = "risingBubble"
 
 #Choose True or False:
-verticallyLagrangian = False
+verticallyLagrangian = True
 
 #Choose 0, 1, 2, 3, or 4:
 refinementLevel = 1
@@ -235,10 +235,10 @@ thetaBar = potentialTemperature(zz, e, null)
 # Pptb = Po * (piBar + piPtb) ** (Cp/Rd) - Pbar
 # rhoBar = Pbar / Rd / Tbar
 # rhoPtb = (Pbar + Pptb) / Rd / (Tbar + Tptb) - rhoBar
-phiBar = g * zzInt
+phiBar0 = g * zzInt
 # dpidsBar = -rhoBar * Ds(phiBar)
 # dpidsPtb = -rhoPtb * Ds(phiBar)
-dpidsBar = Aprime(ss) * Po + Bprime(ss) * np.tile(pSurf, (nLev+2,1))
+dpidsBar0 = Aprime(ss) * Po + Bprime(ss) * np.tile(pSurf, (nLev+2,1))
 # dpidsBar = Ds(Pbar)
 # dpidsPtb = -(rhoBar+rhoPtb) * Ds(phiBar) - dpidsBar
 
@@ -253,11 +253,11 @@ if testCase == "inertiaGravityWaves":
 
 U[1,:,:] = np.zeros((nLev+2, nCol))                      #vertical velocity
 
-U[2,:,:] = thetaBar + thetaPtb(xx,zz)                #potential temperature
+U[2,:,:] = thetaPtb(xx,zz)                           #potential temperature
 
-U[3,:,:] = dpidsBar                                         #pseudo-density
+U[3,:,:] = dpidsBar0                                        #pseudo-density
 
-U[4,0:-1,:] = phiBar                            #geopotential on interfaces
+U[4,0:-1,:] = phiBar0                           #geopotential on interfaces
 
 U[5,:,:] = np.zeros((nLev+2, nCol))                               #pressure
 
@@ -294,19 +294,19 @@ if saveContours:
 
 #Create and save a contour plot of the field specified by whatToPlot:
 
-def contourSomething(U, t, thetaBar, pHydro, dpidsBar):
+def contourSomething(U, t, pHydro):
 
     if plotBackgroundState:
         if whatToPlot == "u":
             tmp = np.zeros((nLev, nCol))
         elif whatToPlot == "w":
-            tmp = np.zeros((nLev, nCol))
+            tmp = np.zeros((nLev+1, nCol))
         elif whatToPlot == "theta":
             tmp = thetaBar[1:-1,:]
         elif whatToPlot == "dpids":
-            tmp = dpidsBar[1:-1,:]
+            tmp = dpidsBar0[1:-1,:]
         elif whatToPlot == "phi":
-            tmp = phiBar
+            tmp = phiBar0
         elif whatToPlot == "P":
             tmp = (pHydro[:-1,:] + pHydro[1:,:]) / 2.
         else:
@@ -315,19 +315,19 @@ def contourSomething(U, t, thetaBar, pHydro, dpidsBar):
         if whatToPlot == "u":
             tmp = U[0,1:-1,:]
         elif whatToPlot == "w":
-            tmp = U[1,1:-1,:]
+            tmp = U[1,:-1,:]
         elif whatToPlot == "theta":
-            tmp = U[2,1:-1,:] - thetaBar[1:-1,:]
+            tmp = U[2,1:-1,:]
         elif whatToPlot == "dpids":
-            tmp = U[3,1:-1,:] - dpidsBar[1:-1,:]
+            tmp = U[3,1:-1,:] - dpidsBar0[1:-1,:]
         elif whatToPlot == "phi":
-            tmp = U[4,0:-1,:] - phiBar
+            tmp = U[4,0:-1,:] - phiBar0
         elif whatToPlot == "P":
             tmp = U[5,1:-1,:]
         else:
             raise ValueError("Invalid whatToPlot string.")
 
-    if whatToPlot == "phi":
+    if (whatToPlot == "phi") | (whatToPlot == "w"):
         xxTmp = xxInt
         zzTmp = U[4,0:-1,:] / g                          #changing z-levels
     else:
@@ -368,6 +368,7 @@ if verticallyLagrangian:
 def fastBackgroundStates(zz, dpids):
     
     thetaBar = potentialTemperature(zz, e, null)
+    dthetaBarDz = potentialTemperatureDerivative(zz, e, null)
     # piBar = exnerPressure(zz, e, null)
     # Pbar = Po * piBar ** (Cp/Rd)
     # Tbar = piBar * thetaBar
@@ -383,7 +384,7 @@ def fastBackgroundStates(zz, dpids):
     dpidsBar = Aprime(ss) * Po \
     + Bprime(ss) * np.tile(pHydro[-1,:], (nLev+2, 1))
 
-    return thetaBar, pHydro, dpidsBar
+    return thetaBar, pHydro, dpidsBar, dthetaBarDz
 
 ###########################################################################
 
@@ -410,12 +411,13 @@ def setGhostNodes(U):
     phi[0,:] = 2.*g*top - phi[1,:]
 
     #Get background states on changing z levels:
-    thetaBar, pHydro, dpidsBar = fastBackgroundStates(phi/g \
+    thetaBar, pHydro, dpidsBar, dthetaBarDz = fastBackgroundStates(phi/g \
     , U[3,1:-1,:])
     
     #get pressure perturbation on mid-levels using equation of state:
     U[5,1:-1,:] = (-U[3,1:-1,:] / ((U[4,1:-1,:]-U[4,0:-2,:])/ds) * Rd \
-    * U[2,1:-1,:] / Po**(Rd/Cp)) ** (Cp/Cv) - (pHydro[:-1,:]+pHydro[1:,:])/2.
+    * (thetaBar+U[2,:,:])[1:-1,:] / Po**(Rd/Cp)) ** (Cp/Cv) \
+    - (pHydro[:-1,:]+pHydro[1:,:])/2.
 
     dphida = Da(U[4,-2,:])
     #set pressure on bottom ghost nodes using Neumann BC:
@@ -443,7 +445,7 @@ def setGhostNodes(U):
     #get w on top ghost nodes:
     U[1,0,:] = 2.*(U[0,0,:] + U[0,1,:])/2. / g * dphida - U[1,1,:]
 
-    return U, thetaBar, pHydro, dpidsBar
+    return U, thetaBar, pHydro, dpidsBar, dthetaBarDz
 
 ###########################################################################
 
@@ -470,7 +472,7 @@ sDotNull = np.zeros((nLev+1, nCol))
 def odefun(t, U, dUdt):
     
     #Get some ghost node values and some other things:
-    U, thetaBar, pHydro, dpidsBar = setGhostNodes(U)
+    U, thetaBar, pHydro, dpidsBar, dthetaBarDz = setGhostNodes(U)
 
     dpidsInt = (U[3,0:-1,:] + U[3,1:,:]) / 2.          #dpids on interfaces
 
@@ -519,8 +521,10 @@ def odefun(t, U, dUdt):
     tmp = sDot * tmp                             #sDot*dth/ds on interfaces
     tmp = (tmp[0:-1,:] + tmp[1:,:]) / 2.         #sDot*dth/ds on mid-levels
     dUdt[2,1:-1,:] = -U[0,1:-1,:] * Da(U[2,1:-1,:]) - tmp \
-    + HVa(U[2,1:-1,:] - thetaBar[1:-1,:]) \
-    + HVs(U[2,:,:] - thetaBar)                                      #dth/dt
+    - U[1,1:-1,:] * dthetaBarDz[1:-1,:] \
+    + HVa(U[2,1:-1,:]) \
+    + HVs(U[2,:,:])                                                 #dth/dt
+    # - U[1,1:-1,:] * Ds(thetaBar)[1:-1,:] * g/((U[4,1:-1,:]-U[4,0:-2,:])/ds) \
 
     tmp = sDot * dpidsInt                         #sDot*dpids on interfaces
     tmp = (tmp[1:,:] - tmp[0:-1,:]) / ds    #d(sDot*dpids)/ds on mid-levels
@@ -533,14 +537,14 @@ def odefun(t, U, dUdt):
     tmp = sDot[1:-1,:] * tmp                    #sDot*dphi/ds on interfaces
     dUdt[4,1:-2,:] = -(U[0,1:-2,:]+U[0,2:-1,:])/2. * Da(U[4,1:-2,:]) - tmp \
     + g * (U[1,1:-2,:]+U[1,2:-1,:])/2. \
-    + HVa(U[4,1:-2,:] - phiBar[1:-1,:]) \
-    + HVs(U[4,0:-1,:] - phiBar)                                    #dphi/dt
+    + HVa(U[4,1:-2,:] - phiBar0[1:-1,:]) \
+    + HVs(U[4,0:-1,:] - phiBar0)                                    #dphi/dt
 
     return dUdt
 
 ###########################################################################
 
-def printMinAndMax(t, et, U, thetaBar, dpidsBar):
+def printMinAndMax(t, et, U):
     
     print("t = {0:5d},  et = {1:6.2f},  MIN:  u = {2:+.2e},  \
 w = {3:+.2e},  th = {4:+.2e},  dpids = {5:+.2e},  \
@@ -549,9 +553,9 @@ phi = {6:+.2e},  P = {7:+.2e}" \
     , et \
     , np.min(U[0,1:-1,:]) \
     , np.min(U[1,1:-1,:]) \
-    , np.min(U[2,1:-1,:] - thetaBar[1:-1,:]) \
-    , np.min(U[3,1:-1,:] - dpidsBar[1:-1,:]) \
-    , np.min(U[4,0:-1,:] - phiBar) \
+    , np.min(U[2,1:-1,:]) \
+    , np.min(U[3,1:-1,:] - dpidsBar0[1:-1,:]) \
+    , np.min(U[4,0:-1,:] - phiBar0) \
     , np.min(U[5,1:-1,:])))
 
     print("                          MAX:  u = {0:+.2e},  \
@@ -559,9 +563,9 @@ w = {1:+.2e},  th = {2:+.2e},  dpids = {3:+.2e},  \
 phi = {4:+.2e},  P = {5:+.2e}\n" \
     . format(np.max(U[0,1:-1,:]) \
     , np.max(U[1,1:-1,:]) \
-    , np.max(U[2,1:-1,:] - thetaBar[1:-1,:]) \
-    , np.max(U[3,1:-1,:] - dpidsBar[1:-1,:]) \
-    , np.max(U[4,0:-1,:] - phiBar) \
+    , np.max(U[2,1:-1,:]) \
+    , np.max(U[3,1:-1,:] - dpidsBar0[1:-1,:]) \
+    , np.max(U[4,0:-1,:] - phiBar0) \
     , np.max(U[5,1:-1,:])))
 
 ###########################################################################
@@ -576,7 +580,7 @@ for i in np.arange(0, nTimesteps+1):
     if verticallyLagrangian and not contourFromSaved \
     and (np.mod(i,1) == 0) and (testCase != "inertiaGravityWaves"):
 
-        U, thetaBar, pHydro, dpidsBar = setGhostNodes(U)
+        U, thetaBar, pHydro, dpidsBar, dthetaBarDz = setGhostNodes(U)
         pHydroSurf = pHydro[-1,:]
 
         #new coordinate on interfaces:
@@ -610,9 +614,9 @@ for i in np.arange(0, nTimesteps+1):
             U[0:5,:,:] = np.load(saveString \
             + '{0:04d}'.format(np.int(np.round(t))) + '.npy')
         
-        U, thetaBar, pHydro, dpidsBar = setGhostNodes(U)
+        U, thetaBar, pHydro, dpidsBar, dthetaBarDz = setGhostNodes(U)
 
-        printMinAndMax(t, time.time()-et, U, thetaBar, dpidsBar)
+        printMinAndMax(t, time.time()-et, U)
 
         # print("|massDiff| = {0:.2e}" \
         # . format(np.abs(np.sum(U[3,1:-1,:] \
@@ -625,7 +629,7 @@ for i in np.arange(0, nTimesteps+1):
             + '{0:04d}'.format(np.int(np.round(t))) + '.npy', U[0:5,:,:])
         
         if saveContours or plotBackgroundState:
-            contourSomething(U, t, thetaBar, pHydro, dpidsBar)
+            contourSomething(U, t, pHydro)
     
     if contourFromSaved:
         t = t + dt
