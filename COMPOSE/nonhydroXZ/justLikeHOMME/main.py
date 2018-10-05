@@ -15,13 +15,13 @@ from gab.nonhydro import common
 
 #Choose "risingBubble", "densityCurrent", "inertiaGravityWaves", or
 #"steadyState":
-testCase = "densityCurrent"
+testCase = "risingBubble"
 
 #Choose True or False:
-verticallyLagrangian = True
+verticallyLagrangian = False
 
 #Choose 0, 1, 2, 3, or 4:
-refinementLevel = 2
+refinementLevel = 1
 
 #Switches to control what happens:
 saveArrays          = True
@@ -84,8 +84,8 @@ left, right, bottom, top, dx, nLev, dt, tf, saveDel \
 
 
 #TEMPORARY OVER-WRITE OF SOME VARIABLES FOR TESTING PURPOSES:
-# tf = 40.
-# saveDel = 4
+# tf = 50.
+# saveDel = 5
 # def zSurfFunc(x):
 #     return np.zeros(np.shape(x))
 
@@ -100,26 +100,13 @@ x = np.linspace(left+dx/2, right-dx/2, nCol)        #array of x-coordinates
 zSurf = zSurfFunc(x)                 #array of values along bottom boundary
 
 #ones and zeros to avoid repeated initialization getting background states:
-e = np.ones((nLev, nCol))
-null = np.zeros((nLev, nCol))
+e = np.ones((nLev+2, nCol))
+null = np.zeros((nLev+2, nCol))
 
 #Hydrostatic background state functions:
 potentialTemperature, potentialTemperatureDerivative \
 , exnerPressure, inverseExnerPressure \
 = common.hydrostaticProfiles(testCase, th0, g, Cp, N, e, null)
-
-###########################################################################
-
-#Equally spaced array of vertical coordinate values (s):
-
-piTop  = exnerPressure(top, 1., 0.)
-pTop  = Po * piTop  ** (Cp/Rd)                 #hydrostatic pressure at top
-# piSurf = exnerPressure(zSurf, e[0,:], null[0,:])
-# pSurf = Po * piSurf ** (Cp/Rd)             #hydrostatic pressure at surface
-sTop = pTop / Po                              #value of s on upper boundary
-ds = (1. - sTop) / nLev
-s = np.linspace(sTop-ds/2, 1+ds/2, nLev+2)
-ss = np.tile(s, (nCol, 1)).T
 
 ###########################################################################
 
@@ -150,6 +137,18 @@ def HVa(U):
 
 ###########################################################################
 
+#Equally spaced array of vertical coordinate values (s):
+
+piTop  = exnerPressure(top, 1., 0.)
+pTop  = Po * piTop  ** (Cp/Rd)                 #hydrostatic pressure at top
+piSurf = exnerPressure(zSurf, e[0,:], null[0,:])
+pSurf = Po * piSurf ** (Cp/Rd)             #hydrostatic pressure at surface
+sTop = pTop / Po                              #value of s on upper boundary
+ds = (1. - sTop) / nLev
+s = np.linspace(sTop-ds/2, 1+ds/2, nLev+2)
+
+###########################################################################
+
 #Get vertical levels zz:
 
 def A(s):
@@ -164,40 +163,41 @@ def Aprime(s):
 def Bprime(s):
     return 1. / (1. - sTop)
 
+ss = np.tile(s, (nCol, 1)).T                          #s-mesh on mid-levels
 ssInt = (ss[0:-1,:] + ss[1:,:]) / 2.                  #s-mesh on interfaces
 
-for j in range(10):
-    piSurf = exnerPressure(zSurf, e[0,:], null[0,:])
-    pSurf = Po * piSurf ** (Cp/Rd)             #hydrostatic pressure at surface
-    dpds = Aprime(ss[1:-1,:]) * Po \
-    + Bprime(ss[1:-1,:]) * np.tile(pSurf, (nLev,1))
-    p = np.zeros((nLev+1, nCol))
-    tmp = pTop * np.ones((nCol))
-    p[0,:] = tmp.copy()
-    for i in range(nLev):
-        tmp = tmp + dpds[i,:] * ds
-        p[i+1,:] = tmp.copy()
-    pSurf = p[-1,:].copy()
-    #Use some algebra to get heights zz:
-    zz = np.zeros((nLev+1, nCol))
-    zz[0,:] = top * np.ones((nCol))
-    integrand = Rd / (Cp*p) * (p/Po)**(Rd/Cp)
-    integrand = (integrand[0:-1,:]+integrand[1:,:])/2. * dpds
-    tmp = exnerPressure(top*e[0,:], e[0,:], null[0,:])
-    for i in range(nLev):
-        tmp = tmp + integrand[i,:] * ds
-        zz[i+1,:] = inverseExnerPressure(tmp)
-    zSurf = zz[-1,:]          #possibly slightly different bottom of domain
+zz = inverseExnerPressure((A(ss) \
++ B(ss) * np.tile(pSurf,(nLev+2,1)) / Po) ** (Rd/Cp))
 
-#Avg zz from interfaces to midpoints, and get (x,z) mesh:
-zzInt = zz.copy()
-zz = (zz[0:-1,:] + zz[1:,:]) / 2.
-zz = np.vstack(( 2.*top - zz[0,:] \
-, zz \
-, 2.*zSurf - zz[-1,:]))
+zzInt = inverseExnerPressure((A(ssInt) \
++ B(ssInt) * np.tile(pSurf,(nLev+1,1)) / Po) ** (Rd/Cp))
+
+ssTmp = ss[1:-1,:]
+p = A(ssTmp) * Po + B(ssTmp) * np.tile(pSurf,(nLev,1))
+dpds = Aprime(ssTmp) * Po + Bprime(ssTmp) * np.tile(pSurf,(nLev,1))
 
 xx = np.tile(x, (nLev+2, 1))
 xxInt = np.tile(x, (nLev+1, 1))
+
+###########################################################################
+
+#Check that the pressure is okay:
+
+# #thing = A(ss[1:-1,:]) * Po + B(ss[1:-1,:]) * np.tile(pSurf,(nLev,1))
+# thing = Aprime(ss[1:-1,:])*Po + Bprime(ss[1:-1,:])*np.tile(pSurf,(nLev,1))
+# pHydro = np.zeros((nLev+1, nCol))
+# pHydro[0,:] = pTop * np.ones((nCol))
+# tmp = pHydro[0,:].copy()
+# for i in range(nLev):
+#     tmp = tmp + thing[i,:] * ds
+#     pHydro[i+1,:] = tmp.copy()
+# thing = (pHydro[0:-1,:] + pHydro[1:,:]) / 2.
+# thing = thing - Po * exnerPressure(zz[1:-1,:],e,null) ** (Cp/Rd)
+# plt.figure()
+# plt.contourf(xx[1:-1,:], zz[1:-1,:], thing, 20)
+# plt.colorbar()
+# plt.show()
+# sys.exit("\ndone for now\n")
 
 ###########################################################################
 
@@ -222,9 +222,10 @@ if plotNodesAndExit:
 
 #Assignment of hydrostatic background states and initial perturbations:
 
+# thetaBar = -p * dpds / Rd / (g*(zzInt[1:,:]-zzInt[0:-1,:])/ds) / (p/Po)**(Rd/Cp)
 # thetaBar = T / (p/Po)**(Rd/Cp) - potentialTemperature(xxInt,zzInt)
 # thetaBar = (thetaBar[0:-1,:] + thetaBar[1:,:]) / 2.
-thetaBar = potentialTemperature(zz[1:-1,:], e, null)
+thetaBar = potentialTemperature(zz, e, null)
 # piBar = exnerPressure(zz, e, null)
 # piPtb = np.zeros((nLev+2, nCol))
 # Tbar = piBar * thetaBar
@@ -251,7 +252,7 @@ if testCase == "inertiaGravityWaves":
 
 U[1,0:-1,:] = np.zeros((nLev+1, nCol))                   #vertical velocity
 
-U[2,:,:] = thetaPtb(xx,zz)                           #potential temperature
+U[2,1:-1,:] = (thetaBar + thetaPtb(xx,zz))[1:-1,:]   #potential temperature
 
 U[3,:,:] = dpidsBar0                                        #pseudo-density
 
@@ -289,37 +290,40 @@ if saveContours:
 
 #Create and save a contour plot of the field specified by whatToPlot:
 
-def contourSomething(U, t, pHydro):
+def contourSomething(U, t, pHydro, dpidsBar, thetaBar):
 
     if plotBackgroundState:
         if whatToPlot == "u":
-            tmp = np.zeros((nLev, nCol))
+            tmp = np.zeros((nLev+2, nCol))
         elif whatToPlot == "w":
             tmp = np.zeros((nLev+1, nCol))
         elif whatToPlot == "theta":
-            tmp = thetaBar
+            tmp = thetaBar.copy()
         elif whatToPlot == "dpids":
-            tmp = dpidsBar0[1:-1,:]
+            tmp = dpidsBar
         elif whatToPlot == "phi":
             tmp = phiBar0
         elif whatToPlot == "P":
-            tmp = (pHydro[:-1,:] + pHydro[1:,:]) / 2.
+            pSurf = pHydro[-1,:]
+            pHydro = (pHydro[:-1,:] + pHydro[1:,:]) / 2.
+            tmp = np.vstack((2.*pTop - pHydro[0,:] \
+            , pHydro \
+            , 2.*pSurf-pHydro[-1,:]))
         else:
             raise ValueError("Invalid whatToPlot string.")
     else:
         if whatToPlot == "u":
-            tmp = U[0,1:-1,:]
+            tmp = U[0,:,:]
         elif whatToPlot == "w":
             tmp = U[1,0:-1,:]
         elif whatToPlot == "theta":
-            tmp = U[2,1:-1,:]
+            tmp = U[2,:,:] - thetaBar
         elif whatToPlot == "dpids":
-            tmp = U[3,1:-1,:] - dpidsBar0[1:-1,:]
+            tmp = U[3,:,:] - dpidsBar
         elif whatToPlot == "phi":
             tmp = U[4,0:-1,:] - phiBar0
         elif whatToPlot == "P":
-            tmp = U[5,1:-1,:]
-            # tmp = (pHydro[:-1,:]+pHydro[1:,:])/2. + U[5,1:-1,:]
+            tmp = U[5,:,:]
         else:
             raise ValueError("Invalid whatToPlot string.")
 
@@ -327,8 +331,11 @@ def contourSomething(U, t, pHydro):
         xxTmp = xxInt
         zzTmp = U[4,0:-1,:] / g                          #changing z-levels
     else:
-        xxTmp = xx[1:-1,:]
+        xxTmp = xx
         zzTmp = (U[4,0:-2,:]+U[4,1:-1,:])/2. / g
+        zzTmp = np.vstack((2.*U[4,0,:]/g - zzTmp[0,:] \
+        , zzTmp \
+        , 2.*U[4,-2,:]/g - zzTmp[-1,:]))
     
     plt.clf()
     plt.contourf(xxTmp, zzTmp, tmp, contours)
@@ -400,12 +407,16 @@ def setGhostNodes(U):
     U[3,0,:] = 2. * U[3,1,:] - U[3,2,:]
 
     #Get background states:
+    phi = (U[4,0:-2,:]+U[4,1:-1,:])/2.
+    phi = np.vstack((2.*U[4,0,:] - phi[0,:] \
+    , phi \
+    , 2.*U[4,-2,:] - phi[-1,:]))
     thetaBar, pHydro, dpidsBar, dthetaBarDz \
-    = fastBackgroundStates((U[4,0:-2,:]+U[4,1:-1,:])/2./g, U[3,1:-1,:])
+    = fastBackgroundStates(phi/g, U[3,1:-1,:])
     
     #Get pressure perturbation on mid-levels using equation of state:
     U[5,1:-1,:] = (-U[3,1:-1,:] / ((U[4,1:-1,:]-U[4,0:-2,:])/ds) * Rd \
-    * (thetaBar+U[2,1:-1,:]) / Po**(Rd/Cp)) ** (Cp/Cv) \
+    * U[2,1:-1,:] / Po**(Rd/Cp)) ** (Cp/Cv) \
     - (pHydro[:-1,:]+pHydro[1:,:])/2.
 
     dphida = Da(U[4,-2,:])
@@ -458,7 +469,7 @@ sDotNull = np.zeros((nLev+1, nCol))
 
 def odefun(t, U, dUdt):
     
-    #Get some ghost node values and some other things:
+    #Get some ghost node values and background states:
     U, thetaBar, pHydro, dpidsBar, dthetaBarDz = setGhostNodes(U)
 
     dpidsInt = (U[3,0:-1,:] + U[3,1:,:]) / 2.          #dpids on interfaces
@@ -510,9 +521,9 @@ def odefun(t, U, dUdt):
     tmp = sDot * tmp                             #sDot*dth/ds on interfaces
     tmp = (tmp[0:-1,:] + tmp[1:,:]) / 2.         #sDot*dth/ds on mid-levels
     dUdt[2,1:-1,:] = -U[0,1:-1,:] * Da(U[2,1:-1,:]) - tmp \
-    - ((U[1,0:-2,:]+U[1,1:-1,:])/2.) * dthetaBarDz \
-    + HVa(U[2,1:-1,:]) \
-    + HVs(U[2,:,:])                                    #dth/dt (mid-levels)
+    + HVa(U[2,1:-1,:] - thetaBar[1:-1,:]) \
+    + HVs(U[2,:,:] - thetaBar)                         #dth/dt (mid-levels)
+    # - ((U[1,0:-2,:]+U[1,1:-1,:])/2.) * dthetaBarDz[1:-1,:] \
 
     tmp = sDot * dpidsInt                         #sDot*dpids on interfaces
     tmp = (tmp[1:,:] - tmp[0:-1,:]) / ds    #d(sDot*dpids)/ds on mid-levels
@@ -535,7 +546,7 @@ def odefun(t, U, dUdt):
 
 ###########################################################################
 
-def printMinAndMax(t, et, U):
+def printMinAndMax(t, et, U, thetaBar):
     
     print("t = {0:5d},  et = {1:6.2f},  MIN:  u = {2:+.2e},  \
 w = {3:+.2e},  th = {4:+.2e},  dpids = {5:+.2e},  \
@@ -544,7 +555,7 @@ phi = {6:+.2e},  P = {7:+.2e}" \
     , et \
     , np.min(U[0,1:-1,:]) \
     , np.min(U[1,0:-1,:]) \
-    , np.min(U[2,1:-1,:]) \
+    , np.min(U[2,1:-1,:] - thetaBar[1:-1,:]) \
     , np.min(U[3,1:-1,:] - dpidsBar0[1:-1,:]) \
     , np.min(U[4,0:-1,:] - phiBar0) \
     , np.min(U[5,1:-1,:])))
@@ -554,7 +565,7 @@ w = {1:+.2e},  th = {2:+.2e},  dpids = {3:+.2e},  \
 phi = {4:+.2e},  P = {5:+.2e}\n" \
     . format(np.max(U[0,1:-1,:]) \
     , np.max(U[1,0:-1,:]) \
-    , np.max(U[2,1:-1,:]) \
+    , np.max(U[2,1:-1,:] - thetaBar[1:-1,:]) \
     , np.max(U[3,1:-1,:] - dpidsBar0[1:-1,:]) \
     , np.max(U[4,0:-1,:] - phiBar0) \
     , np.max(U[5,1:-1,:])))
@@ -607,7 +618,7 @@ for i in np.arange(0, nTimesteps+1):
         
         U, thetaBar, pHydro, dpidsBar, dthetaBarDz = setGhostNodes(U)
 
-        printMinAndMax(t, time.time()-et, U)
+        printMinAndMax(t, time.time()-et, U, thetaBar)
 
         # print("|massDiff| = {0:.2e}" \
         # . format(np.abs(np.sum(U[3,1:-1,:] \
@@ -620,7 +631,7 @@ for i in np.arange(0, nTimesteps+1):
             + '{0:04d}'.format(np.int(np.round(t))) + '.npy', U[0:5,:,:])
         
         if saveContours or plotBackgroundState:
-            contourSomething(U, t, pHydro)
+            contourSomething(U, t, pHydro, dpidsBar0, thetaBar)
     
     if contourFromSaved:
         t = t + dt
