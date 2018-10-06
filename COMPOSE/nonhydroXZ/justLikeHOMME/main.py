@@ -15,7 +15,7 @@ from gab.nonhydro import common
 
 #Choose "risingBubble", "densityCurrent", "inertiaGravityWaves", or
 #"steadyState":
-testCase = "risingBubble"
+testCase = "steadyState"
 
 #Choose True or False:
 verticallyLagrangian = False
@@ -31,7 +31,7 @@ plotNodesAndExit    = False
 plotBackgroundState = False
 
 #Choose which variable to plot ("u", "w", "theta", "dpids", "phi", "P"):
-whatToPlot = "theta"
+whatToPlot = "P"
 
 #Choose either a number of contours, or a range of contours:
 contours = 20
@@ -149,7 +149,7 @@ s = np.linspace(sTop-ds/2, 1+ds/2, nLev+2)
 
 ###########################################################################
 
-#Get vertical levels zz:
+#Prescribed functions for setting hybrid coordinate levels:
 
 def A(s):
     return (1. - s) / (1. - sTop) * sTop
@@ -166,18 +166,48 @@ def Bprime(s):
 ss = np.tile(s, (nCol, 1)).T                          #s-mesh on mid-levels
 ssInt = (ss[0:-1,:] + ss[1:,:]) / 2.                  #s-mesh on interfaces
 
-zz = inverseExnerPressure((A(ss) \
-+ B(ss) * np.tile(pSurf,(nLev+2,1)) / Po) ** (Rd/Cp))
+###########################################################################
 
-zzInt = inverseExnerPressure((A(ssInt) \
-+ B(ssInt) * np.tile(pSurf,(nLev+1,1)) / Po) ** (Rd/Cp))
+#Iterate to get levels zz:
 
-ssTmp = ss[1:-1,:]
-p = A(ssTmp) * Po + B(ssTmp) * np.tile(pSurf,(nLev,1))
-dpds = Aprime(ssTmp) * Po + Bprime(ssTmp) * np.tile(pSurf,(nLev,1))
+zz0 = inverseExnerPressure((A(ssInt) \
++ B(ssInt) * np.tile(pSurf,(nLev+1,1)) / Po) ** (Rd/Cp))     #initial guess
 
-xx = np.tile(x, (nLev+2, 1))
-xxInt = np.tile(x, (nLev+1, 1))
+zz = zz0.copy()
+
+xx = np.tile(x, (nLev+1,1))
+
+dpds = Aprime(ssInt) * Po + Bprime(ssInt) * np.tile(pSurf, (nLev+1,1))
+
+tmp1 = np.ones((nLev+1, nCol))
+tmp2 = np.zeros((nLev+1, nCol))
+
+for j in range(10):
+    P_ex = exnerPressure(zz, tmp1, tmp2)
+    theta = potentialTemperature(zz, tmp1, tmp2) + thetaPtb(xx, zz)
+    integrand = -dpds * Rd * P_ex * theta / g / Po / P_ex**(Cp/Rd)
+    integrand = (integrand[:-1,:] + integrand[1:,:]) / 2.
+    tmp = zz[0,:].copy()
+    for i in range(nLev):
+        tmp = tmp + integrand[i,:] * ds
+        zz[i+1,:] = tmp.copy()
+    # plt.figure()
+    # plt.contourf(xx, zz0, zz-zz0, 20)
+    # plt.colorbar()
+    # plt.show()
+
+zSurf = zz[-1,:].copy()
+
+###########################################################################
+
+# zzInt = zz.copy()
+# zz = (zzInt[:-1,:] + zzInt[1:,:]) / 2.
+# zz = np.vstack((2.*top - zz[0,:] \
+# , zz \
+# , 2.*zSurf - zz[-1,:]))
+# 
+# xxInt = xx.copy()
+# xx = np.tile(x, (nLev+2, 1))
 
 ###########################################################################
 
@@ -201,10 +231,6 @@ xxInt = np.tile(x, (nLev+1, 1))
 
 ###########################################################################
 
-# zSurfPrime = Da(zSurf)              #consistent derivative of topo function
-
-###########################################################################
-
 if plotNodesAndExit:
     plt.figure()
     plt.plot(xx.flatten(), zz.flatten(), marker=".", linestyle="none")
@@ -225,7 +251,8 @@ if plotNodesAndExit:
 # thetaBar = -p * dpds / Rd / (g*(zzInt[1:,:]-zzInt[0:-1,:])/ds) / (p/Po)**(Rd/Cp)
 # thetaBar = T / (p/Po)**(Rd/Cp) - potentialTemperature(xxInt,zzInt)
 # thetaBar = (thetaBar[0:-1,:] + thetaBar[1:,:]) / 2.
-thetaBar = potentialTemperature(zz, e, null)
+theta0 = potentialTemperature(zz, e[:-1,:], null[:-1,:]) + thetaPtb(xx,zz)
+theta0 = (theta0[:-1,:] + theta0[1:,:]) / 2.
 # piBar = exnerPressure(zz, e, null)
 # piPtb = np.zeros((nLev+2, nCol))
 # Tbar = piBar * thetaBar
@@ -234,7 +261,7 @@ thetaBar = potentialTemperature(zz, e, null)
 # Pptb = Po * (piBar + piPtb) ** (Cp/Rd) - Pbar
 # rhoBar = Pbar / Rd / Tbar
 # rhoPtb = (Pbar + Pptb) / Rd / (Tbar + Tptb) - rhoBar
-phiBar0 = g * zzInt
+phiBar0 = g * zz
 # dpidsBar = -rhoBar * Ds(phiBar)
 # dpidsPtb = -rhoPtb * Ds(phiBar)
 dpidsBar0 = Aprime(ss) * Po + Bprime(ss) * np.tile(pSurf, (nLev+2,1))
@@ -252,7 +279,7 @@ if testCase == "inertiaGravityWaves":
 
 U[1,0:-1,:] = np.zeros((nLev+1, nCol))                   #vertical velocity
 
-U[2,1:-1,:] = (thetaBar + thetaPtb(xx,zz))[1:-1,:]   #potential temperature
+U[2,1:-1,:] = theta0                                 #potential temperature
 
 U[3,:,:] = dpidsBar0                                        #pseudo-density
 
@@ -294,48 +321,41 @@ def contourSomething(U, t, pHydro, dpidsBar, thetaBar):
 
     if plotBackgroundState:
         if whatToPlot == "u":
-            tmp = np.zeros((nLev+2, nCol))
+            tmp = np.zeros((nLev, nCol))
         elif whatToPlot == "w":
             tmp = np.zeros((nLev+1, nCol))
         elif whatToPlot == "theta":
-            tmp = thetaBar.copy()
+            tmp = thetaBar[1:-1,:].copy()
         elif whatToPlot == "dpids":
-            tmp = dpidsBar
+            tmp = dpidsBar[1:-1,:]
         elif whatToPlot == "phi":
             tmp = phiBar0
         elif whatToPlot == "P":
-            pSurf = pHydro[-1,:]
-            pHydro = (pHydro[:-1,:] + pHydro[1:,:]) / 2.
-            tmp = np.vstack((2.*pTop - pHydro[0,:] \
-            , pHydro \
-            , 2.*pSurf-pHydro[-1,:]))
+            tmp = (pHydro[:-1,:] + pHydro[1:,:]) / 2.
         else:
             raise ValueError("Invalid whatToPlot string.")
     else:
         if whatToPlot == "u":
-            tmp = U[0,:,:]
+            tmp = U[0,1:-1,:]
         elif whatToPlot == "w":
             tmp = U[1,0:-1,:]
         elif whatToPlot == "theta":
-            tmp = U[2,:,:] - thetaBar
+            tmp = U[2,1:-1,:] - thetaBar[1:-1,:]
         elif whatToPlot == "dpids":
-            tmp = U[3,:,:] - dpidsBar
+            tmp = U[3,1:-1,:] - dpidsBar
         elif whatToPlot == "phi":
             tmp = U[4,0:-1,:] - phiBar0
         elif whatToPlot == "P":
-            tmp = U[5,:,:]
+            tmp = U[5,1:-1,:]
         else:
             raise ValueError("Invalid whatToPlot string.")
 
     if (whatToPlot == "phi") | (whatToPlot == "w"):
-        xxTmp = xxInt
+        xxTmp = xx
         zzTmp = U[4,0:-1,:] / g                          #changing z-levels
     else:
-        xxTmp = xx
+        xxTmp = (xx[:-1,:] + xx[1:,:]) / 2.
         zzTmp = (U[4,0:-2,:]+U[4,1:-1,:])/2. / g
-        zzTmp = np.vstack((2.*U[4,0,:]/g - zzTmp[0,:] \
-        , zzTmp \
-        , 2.*U[4,-2,:]/g - zzTmp[-1,:]))
     
     plt.clf()
     plt.contourf(xxTmp, zzTmp, tmp, contours)
