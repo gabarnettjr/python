@@ -180,7 +180,7 @@ null = np.zeros((nLev+2, nCol))
 #Hydrostatic background state functions:
 potentialTemperature, potentialTemperatureDerivative \
 , exnerPressure, inverseExnerPressure \
-= common.hydrostaticProfiles(testCase, th0, g, Cp, N, e, null)
+= common.hydrostaticProfiles(testCase, th0, g, Cp, N)
 
 ###########################################################################
 
@@ -195,9 +195,9 @@ if verticalCoordinate == "height":
     sTop = 0.
     s = np.linspace(sTop-ds/2, 1+ds/2, nLev+2)
 elif verticalCoordinate == "pressure":
-    piTop  = exnerPressure(top, 1., 0.)
+    piTop  = exnerPressure(top)
     pTop  = Po * piTop  ** (Cp/Rd)             #hydrostatic pressure at top
-    piSurf = exnerPressure(zSurf, e[0,:], null[0,:])
+    piSurf = exnerPressure(zSurf)
     pSurf = Po * piSurf ** (Cp/Rd)         #hydrostatic pressure at surface
     sTop = pTop / Po                          #value of s on upper boundary
     ds = (1. - sTop) / nLev
@@ -252,11 +252,8 @@ elif verticalCoordinate == "pressure":
     zz = zz0.copy()
 
     #Iterate to satisfy initial conditions and hydrostatic condition:
-    tmp1 = np.ones(np.shape(zz))
-    tmp2 = np.zeros(np.shape(zz))
     for j in range(10):
-        T = exnerPressure(zz, tmp1, tmp2) \
-        * potentialTemperature(zz, tmp1, tmp2)
+        T = exnerPressure(zz) * potentialTemperature(zz)
         integrand = -Rd * T * dpds / p / g
         integrand = (integrand[0:-1,:] + integrand[1:,:]) / 2.
         tmp = zz[0,:].copy()
@@ -297,9 +294,9 @@ if plotNodesAndExit:
 
 #Assignment of hydrostatic background states and initial perturbations:
     
-thetaBar = potentialTemperature(zz, e, null)
-piBar = exnerPressure(zz, e, null)
-piPtb = null
+thetaBar = potentialTemperature(zz)
+piBar = exnerPressure(zz)
+piPtb = np.zeros((nLev+2, nCol))
 Tbar = piBar * thetaBar
 Tptb = (piBar + piPtb) * (thetaBar + thetaPtb(xx,zz)) - Tbar
 Pbar = Po * piBar ** (Cp/Rd)
@@ -452,9 +449,9 @@ V = np.zeros((5, nLev+2, nCol))
 
 def fastBackgroundStates(zz):
     
-    thetaBar = potentialTemperature(zz, e, null)
-    piBar = exnerPressure(zz, e, null)
-    dthetaBarDz = potentialTemperatureDerivative(zz, e, null)
+    thetaBar = potentialTemperature(zz)
+    piBar = exnerPressure(zz)
+    dthetaBarDz = potentialTemperatureDerivative(zz)
     
     Tbar = piBar * thetaBar
     Pbar = Po * piBar ** (Cp/Rd)
