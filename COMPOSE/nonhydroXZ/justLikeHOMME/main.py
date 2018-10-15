@@ -50,7 +50,7 @@ arg 5 (contour levels)\n\
         number of contours (integer)\n\
         range of contours (using np.arange or np.linspace for example)\n\n\
 EXAMPLE\n\n\
-python main.py risingBubble vEul 1 P np.arange(-51,51,2) saveArrays saveContours")
+python main.py risingBubble vEul 1 P np.arange(-51,51,2)")
 
 ###########################################################################
 
@@ -180,13 +180,13 @@ potentialTemperature, potentialTemperatureDerivative \
 
 def Ds(U):
     V = np.zeros(np.shape(U))
-    V[0,:] = (-3./2.*U[0,:] + 2.*U[1,:] - 1./2.*U[2,:]) / ds
+    V[0,:] = -3./2./ds*U[0,:] + 2./ds*U[1,:] - 1./2./ds*U[2,:]
     V[1:-1,:] = (U[2:,:] - U[0:-2,:]) / (2.*ds)
-    V[-1,:] = (3./2.*U[-1,:] - 2.*U[-2,:] + 1./2.*U[-3,:]) / ds
+    V[-1,:] = 3./2./ds*U[-1,:] - 2./ds*U[-2,:] + 1./2./ds*U[-3,:]
     return V
 
 def HVs(U):
-    return 2.**-14. * (U[0:-2,:] - 2.*U[1:-1,:] + U[2:,:]) / ds
+    return 0. * 2.**-14./ds * (U[0:-2,:] - 2.*U[1:-1,:] + U[2:,:])
 
 ###########################################################################
 
@@ -223,7 +223,7 @@ def HVa(U):
           + wd6[4]*U[:,4:-2] + wd6[5]*U[:,5:-1] + wd6[6]*U[:,6:]
     else:
         raise ValueError("U should have either one or two dimensions.")
-    return 2.**-1.*dx**5. * U            #multiply by dissipation parameter
+    return 0. * 2.**-1.*dx**5. * U            #multiply by dissipation parameter
 
 ###########################################################################
 
@@ -408,14 +408,14 @@ def contourSomething(U, t, thetaBar, pi, dpidsBar, phiBar):
     else:
         plt.axis("image")
         plt.colorbar(orientation="vertical")
-    # if plotBackgroundState:
-    #     plt.show()
-    #     sys.exit("\nDone plotting the requested background state.")
-    # else:
     plt.axis([left-250., right+250. \
     , np.min(zz[-1,:])-250., np.max(zz[0,:])+250.])
-    fig.savefig( "{0:04d}.png".format(np.int(np.round(t)+1e-12)) \
-    , bbox_inches="tight" )                       #save figure as a png
+    if plotBackgroundState:
+        plt.show()
+        sys.exit("\nDone plotting the requested background state.")
+    else:
+        fig.savefig( "{0:04d}.png".format(np.int(np.round(t)+1e-12)) \
+        , bbox_inches="tight" )                       #save figure as a png
 
 ###########################################################################
 
@@ -588,7 +588,7 @@ def odefun(t, U, dUdt):
     tmp = (U[2,1:,:] - U[2,0:-1,:]) / ds              #dth/ds on interfaces
     tmp = sDot * tmp                             #sDot*dth/ds on interfaces
     tmp = (tmp[0:-1,:] + tmp[1:,:]) / 2.         #sDot*dth/ds on mid-levels
-    dUdt[2,1:-1,:] = -U[0,1:-1,:] * Da(U[2,1:-1,:]) - tmp \
+    dUdt[2,1:-1,:] = -U[0,1:-1,:] * Da(U[2,1:-1,:]) - tmp
     + HVa(U[2,1:-1,:] - thetaBar[1:-1,:]) \
     + HVs(U[2,:,:] - thetaBar)                         #dth/dt (mid-levels)
 
