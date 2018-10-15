@@ -10,33 +10,103 @@ from gab.nonhydro import common
 
 ###########################################################################
 
-#This block contains the only variables that the user should be required
-#to modify when running the code, unless they want to add a new test case.
+#Switches to be set by user:
 
-#Choose "risingBubble", "densityCurrent", "inertiaGravityWaves",
-#"steadyState", or "scharMountainWaves":
-testCase = "densityCurrent"
-
-#Choose True or False:
-verticallyLagrangian = False
-
-#Choose 0, 1, 2, 3, or 4:
-refinementLevel = 1
-
-#Switches to control what happens:
 saveArrays          = True
 saveContours        = True
 contourFromSaved    = False
 plotNodesAndExit    = False
 plotBackgroundState = False
 
-#Choose which variable to plot ("u", "w", "theta", "dpids", "phi", "P"):
-whatToPlot = "theta"
+###########################################################################
 
-#Choose either a number of contours, or a range of contours:
-# contours = 20
-contours = np.arange(-16.5, 1.5, 1)
-# contours = np.arange(-1.05, 1.15, .1) * 1e3
+def printHelp():
+    sys.exit("\n\
+REQUIRED ARGUMENTS\n\n\
+arg 1 (name of test case)\n\
+        risingBubble\n\
+        densityCurrent\n\
+        inertiaGravityWaves\n\
+        tortureTest\n\
+        scharMountainWaves\n\n\
+arg 2 (vertical frame of reference, Eulerian or Lagrangian)\n\
+        vEul\n\
+        vLag\n\n\
+arg 3 (refinement level)\n\
+        0\n\
+        1\n\
+        2\n\
+        3\n\
+        4\n\n\
+OPTIONAL ARGUMENTS\n\n\
+arg 4 (what to plot)\n\
+        u\n\
+        w\n\
+        theta\n\
+        dpids\n\
+        phi\n\
+        P\n\n\
+arg 5 (contour levels)\n\
+        number of contours (integer)\n\
+        range of contours (using np.arange or np.linspace for example)\n\n\
+EXAMPLE\n\n\
+python main.py risingBubble vEul 1 P np.arange(-51,51,2) saveArrays saveContours")
+
+###########################################################################
+
+#Parse required inputs:
+
+try:
+    testCase = sys.argv[1]
+    #Choose "vEul" or "vLag":
+    if sys.argv[2] == "vLag":
+        verticallyLagrangian = True
+    elif sys.argv[2] == "vEul":
+        verticallyLagrangian = False
+    else:
+        raise ValueError("The second argument should be either 'vLag' " \
+        + "or 'vEul'.")
+    #Choose 0, 1, 2, 3, or 4:
+    refinementLevel = np.int64(sys.argv[3])
+except:
+    printHelp()
+
+###########################################################################
+
+#Parse optional inputs:
+
+start = 4
+try:
+    whatToPlot = sys.argv[4]
+except:
+    if testCase == "scharMountainWaves":
+        whatToPlot = "w"
+        contours = np.arange(-.725, .775, .05)
+    elif testCase == "risingBubble":
+        whatToPlot = "theta"
+        contours = np.arange(-.15, 2.25, .1)
+    elif testCase == "inertiaGravityWaves":
+        whatToPlot = "theta"
+        contours = np.arange(-.0015, .0037, .0002)
+    elif testCase == "densityCurrent":
+        whatToPlot = "theta"
+        contours = np.arange(-17.5, 2.5, 1)
+    elif testCase == "steadyState":
+        whatToPlot = "P"
+        contours = 20
+    elif testCase == "tortureTest":
+        whatToPlot = "u"
+        contours = np.arange(-1.05, 1.15, .1)
+    else:
+        raise ValueError("Invalid testCase string.")
+else:
+    start = 5
+    try:
+        contours = eval(sys.argv[5])
+    except:
+        contours = 20
+    else:
+        start = 6
 
 ###########################################################################
 
@@ -122,8 +192,8 @@ def HVs(U):
 
 #Weights and functions for lateral derivatives (7-pt finite-differences):
 
-wd1 = np.array([-1./60., .15, -.75, 0., .75, -.15, 1./60.]) / dx
-wd6 = np.array([1., -6., 15., -20., 15., -6., 1.]) / dx**6.
+wd1 = np.array([-1./60., .15, -.75,   0., .75, -.15, 1./60.]) / dx
+wd6 = np.array([     1., -6.,  15., -20., 15.,  -6.,     1.]) / dx**6.
 
 def Da(U):
     d = len(np.shape(U))
@@ -211,10 +281,10 @@ xxMid = np.tile(x, (nLev, 1))
 for j in range(10):
     zzMid = (zz[:-1,:] + zz[1:,:]) / 2.
     theta = potentialTemperature(zzMid) + thetaPtb(xxMid, zzMid)
-    integrand = -dpids * Rd * (pi/Po)**(Rd/Cp) * theta / g / pi
+    integrand = dpids * Rd * (pi/Po)**(Rd/Cp) * theta / g / pi
     tmp = zz[-1,:].copy()
     for i in range(nLev):
-        tmp = tmp - integrand[-(i+1),:] * ds
+        tmp = tmp + integrand[-(i+1),:] * ds
         zz[-(i+2),:] = tmp.copy()
     # plt.figure()
     # plt.contourf(xx, zz0, zz-zz0, 20)
@@ -309,6 +379,7 @@ def contourSomething(U, t, thetaBar, pi, dpidsBar, phiBar):
         elif whatToPlot == "dpids":
             tmp = U[3,1:-1,:] - dpidsBar[1:-1,:]
         elif whatToPlot == "phi":
+            # tmp = U[4,0:-1,:] - phi0
             tmp = U[4,0:-1,:] - phiBar
         elif whatToPlot == "P":
             tmp = U[5,1:-1,:]
@@ -319,7 +390,7 @@ def contourSomething(U, t, thetaBar, pi, dpidsBar, phiBar):
         xxTmp = xx
         zzTmp = U[4,0:-1,:] / g                          #changing z-levels
     else:
-        xxTmp = (xx[:-1,:] + xx[1:,:]) / 2.
+        xxTmp = xxMid
         zzTmp = (U[4,0:-2,:]+U[4,1:-1,:])/2. / g
     
     plt.clf()
@@ -351,7 +422,8 @@ def contourSomething(U, t, thetaBar, pi, dpidsBar, phiBar):
 #Initialize the output array for the vertical re-map function:
 
 if verticallyLagrangian:
-    V = np.zeros((2, nLev+2, nCol))
+    Vmidlevels  = np.zeros((2, nLev+2, nCol))
+    Vinterfaces = np.zeros((2, nLev+1, nCol))
 
 ###########################################################################
 
@@ -431,18 +503,11 @@ def setGhostNodes(U):
     #extrapolate u to bottom ghost nodes:
     U[0,-1,:] = 2.*U[0,-2,:] - U[0,-3,:]
     #get w on bottom boundary nodes:
-    U[1,-2,:] = (3./2.*U[0,-2,:]-1./2.*U[0,-3,:]) / g * dphida
+    U[1,-2,:] = (U[0,-1,:]+U[0,-2,:])/2. / g * dphida
+    # U[1,-2,:] = (3./2.*U[0,-2,:]-1./2.*U[0,-3,:]) / g * dphida
 
     #set pressure perturbation on top ghost nodes using zero Dirichlet BC:
     U[5,0,:] = -U[5,1,:]
-    # dphida = Da(U[4,0,:])
-    # #set pressure perturbation on top ghost nodes using Neumann BC:
-    # dPda = Da(pi[0,:]) + Da(3./2.*U[5,1,:] - 1./2.*U[5,2,:])
-    # dpids = 3./2.*U[3,1,:] - 1./2.*U[3,2,:]
-    # dphids = (-3./2.*U[4,0,:] + 2.*U[4,1,:] - 1./2.*U[4,2,:]) / ds
-    # RHS = (dPda * dphids - dphida * dpids ) * dphida
-    # RHS = RHS / (g**2. + dphida**2.)
-    # U[5,0,:] = U[5,1,:] - ds * RHS
     #extrapolate u to top ghost nodes:
     U[0,0,:] = 2.*U[0,1,:] - U[0,2,:]
 
@@ -594,9 +659,9 @@ for i in np.arange(0, nTimesteps+1):
 
         #re-map w and phi:
         U[[1,4],0:-1,:] = common.verticalRemap(U[[1,4],0:-1,:] \
-        , pi, piNew, np.zeros((2,nLev+1,nCol)))
+        , pi, piNew, Vinterfaces)
         
-        #move pi to mid-levels:
+        #avg pi to mid-levels:
         pi = (pi[0:-1,:] + pi[1:,:])/2.
         pi = np.vstack((2.*piTop - pi[0,:] \
         , pi \
@@ -608,7 +673,7 @@ for i in np.arange(0, nTimesteps+1):
 
         #re-map u and theta:
         U[[0,2],:,:] = common.verticalRemap(U[[0,2],:,:] \
-        , pi, piNew, V)
+        , pi, piNew, Vmidlevels)
         
         #re-set the pseudo-density:
         U[3,:,:] = dpidsBar.copy()

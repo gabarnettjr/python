@@ -19,7 +19,7 @@ saveArrays          = True
 saveContours        = True
 contourFromSaved    = False
 plotNodesAndExit    = False
-plotBackgroundState = True
+plotBackgroundState = False
 
 ###########################################################################
 
@@ -35,7 +35,7 @@ arg 1 (name of test case)\n\
 arg 2 (type of vertical coordinate)\n\
         height\n\
         pressure\n\n\
-arg 3 (vertical frame of reference, Lagrangian or Eulerian)\n\
+arg 3 (vertical frame of reference, Eulerian or Lagrangian)\n\
         vEul\n\
         vLag\n\n\
 arg 4 (refinement level)\n\
