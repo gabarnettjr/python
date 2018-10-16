@@ -14,7 +14,7 @@ from gab.nonhydro import common
 
 saveArrays          = True
 saveContours        = True
-contourFromSaved    = False
+contourFromSaved    = True
 plotNodesAndExit    = False
 plotBackgroundState = False
 
@@ -22,35 +22,41 @@ plotBackgroundState = False
 
 def printHelp():
     sys.exit("\n\
+----------------------------------------------------------------------\n\n\
 REQUIRED ARGUMENTS\n\n\
-arg 1 (name of test case)\n\
-        risingBubble\n\
-        densityCurrent\n\
-        inertiaGravityWaves\n\
-        tortureTest\n\
-        scharMountainWaves\n\n\
-arg 2 (vertical frame of reference, Eulerian or Lagrangian)\n\
-        vEul\n\
-        vLag\n\n\
-arg 3 (refinement level)\n\
-        0\n\
-        1\n\
-        2\n\
-        3\n\
-        4\n\n\
+argument 1 (name of test case)\n\
+    risingBubble\n\
+    densityCurrent\n\
+    inertiaGravityWaves\n\
+    tortureTest\n\
+    scharMountainWaves\n\n\
+argument 2 (vertical frame of reference, Eulerian or Lagrangian)\n\
+    vEul\n\
+    vLag\n\n\
+argument 3 (refinement level)\n\
+    0\n\
+    1\n\
+    2\n\
+    3\n\
+    4\n\n\
+----------------------------------------------------------------------\n\n\
 OPTIONAL ARGUMENTS\n\n\
-arg 4 (what to plot)\n\
-        u\n\
-        w\n\
-        theta\n\
-        dpids\n\
-        phi\n\
-        P\n\n\
-arg 5 (contour levels)\n\
-        number of contours (integer)\n\
-        range of contours (using np.arange or np.linspace for example)\n\n\
+argument 4 (what to plot)\n\
+    u\n\
+    w\n\
+    theta\n\
+    dpids\n\
+    phi\n\
+    P\n\
+    pi (no background state)\n\n\
+argument 5 (contour levels)\n\
+    number of contours (integer)\n\
+    range of contours (using np.arange or np.linspace for example)\n\n\
+----------------------------------------------------------------------\n\n\
 EXAMPLE\n\n\
-python main.py risingBubble vEul 1 P np.arange(-51,51,2)")
+python main.py risingBubble vEul 1 P np.arange(-51,53,2)\n\n\
+----------------------------------------------------------------------\
+")
 
 ###########################################################################
 
@@ -58,7 +64,6 @@ python main.py risingBubble vEul 1 P np.arange(-51,51,2)")
 
 try:
     testCase = sys.argv[1]
-    #Choose "vEul" or "vLag":
     if sys.argv[2] == "vLag":
         verticallyLagrangian = True
     elif sys.argv[2] == "vEul":
@@ -66,7 +71,6 @@ try:
     else:
         raise ValueError("The second argument should be either 'vLag' " \
         + "or 'vEul'.")
-    #Choose 0, 1, 2, 3, or 4:
     refinementLevel = np.int64(sys.argv[3])
 except:
     printHelp()
@@ -75,38 +79,31 @@ except:
 
 #Parse optional inputs:
 
-start = 4
 try:
     whatToPlot = sys.argv[4]
 except:
-    if testCase == "scharMountainWaves":
-        whatToPlot = "w"
-        contours = np.arange(-.725, .775, .05)
-    elif testCase == "risingBubble":
+    if testCase == "risingBubble":
         whatToPlot = "theta"
         contours = np.arange(-.15, 2.25, .1)
-    elif testCase == "inertiaGravityWaves":
-        whatToPlot = "theta"
-        contours = np.arange(-.0015, .0037, .0002)
     elif testCase == "densityCurrent":
         whatToPlot = "theta"
         contours = np.arange(-17.5, 2.5, 1)
-    elif testCase == "steadyState":
-        whatToPlot = "P"
-        contours = 20
+    elif testCase == "inertiaGravityWaves":
+        whatToPlot = "theta"
+        contours = np.arange(-15, 37, 2) * 1e-4
     elif testCase == "tortureTest":
         whatToPlot = "u"
         contours = np.arange(-1.05, 1.15, .1)
+    elif testCase == "scharMountainWaves":
+        whatToPlot = "w"
+        contours = np.arange(-.725, .775, .05)
     else:
         raise ValueError("Invalid testCase string.")
 else:
-    start = 5
     try:
         contours = eval(sys.argv[5])
     except:
         contours = 20
-    else:
-        start = 6
 
 ###########################################################################
 
@@ -180,20 +177,22 @@ potentialTemperature, potentialTemperatureDerivative \
 
 def Ds(U):
     V = np.zeros(np.shape(U))
-    V[0,:] = -3./2./ds*U[0,:] + 2./ds*U[1,:] - 1./2./ds*U[2,:]
+    V[0,:] = (-3./2.*U[0,:] + 2.*U[1,:] - 1./2.*U[2,:]) / ds
     V[1:-1,:] = (U[2:,:] - U[0:-2,:]) / (2.*ds)
-    V[-1,:] = 3./2./ds*U[-1,:] - 2./ds*U[-2,:] + 1./2./ds*U[-3,:]
+    V[-1,:] = (3./2.*U[-1,:] - 2.*U[-2,:] + 1./2.*U[-3,:]) / ds
     return V
 
 def HVs(U):
-    return 0. * 2.**-14./ds * (U[0:-2,:] - 2.*U[1:-1,:] + U[2:,:])
+    return 2.**-14./ds * (U[0:-2,:] - 2.*U[1:-1,:] + U[2:,:])
+    # return np.zeros((np.shape(U)[0]-2, np.shape(U)[1]))
 
 ###########################################################################
 
 #Weights and functions for lateral derivatives (7-pt finite-differences):
 
-wd1 = np.array([-1./60., .15, -.75,   0., .75, -.15, 1./60.]) / dx
-wd6 = np.array([     1., -6.,  15., -20., 15.,  -6.,     1.]) / dx**6.
+wd1 = np.array([-1./60., .15, -.75, 0., .75, -.15, 1./60.]) / dx
+wd6 = np.array([1., -6., 15., -20., 15., -6., 1.]) / dx**6.
+whv = 2.**-1.*dx**5. * wd6        #multiply by scale-dependent HV parameter
 
 def Da(U):
     d = len(np.shape(U))
@@ -213,17 +212,18 @@ def HVa(U):
     d = len(np.shape(U))
     if d == 1:
         U = np.hstack((U[[-3,-2,-1]], U, U[[0,1,2]]))
-        U = wd6[0]*U[0:-6] + wd6[1]*U[1:-5] + wd6[2]*U[2:-4] \
-          + wd6[3]*U[3:-3] \
-          + wd6[4]*U[4:-2] + wd6[5]*U[5:-1] + wd6[6]*U[6:]
+        U = whv[0]*U[0:-6] + whv[1]*U[1:-5] + whv[2]*U[2:-4] \
+          + whv[3]*U[3:-3] \
+          + whv[4]*U[4:-2] + whv[5]*U[5:-1] + whv[6]*U[6:]
     elif d == 2:
         U = np.hstack((U[:,[-3,-2,-1]], U, U[:,[0,1,2]]))
-        U = wd6[0]*U[:,0:-6] + wd6[1]*U[:,1:-5] + wd6[2]*U[:,2:-4] \
-          + wd6[3]*U[:,3:-3] \
-          + wd6[4]*U[:,4:-2] + wd6[5]*U[:,5:-1] + wd6[6]*U[:,6:]
+        U = whv[0]*U[:,0:-6] + whv[1]*U[:,1:-5] + whv[2]*U[:,2:-4] \
+          + whv[3]*U[:,3:-3] \
+          + whv[4]*U[:,4:-2] + whv[5]*U[:,5:-1] + whv[6]*U[:,6:]
     else:
         raise ValueError("U should have either one or two dimensions.")
-    return 0. * 2.**-1.*dx**5. * U            #multiply by dissipation parameter
+    return U
+    # return np.zeros(np.shape(U))
 
 ###########################################################################
 
@@ -270,6 +270,8 @@ for i in range(nLev):
     tmp = tmp + dpids[i,:] * ds
     pi[i+1,:] = tmp.copy()
 
+pi0 = pi.copy()
+
 zz0 = inverseExnerPressure((pi/Po) ** (Rd/Cp))               #initial guess
 zz = zz0.copy()
 xx = np.tile(x, (nLev+1,1))
@@ -287,7 +289,7 @@ for j in range(10):
         tmp = tmp + integrand[-(i+1),:] * ds
         zz[-(i+2),:] = tmp.copy()
     # plt.figure()
-    # plt.contourf(xx, zz0, zz-zz0, 20)
+    # plt.contourf(xx, zz, zz-zz0, 20)
     # plt.colorbar()
     # plt.show()
 
@@ -321,8 +323,11 @@ dpids0 = Aprime(ss) * Po + Bprime(ss) * np.tile(piSurf, (nLev+2,1))
 U = np.zeros((6, nLev+2, nCol))
 
 if testCase == "inertiaGravityWaves":
-    U[0,:,:] \
-    = 20. * np.ones((nLev+2, nCol))     #horizontal velocity u (mid-levels)
+    U[0,:,:] = 20. * np.ones((nLev+2, nCol))
+elif testCase == "scharMountainWaves":
+    U[0,:,:] = 10. * np.ones((nLev+2, nCol))     
+else:
+    U[0,:,:] = np.zeros((nLev+2, nCol)) #horizontal velocity u (mid-levels)
 
 U[1,0:-1,:] = np.zeros((nLev+1, nCol))    #vertical velocity w (interfaces)
 
@@ -378,15 +383,18 @@ def contourSomething(U, t, thetaBar, pi, dpidsBar, phiBar):
             tmp = U[2,1:-1,:] - thetaBar[1:-1,:]
         elif whatToPlot == "dpids":
             tmp = U[3,1:-1,:] - dpidsBar[1:-1,:]
+            # tmp = U[3,1:-1,:] - dpids0[1:-1,:]
         elif whatToPlot == "phi":
-            # tmp = U[4,0:-1,:] - phi0
-            tmp = U[4,0:-1,:] - phiBar
+            # tmp = U[4,0:-1,:] - phiBar
+            tmp = U[4,0:-1,:] - phi0
         elif whatToPlot == "P":
             tmp = U[5,1:-1,:]
+        elif whatToPlot == "pi":
+            tmp = pi - pi0
         else:
             raise ValueError("Invalid whatToPlot string.")
 
-    if (whatToPlot == "phi") | (whatToPlot == "w"):
+    if (whatToPlot == "phi") | (whatToPlot == "w") | (whatToPlot == "pi"):
         xxTmp = xx
         zzTmp = U[4,0:-1,:] / g                          #changing z-levels
     else:
@@ -399,7 +407,9 @@ def contourSomething(U, t, thetaBar, pi, dpidsBar, phiBar):
     plt.plot(x, U[4,-2,:]/g, linestyle="-", color="red")
     # plt.plot(xxTmp.flatten(), zzTmp.flatten(), color="red", marker="." \
     # , linestyle="none", markersize=1)
+
     if (testCase == "inertiaGravityWaves") \
+    or (testCase == "tortureTest") \
     or (testCase == "scharMountainWaves"):
         plt.colorbar(orientation="horizontal")
     elif (testCase == "densityCurrent"):
@@ -408,9 +418,15 @@ def contourSomething(U, t, thetaBar, pi, dpidsBar, phiBar):
     else:
         plt.axis("image")
         plt.colorbar(orientation="vertical")
+
+    # if (testCase == "scharMountainWaves") and (whatToPlot == "w"):
+    #     plt.axis([-20000., 20000., np.min(zz[-1,:])-250., 10000.])
+    # else:
     plt.axis([left-250., right+250. \
     , np.min(zz[-1,:])-250., np.max(zz[0,:])+250.])
+
     if plotBackgroundState:
+        plt.title("min={0:g}, max={1:g}".format(np.min(tmp),np.max(tmp)))
         plt.show()
         sys.exit("\nDone plotting the requested background state.")
     else:
@@ -584,11 +600,12 @@ def odefun(t, U, dUdt):
     dUdt[1,0,:] = -uInt[0,:] * Da(U[1,0,:]) \
     + g * ((U[5,1,:]-U[5,0,:])/ds) / dpidsInt[0,:] \
     + HVa(U[1,0,:])                                            #dw/dt (top)
+    # + g * ((U[5,1,:]-U[5,0,:])/ds) / ((-3./2.*pi[0,:]+2.*pi[1,:]-1./2.*pi[2,:])/ds) \
 
     tmp = (U[2,1:,:] - U[2,0:-1,:]) / ds              #dth/ds on interfaces
     tmp = sDot * tmp                             #sDot*dth/ds on interfaces
     tmp = (tmp[0:-1,:] + tmp[1:,:]) / 2.         #sDot*dth/ds on mid-levels
-    dUdt[2,1:-1,:] = -U[0,1:-1,:] * Da(U[2,1:-1,:]) - tmp
+    dUdt[2,1:-1,:] = -U[0,1:-1,:] * Da(U[2,1:-1,:]) - tmp \
     + HVa(U[2,1:-1,:] - thetaBar[1:-1,:]) \
     + HVs(U[2,:,:] - thetaBar)                         #dth/dt (mid-levels)
 
@@ -647,8 +664,7 @@ for i in np.arange(0, nTimesteps+1):
     
     #Vertical re-map:
     if verticallyLagrangian and not contourFromSaved \
-    and (np.mod(i,3) == 0) and (testCase != "inertiaGravityWaves") \
-    and (testCase != "scharMountainWaves"):
+    and (np.mod(i,3) == 0) and (testCase != "inertiaGravityWaves"):
 
         U, thetaBar, pi, dpidsBar, phiBar = setGhostNodes(U)
         piSurf = pi[-1,:].copy()
