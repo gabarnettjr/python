@@ -14,7 +14,7 @@ from gab.nonhydro import common
 
 saveArrays          = True
 saveContours        = True
-contourFromSaved    = True
+contourFromSaved    = False
 plotNodesAndExit    = False
 plotBackgroundState = False
 
@@ -107,6 +107,10 @@ else:
 
 ###########################################################################
 
+# print("Test Case: ")
+
+###########################################################################
+
 #Get string for saving results:
 
 saveString = "./results/" + testCase + "_"
@@ -148,25 +152,13 @@ left, right, bottom, top, dx, nLev, dt, tf, saveDel \
 , zSurf, thetaPtb \
 = common.domainParameters(testCase, refinementLevel, g, Cp, th0)
 
-
-
-
-#TEMPORARY OVER-WRITE OF SOME VARIABLES FOR TESTING PURPOSES:
-# tf = 50.
-# saveDel = 5
-# def zSurf(x):
-#     return np.zeros(np.shape(x))
-
-
-
-
 #Some other important parameters:
 nCol = np.int(np.round((right - left) / dx))             #number of columns
 t = 0.                                                        #initial time
 nTimesteps = np.int(np.round(tf / dt))                #number of time-steps
 x = np.linspace(left+dx/2, right-dx/2, nCol)        #array of x-coordinates
 
-#Initial hydrostatic background state functions (given in test case):
+#Initial hydrostatic background state functions of z (given in test case):
 potentialTemperature, potentialTemperatureDerivative \
 , exnerPressure, inverseExnerPressure \
 = common.hydrostaticProfiles(testCase, th0, g, Cp, N)
@@ -182,9 +174,12 @@ def Ds(U):
     V[-1,:] = (3./2.*U[-1,:] - 2.*U[-2,:] + 1./2.*U[-3,:]) / ds
     return V
 
-def HVs(U):
-    return 2.**-14./ds * (U[0:-2,:] - 2.*U[1:-1,:] + U[2:,:])
-    # return np.zeros((np.shape(U)[0]-2, np.shape(U)[1]))
+if (testCase == "inertiaGravityWaves") or (testCase == "tortureTest"):
+    def HVs(U):
+        return np.zeros((np.shape(U)[0]-2, np.shape(U)[1]))
+else:
+    def HVs(U):
+        return 2.**-14./ds * (U[0:-2,:] - 2.*U[1:-1,:] + U[2:,:])
 
 ###########################################################################
 
@@ -208,22 +203,25 @@ def Da(U):
         raise ValueError("U should have either one or two dimensions.")
     return U
 
-def HVa(U):
-    d = len(np.shape(U))
-    if d == 1:
-        U = np.hstack((U[[-3,-2,-1]], U, U[[0,1,2]]))
-        U = whv[0]*U[0:-6] + whv[1]*U[1:-5] + whv[2]*U[2:-4] \
-          + whv[3]*U[3:-3] \
-          + whv[4]*U[4:-2] + whv[5]*U[5:-1] + whv[6]*U[6:]
-    elif d == 2:
-        U = np.hstack((U[:,[-3,-2,-1]], U, U[:,[0,1,2]]))
-        U = whv[0]*U[:,0:-6] + whv[1]*U[:,1:-5] + whv[2]*U[:,2:-4] \
-          + whv[3]*U[:,3:-3] \
-          + whv[4]*U[:,4:-2] + whv[5]*U[:,5:-1] + whv[6]*U[:,6:]
-    else:
-        raise ValueError("U should have either one or two dimensions.")
-    return U
-    # return np.zeros(np.shape(U))
+if (testCase == "inertiaGravityWaves") or (testCase == "tortureTest"):
+    def HVa(U):
+        return np.zeros(np.shape(U))
+else:
+    def HVa(U):
+        d = len(np.shape(U))
+        if d == 1:
+            U = np.hstack((U[[-3,-2,-1]], U, U[[0,1,2]]))
+            U = whv[0]*U[0:-6] + whv[1]*U[1:-5] + whv[2]*U[2:-4] \
+              + whv[3]*U[3:-3] \
+              + whv[4]*U[4:-2] + whv[5]*U[5:-1] + whv[6]*U[6:]
+        elif d == 2:
+            U = np.hstack((U[:,[-3,-2,-1]], U, U[:,[0,1,2]]))
+            U = whv[0]*U[:,0:-6] + whv[1]*U[:,1:-5] + whv[2]*U[:,2:-4] \
+              + whv[3]*U[:,3:-3] \
+              + whv[4]*U[:,4:-2] + whv[5]*U[:,5:-1] + whv[6]*U[:,6:]
+        else:
+            raise ValueError("U should have either one or two dimensions.")
+        return U
 
 ###########################################################################
 
@@ -272,8 +270,8 @@ for i in range(nLev):
 
 pi0 = pi.copy()
 
-zz0 = inverseExnerPressure((pi/Po) ** (Rd/Cp))               #initial guess
-zz = zz0.copy()
+zz = inverseExnerPressure((pi/Po) ** (Rd/Cp))                #initial guess
+zz0 = zz.copy()
 xx = np.tile(x, (nLev+1,1))
 
 pi = (pi[:-1,:] + pi[1:,:]) / 2.             #avg pi to interior mid-levels
@@ -289,7 +287,7 @@ for j in range(10):
         tmp = tmp + integrand[-(i+1),:] * ds
         zz[-(i+2),:] = tmp.copy()
     # plt.figure()
-    # plt.contourf(xx, zz, zz-zz0, 20)
+    # plt.contourf(xx, zz0, zz-zz0, 20)
     # plt.colorbar()
     # plt.show()
 
@@ -360,11 +358,7 @@ if saveContours:
 def contourSomething(U, t, thetaBar, pi, dpidsBar, phiBar):
 
     if plotBackgroundState:
-        if whatToPlot == "u":
-            tmp = np.zeros((nLev, nCol))
-        elif whatToPlot == "w":
-            tmp = np.zeros((nLev+1, nCol))
-        elif whatToPlot == "theta":
+        if whatToPlot == "theta":
             tmp = thetaBar[1:-1,:].copy()
         elif whatToPlot == "dpids":
             tmp = dpidsBar[1:-1,:].copy()
@@ -373,7 +367,8 @@ def contourSomething(U, t, thetaBar, pi, dpidsBar, phiBar):
         elif whatToPlot == "P":
             tmp = (pi[:-1,:] + pi[1:,:]) / 2.
         else:
-            raise ValueError("Invalid whatToPlot string.")
+            raise ValueError("Invalid whatToPlot string.  Choose 'theta'" \
+            + ", 'dpids', 'phi', or 'P'.")
     else:
         if whatToPlot == "u":
             tmp = U[0,1:-1,:]
@@ -385,14 +380,15 @@ def contourSomething(U, t, thetaBar, pi, dpidsBar, phiBar):
             tmp = U[3,1:-1,:] - dpidsBar[1:-1,:]
             # tmp = U[3,1:-1,:] - dpids0[1:-1,:]
         elif whatToPlot == "phi":
-            # tmp = U[4,0:-1,:] - phiBar
-            tmp = U[4,0:-1,:] - phi0
+            tmp = U[4,0:-1,:] - phiBar
+            # tmp = U[4,0:-1,:] - phi0
         elif whatToPlot == "P":
             tmp = U[5,1:-1,:]
         elif whatToPlot == "pi":
             tmp = pi - pi0
         else:
-            raise ValueError("Invalid whatToPlot string.")
+            raise ValueError("Invalid whatToPlot string.  Choose 'u', " \
+            + "'w', 'theta', 'dpids', 'phi', 'P', or 'pi'.")
 
     if (whatToPlot == "phi") | (whatToPlot == "w") | (whatToPlot == "pi"):
         xxTmp = xx
@@ -510,7 +506,7 @@ def setGhostNodes(U):
 
     dphida = Da(U[4,-2,:])
     #set pressure perturbation on bottom ghost nodes using Neumann BC:
-    dPda = Da(pi[-1,:]) + Da(3./2.*U[5,-2,:] - 1./2.*U[5,-3,:])
+    dPda = Da(pi[-1,:] + 3./2.*U[5,-2,:] - 1./2.*U[5,-3,:])
     dpids = 3./2.*U[3,-2,:] - 1./2.*U[3,-3,:]
     dphids = (3./2.*U[4,-2,:] - 2.*U[4,-3,:] + 1./2.*U[4,-4,:]) / ds
     RHS = (dPda * dphids - dphida * dpids) * dphida
@@ -520,10 +516,19 @@ def setGhostNodes(U):
     U[0,-1,:] = 2.*U[0,-2,:] - U[0,-3,:]
     #get w on bottom boundary nodes:
     U[1,-2,:] = (U[0,-1,:]+U[0,-2,:])/2. / g * dphida
-    # U[1,-2,:] = (3./2.*U[0,-2,:]-1./2.*U[0,-3,:]) / g * dphida
 
     #set pressure perturbation on top ghost nodes using zero Dirichlet BC:
     U[5,0,:] = -U[5,1,:]
+
+    # dphida = Da(U[4,0,:])
+    # #set pressure perturbation on top ghost nodes using Neumann BC:
+    # dPda = Da(pi[0,:] + 3./2.*U[5,1,:] - 1./2.*U[5,2,:])
+    # dpids = 3./2.*U[3,1,:] - 1./2.*U[3,2,:]
+    # dphids = (-3./2.*U[4,0,:] + 2.*U[4,1,:] - 1./2.*U[4,2,:]) / ds
+    # RHS = (dPda * dphids - dphida * dpids) * dphida
+    # RHS = RHS / (g**2. + dphida**2.)
+    # U[5,0,:] = U[5,1,:] - ds * RHS
+
     #extrapolate u to top ghost nodes:
     U[0,0,:] = 2.*U[0,1,:] - U[0,2,:]
 
@@ -630,27 +635,30 @@ def odefun(t, U, dUdt):
 
 ###########################################################################
 
-def printMinAndMax(t, et, U, thetaBar, dpidsBar, phiBar):
+def printMinAndMax(t, et, U, thetaBar, pi, dpidsBar, phiBar):
     
-    print("t = {0:5d},  et = {1:6.2f},  MIN:  u = {2:+.2e},  \
-w = {3:+.2e},  th = {4:+.2e},  dpids = {5:+.2e},  \
+    print("t = {0:5d},  et = {1:6.2f},  |massDiff| = {8:+.1e},  \
+MIN:  u = {2:+.2e},  \
+w = {3:+.2e},  th = {4:+.2e},  pi = {5:+.2e},  \
 phi = {6:+.2e},  P = {7:+.2e}" \
     . format(np.int(np.round(t)) \
     , et \
     , np.min(U[0,1:-1,:]) \
     , np.min(U[1,0:-1,:]) \
     , np.min(U[2,1:-1,:] - thetaBar[1:-1,:]) \
-    , np.min(U[3,1:-1,:] - dpidsBar[1:-1,:]) \
+    , np.min(pi - pi0) \
     , np.min(U[4,0:-1,:] - phiBar) \
-    , np.min(U[5,1:-1,:])))
+    , np.min(U[5,1:-1,:]) \
+    , np.abs(np.sum(U[3,1:-1,:] / g * ds * dx) - mass0) / mass0))
 
-    print("                          MAX:  u = {0:+.2e},  \
-w = {1:+.2e},  th = {2:+.2e},  dpids = {3:+.2e},  \
+    print("                                                  \
+MAX:  u = {0:+.2e},  \
+w = {1:+.2e},  th = {2:+.2e},  pi = {3:+.2e},  \
 phi = {4:+.2e},  P = {5:+.2e}\n" \
     . format(np.max(U[0,1:-1,:]) \
     , np.max(U[1,0:-1,:]) \
     , np.max(U[2,1:-1,:] - thetaBar[1:-1,:]) \
-    , np.max(U[3,1:-1,:] - dpidsBar[1:-1,:]) \
+    , np.max(pi - pi0) \
     , np.max(U[4,0:-1,:] - phiBar) \
     , np.max(U[5,1:-1,:])))
 
@@ -664,7 +672,7 @@ for i in np.arange(0, nTimesteps+1):
     
     #Vertical re-map:
     if verticallyLagrangian and not contourFromSaved \
-    and (np.mod(i,3) == 0) and (testCase != "inertiaGravityWaves"):
+    and (np.mod(i,3) == 0):
 
         U, thetaBar, pi, dpidsBar, phiBar = setGhostNodes(U)
         piSurf = pi[-1,:].copy()
@@ -702,12 +710,8 @@ for i in np.arange(0, nTimesteps+1):
         
         U, thetaBar, pi, dpidsBar, phiBar = setGhostNodes(U)
 
-        printMinAndMax(t, time.time()-et, U, thetaBar, dpidsBar, phiBar)
+        printMinAndMax(t, time.time()-et, U, thetaBar, pi, dpidsBar, phiBar)
 
-        # print("|massDiff| = {0:.2e}" \
-        # . format(np.abs(np.sum(U[3,1:-1,:] \
-        # / g * ds * dx) - mass0) / mass0))
-        
         et = time.time()
         
         if saveArrays:

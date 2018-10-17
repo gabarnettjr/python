@@ -106,6 +106,9 @@ except:
     elif testCase == "steadyState":
         whatToPlot = "P"
         contours = 20
+    elif testCase == "tortureTest":
+        whatToPlot = "u"
+        contours = np.arange(-5.25,5.75,.5)
     else:
         raise ValueError("Invalid testCase string.")
 else:
@@ -391,25 +394,26 @@ def contourSomething(U, t):
 
     zz = U[4,:,:] / g                           #possibly changing z-levels
     
-    if testCase != "inertiaGravityWaves":
-        matplotlib.rcParams.update({'font.size': 22})#not igw
-    else:
-        matplotlib.rcParams.update({'font.size': 14})#igw
+    # if testCase != "inertiaGravityWaves":
+    #     matplotlib.rcParams.update({'font.size': 22})#not igw
+    # else:
+    #     matplotlib.rcParams.update({'font.size': 14})#igw
 
     plt.clf()
-    plt.contourf(xx, zz, tmp, contours)
-    # plt.contourf(xx[1:-1,:], zz[1:-1,:], tmp[1:-1,:], contours)
-    lw = .75
-    plt.plot([np.min(x),np.max(x)], [top,top], linestyle="-", color="red" \
-    , linewidth=lw)
-    plt.plot(x,zSurf, linestyle="-", color="red", linewidth=lw)
-    plt.plot([left,left], [zSurfFunc(left),top], linestyle="-" \
-    , color="red", linewidth=lw)
-    plt.plot([right,right], [zSurfFunc(right),top], linestyle="-" \
-    , color="red", linewidth=lw)
+    # plt.contourf(xx, zz, tmp, contours)
+    plt.contourf(xx[1:-1,:], zz[1:-1,:], tmp[1:-1,:], contours)
+    lw = 1
+    plt.plot([np.min(x),np.max(x)], [top,top], linestyle="-", color="red")
+    plt.plot(x,zSurf, linestyle="-", color="red")
+    # plt.plot([left,left], [zSurfFunc(left),top], linestyle="-" \
+    # , color="red", linewidth=lw)
+    # plt.plot([right,right], [zSurfFunc(right),top], linestyle="-" \
+    # , color="red", linewidth=lw)
     # plt.plot(xx[1:-1,:].flatten(), zz[1:-1,:].flatten(), marker="." \
     # , linestyle="none", color="black", markersize=1)
-    if testCase == "inertiaGravityWaves":
+    if (testCase == "inertiaGravityWaves") or (testCase == "tortureTest"):
+        plt.axis([left-250., right+250. \
+        , np.min(zSurf-250.), top+250.])
         plt.colorbar(orientation="horizontal")
     elif testCase == "densityCurrent":
         plt.axis("image")
@@ -646,7 +650,7 @@ for i in np.arange(0, nTimesteps+1):
     
     #Vertical re-map:
     if verticallyLagrangian and not contourFromSaved \
-    and (np.mod(i,1) == 0) and (testCase != "inertiaGravityWaves"):
+    and (np.mod(i,3) == 0) and (testCase != "inertiaGravityWaves"):
         if verticalCoordinate == "height":
             U = setGhostNodes(U)[0]
             U[0:5,:,:] = common.verticalRemap(U[0:5,:,:] \
