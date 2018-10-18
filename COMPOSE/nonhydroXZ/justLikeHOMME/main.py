@@ -23,31 +23,38 @@ plotBackgroundState = False
 
 def printHelp():
     sys.exit("\n\
-2D (XZ) DRY NONHYDROSTATIC MODEL USING HOMME-LIKE FORMULATION\n\n\
+2D (XZ) DRY ATMOSPHERE PROTOTYPE USING HOMME-LIKE FORMULATION\n\n\
 ----------------------------------------------------------------------\n\n\
 INFORMATION\n\n\
 Governing equations are expressed in terms of velocities u and w, \n\
 potential temperature theta, pseudo-density dpi/ds, geopotential phi, \n\
-and diagnostic pressure perturbation P' (P = pi + P').\n\n\
+and diagnostic pressure perturbation P' (P = pi + P'), where pi \n\
+is the hydrostatic pressure.\n\n\
+You can switch between hydrostatic and nonhydrostatic governing \n\
+equations, and in the hydrostatic case P' is zero, so w is zero for \n\
+all time, and phi is diagnostic  instead of prognostic.\n\n\
 To account for topography, a hybrid pressure coordinate s is used in \n\
 the vertical direction, so that constant s-surfaces follow the \n\
-topography near the surface, but near the top become nearly flat \n\
+topography near the surface, but near the top they become nearly flat \n\
 hydrostatic pressure surfaces.\n\n\
 Variables are located vertically on either mid-levels or interfaces \n\
 using Lorenz staggering.  w and phi are on interfaces, while the other \n\
 prognostic variables and the diagnostic pressure are on mid-levels.\n\n\
 ----------------------------------------------------------------------\n\n\
 REQUIRED ARGUMENTS\n\n\
-argument 1 (name of test case)\n\
+argument 1 (atmospheric formulation)\n\
+    hydrostatic\n\
+    nonhydrostatic\n\n\
+argument 2 (name of test case)\n\
     risingBubble\n\
     densityCurrent\n\
     inertiaGravityWaves\n\
     tortureTest\n\
     scharMountainWaves\n\n\
-argument 2 (vertical frame of reference, Eulerian or Lagrangian)\n\
+argument 3 (vertical frame of reference, Eulerian or Lagrangian)\n\
     vEul\n\
     vLag\n\n\
-argument 3 (refinement level)\n\
+argument 4 (refinement level)\n\
     0\n\
     1\n\
     2\n\
@@ -55,15 +62,15 @@ argument 3 (refinement level)\n\
     4\n\n\
 ----------------------------------------------------------------------\n\n\
 OPTIONAL ARGUMENTS\n\n\
-argument 4 (what to plot)\n\
+argument 5 (what to plot)\n\
     u\n\
     w\n\
     theta\n\
     dpids\n\
     phi\n\
     P\n\
-    pi (no background state)\n\n\
-argument 5 (contour levels)\n\
+    pi\n\n\
+argument 6 (contour levels)\n\
     number of contours (integer)\n\
     range of contours (using np.arange or np.linspace for example)\n\n\
 final argument\n\
@@ -72,15 +79,15 @@ final argument\n\
     simulation will start from scratch.\n\n\
 ----------------------------------------------------------------------\n\n\
 EXAMPLES (run first example first)\n\n\
-python main.py risingBubble vEul 1 P np.arange(-65,85,10)\n\n\
-python main.py risingBubble vEul 1 w fromSaved\n\n\
-python main.py risingBubble vEul 1 fromSaved\n\n\
+python main.py nonhydrostatic risingBubble vEul 1 P np.arange(-65,85,10)\n\n\
+python main.py nonhydrostatic risingBubble vEul 1 w fromSaved\n\n\
+python main.py nonhydrostatic risingBubble vEul 1 fromSaved\n\n\
 ----------------------------------------------------------------------\
 ")
 
 ###########################################################################
 
-#Quick way to switch between a new simulation and plotting from an old one:
+#Quick way to switch between [new simulation] and [plot from saved data]:
 
 sysArgv = sys.argv.copy()
 
@@ -95,15 +102,22 @@ else:
 #Parse required command-line inputs:
 
 try:
-    testCase = sysArgv[1]
-    if sysArgv[2] == "vLag":
+    if sys.argv[1] == "hydrostatic":
+        hydrostatic = True
+    elif sys.argv[1] == "nonhydrostatic":
+        hydrostatic = False
+    else:
+        raise ValueError("The first argument should be either " \
+        + "hydrostatic or nonhydrostatic.")
+    testCase = sysArgv[2]
+    if sysArgv[3] == "vLag":
         verticallyLagrangian = True
-    elif sysArgv[2] == "vEul":
+    elif sysArgv[3] == "vEul":
         verticallyLagrangian = False
     else:
-        raise ValueError("The second argument should be either 'vLag' " \
-        + "or 'vEul'.")
-    refinementLevel = np.int64(sysArgv[3])
+        raise ValueError("The third argument should be either vLag " \
+        + "or vEul.")
+    refinementLevel = np.int64(sysArgv[4])
 except:
     printHelp()
 
@@ -112,7 +126,7 @@ except:
 #Parse optional command-line inputs:
 
 try:
-    whatToPlot = sysArgv[4]
+    whatToPlot = sysArgv[5]
 except:
     if testCase == "risingBubble":
         whatToPlot = "theta"
@@ -133,7 +147,7 @@ except:
         raise ValueError("Invalid testCase string.")
 else:
     try:
-        contours = eval(sysArgv[5])
+        contours = eval(sysArgv[6])
     except:
         contours = 20
 
@@ -141,7 +155,10 @@ else:
 
 #Get string for saving results:
 
-saveString = "./results/" + testCase + "_"
+if hydrostatic:
+    saveString = "./results/" + "hydrostatic"    + "_" + testCase + "_"
+else:
+    saveString = "./results/" + "nonhydrostatic" + "_" + testCase + "_"
 
 if verticallyLagrangian:
     saveString = saveString + "vLag" + "_"
@@ -177,7 +194,7 @@ Cp, Cv, Rd, g, Po, th0, N = common.constants(testCase)
 
 #Test-specific parameters describing domain and initial perturbation:
 left, right, bottom, top, dx, nLev, dt, tf, saveDel, zSurf, thetaPtb \
-= common.domainParameters(testCase, refinementLevel, g, Cp, th0)
+= common.domainParameters(testCase, hydrostatic, refinementLevel, g, Cp, th0)
 
 #Some other important parameters:
 nCol = np.int(np.round((right - left) / dx))             #number of columns
@@ -204,10 +221,10 @@ Vertically : {1:s}\n\
 Domain Box : [{2:g},{3:g},{4:g},{5:g}]\n\
 Delta x    : {6:g}\n\
 Levels     : {7:g}\n\
-Delta t    : 1/{8:d}\n\
+Delta t    : {8:g}\n\
 Final time : {9:d}\n" \
 . format(testCase, tmp, left, right, bottom, top \
-, dx, nLev, np.int(np.round(1./dt)), np.int(tf)))
+, dx, nLev, dt, np.int(tf)))
 
 ###########################################################################
 
@@ -524,6 +541,9 @@ def setGhostNodes(U):
     thetaBar, pi, dpidsBar, phiBar \
     = fastBackgroundStates(U[4,:-1,:], U[3,1:-1,:])
 
+    if hydrostatic:
+        U[4,:-1,:] = phiBar.copy()
+
     #Extrapolate dpids to bottom ghost nodes:
     U[3,-1,:] = 2. * (U[3,-2,:]-dpidsBar[-2,:]) - (U[3,-3,:]-dpidsBar[-3,:]) \
     + dpidsBar[-1,:]
@@ -540,38 +560,29 @@ def setGhostNodes(U):
     U[2,0,:] = 2. * (U[2,1,:]-thetaBar[1,:]) - (U[2,2,:]-thetaBar[2,:]) \
     + thetaBar[0,:]
     
-    #Get pressure perturbation on mid-levels using equation of state:
-    U[5,1:-1,:] = (-U[3,1:-1,:] / ((U[4,1:-1,:]-U[4,0:-2,:])/ds) * Rd \
-    * U[2,1:-1,:] / Po**(Rd/Cp)) ** (Cp/Cv) \
-    - (pi[:-1,:]+pi[1:,:])/2.
-
-    dphida = Da(U[4,-2,:])
-    #set pressure perturbation on bottom ghost nodes using Neumann BC:
-    dPda = Da(pi[-1,:] + 3./2.*U[5,-2,:] - 1./2.*U[5,-3,:])
-    dpids = 3./2.*U[3,-2,:] - 1./2.*U[3,-3,:]
-    dphids = (3./2.*U[4,-2,:] - 2.*U[4,-3,:] + 1./2.*U[4,-4,:]) / ds
-    RHS = (dPda * dphids - dphida * dpids) * dphida
-    RHS = RHS / (g**2. + dphida**2.)
-    U[5,-1,:] = U[5,-2,:] + ds * RHS
     #extrapolate u to bottom ghost nodes:
     U[0,-1,:] = 2.*U[0,-2,:] - U[0,-3,:]
-    #get w on bottom boundary nodes:
-    U[1,-2,:] = (U[0,-1,:]+U[0,-2,:])/2. / g * dphida
-
-    #set pressure perturbation on top ghost nodes using zero Dirichlet BC:
-    U[5,0,:] = -U[5,1,:]
-
-    # dphida = Da(U[4,0,:])
-    # #set pressure perturbation on top ghost nodes using Neumann BC:
-    # dPda = Da(pi[0,:] + 3./2.*U[5,1,:] - 1./2.*U[5,2,:])
-    # dpids = 3./2.*U[3,1,:] - 1./2.*U[3,2,:]
-    # dphids = (-3./2.*U[4,0,:] + 2.*U[4,1,:] - 1./2.*U[4,2,:]) / ds
-    # RHS = (dPda * dphids - dphida * dpids) * dphida
-    # RHS = RHS / (g**2. + dphida**2.)
-    # U[5,0,:] = U[5,1,:] - ds * RHS
 
     #extrapolate u to top ghost nodes:
     U[0,0,:] = 2.*U[0,1,:] - U[0,2,:]
+
+    if not hydrostatic:
+        dphida = Da(U[4,-2,:])
+        #Get pressure perturbation on mid-levels using equation of state:
+        U[5,1:-1,:] = (-U[3,1:-1,:] / ((U[4,1:-1,:]-U[4,0:-2,:])/ds) * Rd \
+        * U[2,1:-1,:] / Po**(Rd/Cp)) ** (Cp/Cv) \
+        - (pi[:-1,:]+pi[1:,:])/2.
+        #Set pressure perturbation on bottom ghost nodes using Neumann BC:
+        dPda = Da(pi[-1,:] + 3./2.*U[5,-2,:] - 1./2.*U[5,-3,:])
+        dpids = 3./2.*U[3,-2,:] - 1./2.*U[3,-3,:]
+        dphids = (3./2.*U[4,-2,:] - 2.*U[4,-3,:] + 1./2.*U[4,-4,:]) / ds
+        RHS = (dPda * dphids - dphida * dpids) * dphida
+        RHS = RHS / (g**2. + dphida**2.)
+        U[5,-1,:] = U[5,-2,:] + ds * RHS
+        #Set pressure perturbation on top ghost nodes using Dirichlet BC:
+        U[5,0,:] = -U[5,1,:]
+        #get w on bottom boundary nodes:
+        U[1,-2,:] = (U[0,-1,:]+U[0,-2,:])/2. / g * dphida
 
     return U, thetaBar, pi, dpidsBar, phiBar
 
@@ -636,16 +647,17 @@ def odefun(t, U, dUdt):
     + HVa(U[0,1:-1,:]) \
     + HVs(U[0,:,:])                                     #du/dt (mid-levels)
     
-    tmp = (U[1,1:-1,:] - U[1,0:-2,:]) / ds             #dw/ds on mid-levels
-    tmp = (tmp[0:-1,:] + tmp[1:,:]) / 2.      #dw/ds on interior interfaces
-    tmp = sDot[1:-1,:] * tmp             #sDot*dw/ds on interior interfaces
-    dUdt[1,1:-2,:] = -uInt[1:-1,:] * Da(U[1,1:-2,:]) - tmp \
-    + g * ((U[5,2:-1,:]-U[5,1:-2,:])/ds) / dpidsInt[1:-1,:] \
-    + HVa(U[1,1:-2,:]) \
-    + HVs(U[1,0:-1,:])                         #dw/dt (interior interfaces)
-    dUdt[1,0,:] = -uInt[0,:] * Da(U[1,0,:]) \
-    + g * ((U[5,1,:]-U[5,0,:])/ds) / dpidsInt[0,:] \
-    + HVa(U[1,0,:])                                            #dw/dt (top)
+    if not hydrostatic:
+        tmp = (U[1,1:-1,:] - U[1,0:-2,:]) / ds         #dw/ds on mid-levels
+        tmp = (tmp[0:-1,:] + tmp[1:,:]) / 2.  #dw/ds on interior interfaces
+        tmp = sDot[1:-1,:] * tmp         #sDot*dw/ds on interior interfaces
+        dUdt[1,1:-2,:] = -uInt[1:-1,:] * Da(U[1,1:-2,:]) - tmp \
+        + g * ((U[5,2:-1,:]-U[5,1:-2,:])/ds) / dpidsInt[1:-1,:] \
+        + HVa(U[1,1:-2,:]) \
+        + HVs(U[1,0:-1,:])                     #dw/dt (interior interfaces)
+        dUdt[1,0,:] = -uInt[0,:] * Da(U[1,0,:]) \
+        + g * ((U[5,1,:]-U[5,0,:])/ds) / dpidsInt[0,:] \
+        + HVa(U[1,0,:])                                        #dw/dt (top)
 
     tmp = (U[2,1:,:] - U[2,0:-1,:]) / ds              #dth/ds on interfaces
     tmp = sDot * tmp                             #sDot*dth/ds on interfaces
@@ -660,16 +672,17 @@ def odefun(t, U, dUdt):
     + HVa(U[3,1:-1,:] - dpidsBar[1:-1,:]) \
     + HVs(U[3,:,:] - dpidsBar)                    #d(dpids)/dt (mid-levels)
 
-    tmp = (U[4,1:-1,:] - U[4,0:-2,:]) / ds           #dphi/ds on mid-levels
-    tmp = (tmp[0:-1,:] + tmp[1:,:]) / 2.    #dphi/ds on interior interfaces
-    tmp = sDot[1:-1,:] * tmp           #sDot*dphi/ds on interior interfaces
-    dUdt[4,1:-2,:] = -uInt[1:-1,:] * Da(U[4,1:-2,:]) - tmp \
-    + g * U[1,1:-2,:] \
-    + HVa(U[4,1:-2,:] - phiBar[1:-1,:]) \
-    + HVs(U[4,0:-1,:] - phiBar)              #dphi/dt (interior interfaces)
-    dUdt[4,0,:] = -uInt[0,:] * Da(U[4,0,:]) \
-    + g * U[1,0,:] \
-    + HVa(U[4,0,:] - phiBar[0,:])                            #dphi/dt (top)
+    if not hydrostatic:
+        tmp = (U[4,1:-1,:] - U[4,0:-2,:]) / ds       #dphi/ds on mid-levels
+        tmp = (tmp[0:-1,:] + tmp[1:,:]) / 2.#dphi/ds on interior interfaces
+        tmp = sDot[1:-1,:] * tmp       #sDot*dphi/ds on interior interfaces
+        dUdt[4,1:-2,:] = -uInt[1:-1,:] * Da(U[4,1:-2,:]) - tmp \
+        + g * U[1,1:-2,:] \
+        + HVa(U[4,1:-2,:] - phiBar[1:-1,:]) \
+        + HVs(U[4,0:-1,:] - phiBar)          #dphi/dt (interior interfaces)
+        dUdt[4,0,:] = -uInt[0,:] * Da(U[4,0,:]) \
+        + g * U[1,0,:] \
+        + HVa(U[4,0,:] - phiBar[0,:])                        #dphi/dt (top)
 
     return dUdt
 

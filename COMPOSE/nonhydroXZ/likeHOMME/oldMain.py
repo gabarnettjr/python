@@ -160,7 +160,7 @@ Cp, Cv, Rd, g, Po, th0, N = common.constants(testCase)
 #Test-specific parameters describing domain and initial perturbation:
 left, right, bottom, top, dx, nLev, dt, tf, saveDel \
 , zSurfFunc, thetaPtb \
-= common.domainParameters(testCase, refinementLevel, g, Cp, th0)
+= common.domainParameters(testCase, False, refinementLevel, g, Cp, th0)
 
 
 
