@@ -10,18 +10,32 @@ from gab.nonhydro import common
 
 ###########################################################################
 
-#Switches to be set by user:
+#Switches that rarely need to be flipped:
 
 saveArrays          = True
 saveContours        = True
-contourFromSaved    = False
 plotNodesAndExit    = False
 plotBackgroundState = False
 
 ###########################################################################
 
+#Explain the required and optional command-line arguments:
+
 def printHelp():
     sys.exit("\n\
+2D (XZ) DRY NONHYDROSTATIC MODEL USING HOMME-LIKE FORMULATION\n\n\
+----------------------------------------------------------------------\n\n\
+INFORMATION\n\n\
+Governing equations are expressed in terms of velocities u and w, \n\
+potential temperature theta, pseudo-density dpi/ds, geopotential phi, \n\
+and diagnostic pressure perturbation P' (P = pi + P').\n\n\
+To account for topography, a hybrid pressure coordinate s is used in \n\
+the vertical direction, so that constant s-surfaces follow the \n\
+topography near the surface, but near the top become nearly flat \n\
+hydrostatic pressure surfaces.\n\n\
+Variables are located vertically on either mid-levels or interfaces \n\
+using Lorenz staggering.  w and phi are on interfaces, while the other \n\
+prognostic variables and the diagnostic pressure are on mid-levels.\n\n\
 ----------------------------------------------------------------------\n\n\
 REQUIRED ARGUMENTS\n\n\
 argument 1 (name of test case)\n\
@@ -52,35 +66,53 @@ argument 4 (what to plot)\n\
 argument 5 (contour levels)\n\
     number of contours (integer)\n\
     range of contours (using np.arange or np.linspace for example)\n\n\
+final argument\n\
+    If the final command line argument is fromSaved, then results will\n\
+    be loaded and plotted from a previous run, otherwise the \n\
+    simulation will start from scratch.\n\n\
 ----------------------------------------------------------------------\n\n\
-EXAMPLE\n\n\
-python main.py risingBubble vEul 1 P np.arange(-51,53,2)\n\n\
+EXAMPLES (run first example first)\n\n\
+python main.py risingBubble vEul 1 P np.arange(-65,85,10)\n\n\
+python main.py risingBubble vEul 1 w fromSaved\n\n\
+python main.py risingBubble vEul 1 fromSaved\n\n\
 ----------------------------------------------------------------------\
 ")
 
 ###########################################################################
 
-#Parse required inputs:
+#Quick way to switch between a new simulation and plotting from an old one:
+
+sysArgv = sys.argv.copy()
+
+if sysArgv[-1] == "fromSaved":
+    contourFromSaved = True
+    sysArgv = sysArgv[:-1]
+else:
+    contourFromSaved = False
+
+###########################################################################
+
+#Parse required command-line inputs:
 
 try:
-    testCase = sys.argv[1]
-    if sys.argv[2] == "vLag":
+    testCase = sysArgv[1]
+    if sysArgv[2] == "vLag":
         verticallyLagrangian = True
-    elif sys.argv[2] == "vEul":
+    elif sysArgv[2] == "vEul":
         verticallyLagrangian = False
     else:
         raise ValueError("The second argument should be either 'vLag' " \
         + "or 'vEul'.")
-    refinementLevel = np.int64(sys.argv[3])
+    refinementLevel = np.int64(sysArgv[3])
 except:
     printHelp()
 
 ###########################################################################
 
-#Parse optional inputs:
+#Parse optional command-line inputs:
 
 try:
-    whatToPlot = sys.argv[4]
+    whatToPlot = sysArgv[4]
 except:
     if testCase == "risingBubble":
         whatToPlot = "theta"
@@ -93,7 +125,7 @@ except:
         contours = np.arange(-15, 37, 2) * 1e-4
     elif testCase == "tortureTest":
         whatToPlot = "u"
-        contours = np.arange(-1.05, 1.15, .1)
+        contours = np.arange(-5.25, 5.75, .5)
     elif testCase == "scharMountainWaves":
         whatToPlot = "w"
         contours = np.arange(-.725, .775, .05)
@@ -101,13 +133,9 @@ except:
         raise ValueError("Invalid testCase string.")
 else:
     try:
-        contours = eval(sys.argv[5])
+        contours = eval(sysArgv[5])
     except:
         contours = 20
-
-###########################################################################
-
-# print("Test Case: ")
 
 ###########################################################################
 
@@ -144,12 +172,11 @@ if contourFromSaved:
 
 ###########################################################################
 
-#Definitions of atmospheric constants:
+#Definitions of atmospheric constants for dry air:
 Cp, Cv, Rd, g, Po, th0, N = common.constants(testCase)
 
 #Test-specific parameters describing domain and initial perturbation:
-left, right, bottom, top, dx, nLev, dt, tf, saveDel \
-, zSurf, thetaPtb \
+left, right, bottom, top, dx, nLev, dt, tf, saveDel, zSurf, thetaPtb \
 = common.domainParameters(testCase, refinementLevel, g, Cp, th0)
 
 #Some other important parameters:
@@ -158,10 +185,29 @@ t = 0.                                                        #initial time
 nTimesteps = np.int(np.round(tf / dt))                #number of time-steps
 x = np.linspace(left+dx/2, right-dx/2, nCol)        #array of x-coordinates
 
-#Initial hydrostatic background state functions of z (given in test case):
+#Initial hydrostatic background state functions of z (given by test case):
 potentialTemperature, potentialTemperatureDerivative \
 , exnerPressure, inverseExnerPressure \
 = common.hydrostaticProfiles(testCase, th0, g, Cp, N)
+
+###########################################################################
+
+#Print some info about the test case that the user might want to know:
+
+if verticallyLagrangian:
+    tmp = "Lagrangian"
+else:
+    tmp = "Eulerian"
+print("\n\
+Test Case  : {0:s} \n\
+Vertically : {1:s}\n\
+Domain Box : [{2:g},{3:g},{4:g},{5:g}]\n\
+Delta x    : {6:g}\n\
+Levels     : {7:g}\n\
+Delta t    : 1/{8:d}\n\
+Final time : {9:d}\n" \
+. format(testCase, tmp, left, right, bottom, top \
+, dx, nLev, np.int(np.round(1./dt)), np.int(tf)))
 
 ###########################################################################
 
@@ -185,9 +231,9 @@ else:
 
 #Weights and functions for lateral derivatives (7-pt finite-differences):
 
-wd1 = np.array([-1./60., .15, -.75, 0., .75, -.15, 1./60.]) / dx
-wd6 = np.array([1., -6., 15., -20., 15., -6., 1.]) / dx**6.
-whv = 2.**-1.*dx**5. * wd6        #multiply by scale-dependent HV parameter
+wd1 = np.array([-1./60., .15, -.75,   0., .75, -.15, 1./60.]) / dx
+wd6 = np.array([     1., -6.,  15., -20., 15.,  -6.,     1.]) / dx**6.
+whv = 2.**-1.*dx**5. * wd6            #multiply by hyperviscosity parameter
 
 def Da(U):
     d = len(np.shape(U))
@@ -231,7 +277,7 @@ piTop  = Po * exnerPressure(top)  ** (Cp/Rd)            #HS pressure at top
 piSurf = Po * exnerPressure(zSurf(x)) ** (Cp/Rd)    #HS pressure at surface
 sTop = piTop / Po                             #value of s on upper boundary
 ds = (1. - sTop) / nLev                                            #delta s
-s = np.linspace(sTop-ds/2, 1+ds/2, nLev+2)         #equally-spaced s values
+s = np.linspace(sTop-ds/2, 1+ds/2, nLev+2)    #equally-spaced on mid-levels
 
 ###########################################################################
 
@@ -295,9 +341,10 @@ for j in range(10):
 
 if plotNodesAndExit:
     plt.figure()
-    plt.plot(xx.flatten(), zz.flatten(), marker=".", linestyle="none")
-    plt.plot(x, zz[-1,:], color="red", linestyle="-")
-    plt.plot(x, zz[0,:], color="red", linestyle="-")
+    plt.plot(xxMid.flatten(), zzMid.flatten(), marker=".", color="black" \
+    , linestyle="none")
+    for i in range(nLev+1):
+        plt.plot(x, zz[i,:], color="red", linestyle="-")
     plt.plot([left,left], [zSurf(left),top], color="red" \
     , linestyle="-")
     plt.plot([right,right], [zSurf(right),top], color="red" \
@@ -308,17 +355,13 @@ if plotNodesAndExit:
 
 ###########################################################################
 
-#Assignment of hydrostatic background states and initial perturbations:
-
-theta0 = potentialTemperature(zzMid) + thetaPtb(xxMid, zzMid)
-phi0   = g * zz
-dpids0 = Aprime(ss) * Po + Bprime(ss) * np.tile(piSurf, (nLev+2,1))
-
-###########################################################################
-
 #Assignment of initial conditions:
 
-U = np.zeros((6, nLev+2, nCol))
+theta0 = potentialTemperature(zzMid) + thetaPtb(xxMid, zzMid)
+dpids0 = Aprime(ss) * Po + Bprime(ss) * np.tile(piSurf, (nLev+2,1))
+phi0   = g * zz
+
+U = np.zeros((6, nLev+2, nCol))                  #Main 3D array of unknowns
 
 if testCase == "inertiaGravityWaves":
     U[0,:,:] = 20. * np.ones((nLev+2, nCol))
@@ -367,8 +410,8 @@ def contourSomething(U, t, thetaBar, pi, dpidsBar, phiBar):
         elif whatToPlot == "P":
             tmp = (pi[:-1,:] + pi[1:,:]) / 2.
         else:
-            raise ValueError("Invalid whatToPlot string.  Choose 'theta'" \
-            + ", 'dpids', 'phi', or 'P'.")
+            raise ValueError("Invalid whatToPlot string.  Choose theta" \
+            + ", dpids, phi, or P.")
     else:
         if whatToPlot == "u":
             tmp = U[0,1:-1,:]
@@ -378,17 +421,15 @@ def contourSomething(U, t, thetaBar, pi, dpidsBar, phiBar):
             tmp = U[2,1:-1,:] - thetaBar[1:-1,:]
         elif whatToPlot == "dpids":
             tmp = U[3,1:-1,:] - dpidsBar[1:-1,:]
-            # tmp = U[3,1:-1,:] - dpids0[1:-1,:]
         elif whatToPlot == "phi":
             tmp = U[4,0:-1,:] - phiBar
-            # tmp = U[4,0:-1,:] - phi0
         elif whatToPlot == "P":
             tmp = U[5,1:-1,:]
         elif whatToPlot == "pi":
             tmp = pi - pi0
         else:
-            raise ValueError("Invalid whatToPlot string.  Choose 'u', " \
-            + "'w', 'theta', 'dpids', 'phi', 'P', or 'pi'.")
+            raise ValueError("Invalid whatToPlot string.  Choose u, " \
+            + "w, theta, dpids, phi, P, or pi.")
 
     if (whatToPlot == "phi") | (whatToPlot == "w") | (whatToPlot == "pi"):
         xxTmp = xx
@@ -589,7 +630,7 @@ def odefun(t, U, dUdt):
     tmp = (tmp[0:-1,:] + tmp[1:,:]) / 2.          #sDot*du/ds on mid-levels
     dUdt[0,1:-1,:] = -U[0,1:-1,:] * Da(U[0,1:-1,:]) - tmp \
     + 1./U[3,1:-1,:] * (((U[4,1:-1,:]-U[4,0:-2,:])/ds) \
-    * (Da((pi[:-1,:]+pi[1:,:])/2.) + Da(U[5,1:-1,:])) \
+    * Da((pi[:-1,:]+pi[1:,:])/2. + U[5,1:-1,:]) \
     - (U[3,:,:] + Ds(U[5,:,:]))[1:-1,:] \
     * Da((U[4,0:-2,:]+U[4,1:-1,:])/2.)) \
     + HVa(U[0,1:-1,:]) \
@@ -605,7 +646,6 @@ def odefun(t, U, dUdt):
     dUdt[1,0,:] = -uInt[0,:] * Da(U[1,0,:]) \
     + g * ((U[5,1,:]-U[5,0,:])/ds) / dpidsInt[0,:] \
     + HVa(U[1,0,:])                                            #dw/dt (top)
-    # + g * ((U[5,1,:]-U[5,0,:])/ds) / ((-3./2.*pi[0,:]+2.*pi[1,:]-1./2.*pi[2,:])/ds) \
 
     tmp = (U[2,1:,:] - U[2,0:-1,:]) / ds              #dth/ds on interfaces
     tmp = sDot * tmp                             #sDot*dth/ds on interfaces
@@ -677,29 +717,29 @@ for i in np.arange(0, nTimesteps+1):
         U, thetaBar, pi, dpidsBar, phiBar = setGhostNodes(U)
         piSurf = pi[-1,:].copy()
 
-        #new coordinate on interfaces:
+        #New coordinate on interfaces:
         piNew = A(ssInt) * Po \
         + B(ssInt) * np.tile(piSurf, (nLev+1, 1))
 
-        #re-map w and phi:
+        #Re-map w and phi:
         U[[1,4],0:-1,:] = common.verticalRemap(U[[1,4],0:-1,:] \
         , pi, piNew, Vinterfaces)
         
-        #avg pi to mid-levels:
+        #Avg pi to mid-levels:
         pi = (pi[0:-1,:] + pi[1:,:])/2.
         pi = np.vstack((2.*piTop - pi[0,:] \
         , pi \
         , 2.*piSurf - pi[-1,:]))
 
-        #new coordinate on mid-levels:
+        #New coordinate on mid-levels:
         piNew = A(ss) * Po \
         + B(ss) * np.tile(piSurf, (nLev+2, 1))
 
-        #re-map u and theta:
+        #Re-map u and theta:
         U[[0,2],:,:] = common.verticalRemap(U[[0,2],:,:] \
         , pi, piNew, Vmidlevels)
         
-        #re-set the pseudo-density:
+        #Re-set the pseudo-density:
         U[3,:,:] = dpidsBar.copy()
     
     if np.mod(i, np.int(np.round(saveDel/dt))) == 0:
