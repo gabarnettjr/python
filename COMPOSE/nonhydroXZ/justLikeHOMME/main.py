@@ -23,6 +23,7 @@ plotBackgroundState = False
 
 def printHelp():
     sys.exit("\n\
+----------------------------------------------------------------------\n\n\
 2D (XZ) DRY ATMOSPHERE PROTOTYPE USING HOMME-LIKE FORMULATION\n\n\
 ----------------------------------------------------------------------\n\n\
 INFORMATION\n\n\
@@ -35,7 +36,7 @@ equations, and in the hydrostatic case P' is zero, so w is zero for \n\
 all time, and phi is diagnostic  instead of prognostic.\n\n\
 To account for topography, a hybrid pressure coordinate s is used in \n\
 the vertical direction, so that constant s-surfaces follow the \n\
-topography near the surface, but near the top they become nearly flat \n\
+topography at the bottom, but at the top they become nearly flat \n\
 hydrostatic pressure surfaces.\n\n\
 Variables are located vertically on either mid-levels or interfaces \n\
 using Lorenz staggering.  w and phi are on interfaces, while the other \n\

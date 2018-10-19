@@ -17,9 +17,9 @@ from gab.nonhydro import common
 #Switches to control what happens:
 saveArrays          = True
 saveContours        = True
-contourFromSaved    = False
 plotNodesAndExit    = False
 plotBackgroundState = False
+cheating            = True
 
 ###########################################################################
 
@@ -56,8 +56,21 @@ arg 5 (what to plot)\n\
 arg 6 (contour levels)\n\
         number of contours (integer)\n\
         range of contours (using np.arange or np.linspace for example)\n\n\
+final argument\n\
+        if the final argument is fromSaved, then plots will be created\n\
+        from saved data, otherwise simulation starts from scratch.\n\n\
 EXAMPLE\n\n\
 python oldMain.py risingBubble height vEul 1 P np.arange(-51,23,2)")
+
+###########################################################################
+
+sysArgv = sys.argv.copy()
+
+if sysArgv[-1] == "fromSaved":
+    sysArgv = sysArgv[:-1]
+    contourFromSaved = True
+else:
+    contourFromSaved = False
 
 ###########################################################################
 
@@ -66,19 +79,19 @@ python oldMain.py risingBubble height vEul 1 P np.arange(-51,23,2)")
 try:
     #Choose "risingBubble", "densityCurrent", "inertiaGravityWaves",
     #"steadyState", or "scharMountainWaves":
-    testCase = sys.argv[1]
+    testCase = sysArgv[1]
     #Choose "pressure" or "height":
-    verticalCoordinate = sys.argv[2]
+    verticalCoordinate = sysArgv[2]
     #Choose "vEul" or "vLag":
-    if sys.argv[3] == "vLag":
+    if sysArgv[3] == "vLag":
         verticallyLagrangian = True
-    elif sys.argv[3] == "vEul":
+    elif sysArgv[3] == "vEul":
         verticallyLagrangian = False
     else:
         raise ValueError("The third argument should be either 'vLag' " \
         + "or 'vEul'.")
     #Choose 0, 1, 2, 3, or 4:
-    refinementLevel = np.int64(sys.argv[4])
+    refinementLevel = np.int64(sysArgv[4])
 except:
     printHelp()
 
@@ -89,7 +102,7 @@ except:
 try:
     #Choose which variable to plot
     #("u", "w", "T", "rho", "phi", "P", "theta", "pi"):
-    whatToPlot = sys.argv[5]
+    whatToPlot = sysArgv[5]
 except:
     if testCase == "scharMountainWaves":
         whatToPlot = "w"
@@ -113,7 +126,7 @@ except:
         raise ValueError("Invalid testCase string.")
 else:
     try:
-        contours = eval(sys.argv[6])
+        contours = eval(sysArgv[6])
     except:
         contours = 20
 
@@ -296,18 +309,50 @@ if plotNodesAndExit:
 ###########################################################################
 
 #Assignment of hydrostatic background states and initial perturbations:
-    
-thetaBar = potentialTemperature(zz)
-piBar = exnerPressure(zz)
-piPtb = np.zeros((nLev+2, nCol))
-Tbar = piBar * thetaBar
-Tptb = (piBar + piPtb) * (thetaBar + thetaPtb(xx,zz)) - Tbar
-Pbar = Po * piBar ** (Cp/Rd)
-Pptb = Po * (piBar + piPtb) ** (Cp/Rd) - Pbar
-rhoBar = Pbar / Rd / Tbar
-rhoPtb = (Pbar + Pptb) / Rd / (Tbar + Tptb) - rhoBar
-phiBar = g * zz
-    
+
+if cheating:
+    # for j in range(10):
+    #     thetaBar = potentialTemperature(zz)
+    #     piBar = exnerPressure(zz)
+    #     Tbar = piBar * thetaBar
+    #     Pbar = Po * piBar ** (Cp/Rd)
+    #     rhoBar = Pbar / Rd / Tbar
+    #     phiBar = np.zeros((nLev+1, nCol))
+    #     tmp = g * zSurfFunc(x)
+    #     phiBar[-1,:] = tmp.copy()
+    #     integrand = (Ds(Pbar) / rhoBar)[1:-1,:]
+    #     for i in range(nLev):
+    #         tmp = tmp + integrand[-(i+1),:] * ds
+    #         phiBar[-(i+2),:] = tmp.copy()
+    #     phiBar = (phiBar[:-1,:] + phiBar[1:,:]) / 2.
+    #     phiBar = np.vstack((2.*g*top - phiBar[0,:] \
+    #     , phiBar \
+    #     , 2.*g*zSurfFunc(x) - phiBar[-1,:]))
+    #     zz = phiBar / g
+    thetaBar = potentialTemperature(zz)
+    piBar = exnerPressure(zz)
+    piPtb = np.zeros((nLev+2, nCol))
+    Tbar = piBar * thetaBar
+    Tptb = (piBar + piPtb) * (thetaBar + thetaPtb(xx,zz)) - Tbar
+    Pbar = Po * piBar ** (Cp/Rd)
+    Pptb = Po * (piBar + piPtb) ** (Cp/Rd) - Pbar
+    rhoBar = Pbar / Rd / Tbar
+    rhoPtb = (Pbar + Pptb) / Rd / (Tbar + Tptb) - rhoBar
+    phiBar = g * zz
+else:
+    #Background states:
+    thetaBar = potentialTemperature(zz)
+    piBar = exnerPressure(zz)
+    phiBar = g * zz
+    Pbar = Po * piBar ** (Cp/Rd)
+    rhoBar = -Ds(Pbar) / Ds(phiBar)
+    Tbar = Pbar / rhoBar / Rd
+    #Perturbations:
+    piPtb = np.zeros((nLev+2, nCol))
+    Pptb = np.zeros((nLev+2, nCol))
+    Tptb = (piBar+piPtb) * (thetaBar+thetaPtb(xx,zz)) - Tbar
+    rhoPtb = (Pbar+Pptb) / Rd / (Tbar+Tptb) - rhoBar
+
 ###########################################################################
 
 #Assignment of initial conditions:
@@ -350,7 +395,7 @@ if saveContours:
 
 #Create and save a contour plot of the field specified by whatToPlot:
 
-def contourSomething(U, t):
+def contourSomething(U, t, Pbar, rhoBar, Tbar, phiBar):
 
     if plotBackgroundState:
         if whatToPlot == "u":
@@ -385,9 +430,11 @@ def contourSomething(U, t):
         elif whatToPlot == "P":
             tmp = U[5,:,:]
         elif whatToPlot == "theta":
-            tmp = (U[2,:,:]+Tbar) / ((U[5,:,:]+Pbar) / Po) ** (Rd/Cp) \
+            thetaBar = Tbar / (Pbar/Po)**(Rd/Cp)
+            tmp = (U[2,:,:]+Tbar) / ((U[5,:,:]+Pbar)/Po)**(Rd/Cp) \
             - thetaBar
         elif whatToPlot == "pi":
+            piBar = (Pbar/Po) ** (Rd/Cp)
             tmp = ((U[5,:,:]+Pbar) / Po) ** (Rd/Cp) - piBar
         else:
             raise ValueError("Invalid whatToPlot string.")
@@ -453,20 +500,29 @@ V = np.zeros((5, nLev+2, nCol))
 
 def fastBackgroundStates(zz):
     
-    thetaBar = potentialTemperature(zz)
-    piBar = exnerPressure(zz)
-    dthetaBarDz = potentialTemperatureDerivative(zz)
+    if cheating:
+        piBar = exnerPressure(zz)
+        Tbar = piBar * potentialTemperature(zz)
+        Pbar = Po * piBar ** (Cp/Rd)
+        rhoBar = Pbar / Rd / Tbar
+    else:
+        Pbar = Po * exnerPressure(zz) ** (Cp/Rd)
+        rhoBar = -Ds(Pbar) / Ds(g*zz)
+        Tbar = Pbar / Rd / rhoBar
+
+    # phiBar = np.zeros((nLev+1, nCol))
+    # tmp = g * zSurfFunc(x)
+    # phiBar[-1,:] = tmp.copy()
+    # integrand = (Ds(Pbar) / rhoBar)[1:-1,:]
+    # for i in range(nLev):
+    #     tmp = tmp + integrand[-(i+1),:] * ds
+    #     phiBar[-(i+2),:] = tmp.copy()
+    # phiBar = (phiBar[:-1,:] + phiBar[1:,:]) / 2.
+    # phiBar = np.vstack((2.*g*top - phiBar[0,:] \
+    # , phiBar \
+    # , 2.*g*zSurfFunc(x) - phiBar[-1,:]))
     
-    Tbar = piBar * thetaBar
-    Pbar = Po * piBar ** (Cp/Rd)
-    rhoBar = Pbar / Rd / Tbar
-    
-    dpiBarDz = -g / Cp / thetaBar                    #hydrostatic condition
-    dTbarDz = piBar * dthetaBarDz + thetaBar * dpiBarDz
-    dPbarDz = Po * Cp/Rd * piBar**(Cp/Rd-1.) * dpiBarDz
-    drhoBarDz = (dPbarDz - Rd*rhoBar*dTbarDz) / (Rd * Tbar)
-    
-    return Pbar, rhoBar, Tbar, drhoBarDz, dTbarDz
+    return Pbar, rhoBar, Tbar
 
 ###########################################################################
 
@@ -481,8 +537,7 @@ def setGhostNodes(U):
     / wItop[0]
     
     #Get background states on possibly changing vertical levels:
-    Pbar, rhoBar, Tbar, drhoBarDz, dTbarDz \
-    = fastBackgroundStates(U[4,:,:] / g)
+    Pbar, rhoBar, Tbar = fastBackgroundStates(U[4,:,:] / g)
     
     #extrapolate tangent velocity uT to bottom ghost nodes:
     uT = U[0,-2:-stc-2:-1,:] * TxBot + U[1,-2:-stc-2:-1,:] * TzBot
@@ -535,7 +590,7 @@ def setGhostNodes(U):
     U[3,0,:] = (Pbar[0,:]+U[5,0,:]) / Rd / (Tbar[0,:]+U[2,0,:]) \
     - rhoBar[0,:]
     
-    return U, Pbar, rhoBar, Tbar, drhoBarDz, dTbarDz
+    return U, Pbar, rhoBar, Tbar
 
 ###########################################################################
 
@@ -563,7 +618,7 @@ def odefun(t, U, dUdt):
     
     #Preliminaries:
     
-    U, Pbar, rhoBar, Tbar, drhoBarDz, dTbarDz = setGhostNodes(U)
+    U, Pbar, rhoBar, Tbar = setGhostNodes(U)
     
     rhoInv = 1. / (rhoBar + U[3,:,:])
     duda   = Da(U[0,:,:])
@@ -617,11 +672,13 @@ def odefun(t, U, dUdt):
     + HV(U[1,:,:])                                                   #dw/dt
 
     dUdt[2,1:-1,:] = (-U[0,:,:] * Da(U[2,:,:]) - sDot * Ds(U[2,:,:]) \
-    - U[1,:,:] * dTbarDz - Rd/Cv * (Tbar + U[2,:,:]) * divU)[1:-1,:] \
+    - U[1,:,:] * Ds(Tbar) * g / dphids \
+    - Rd/Cv * (Tbar + U[2,:,:]) * divU)[1:-1,:] \
     + HV(U[2,:,:])                                                   #dT/dt
 
     dUdt[3,1:-1,:] = (-U[0,:,:] * Da(U[3,:,:]) - sDot * Ds(U[3,:,:]) \
-    - U[1,:,:] * drhoBarDz - (rhoBar + U[3,:,:]) * divU)[1:-1,:] \
+    - U[1,:,:] * Ds(rhoBar) * g / dphids \
+    - (rhoBar + U[3,:,:]) * divU)[1:-1,:] \
     + HV(U[3,:,:])                                                 #drho/dt
 
     # dUdt[4,1:-1,:] = (-U[0,:,:] * Da(U[4,:,:]) - sDot * Ds(U[4,:,:]) \
@@ -697,9 +754,7 @@ for i in np.arange(0, nTimesteps+1):
             U[0:5,:,:] = np.load(saveString \
             + '{0:04d}'.format(np.int(np.round(t))) + '.npy')
         
-        tmp = setGhostNodes(U)
-        U = tmp[0]
-        rhoBar = tmp[2]
+        U, Pbar, rhoBar, Tbar = setGhostNodes(U)
         
         common.printMinAndMax(t, time.time()-et, U, rhoBar, phiBar)
 
@@ -724,7 +779,7 @@ for i in np.arange(0, nTimesteps+1):
             # dpidsBar = Aprime(ss) * Po \
             # + Bprime(ss) * np.tile(pHydroSurf, (nLev+2, 1))
             # U[3,:,:] = -(rhoBar+U[3,:,:])*Ds(U[4,:,:]) - dpidsBar
-            contourSomething(U, t)
+            contourSomething(U, t, Pbar, rhoBar, Tbar, phiBar)
             # U[3,:,:] = tmp
     
     if contourFromSaved:
