@@ -140,10 +140,10 @@ except:
         contours = np.arange(-15, 37, 2) * 1e-4
     elif testCase == "tortureTest":
         whatToPlot = "u"
-        contours = np.arange(-5.25, 5.75, .5)
+        contours = np.arange(-525, 575, 50) * 1e-2
     elif testCase == "scharMountainWaves":
         whatToPlot = "w"
-        contours = np.arange(-.725, .775, .05)
+        contours = np.arange(-725, 775, 50) * 1e-3
     else:
         raise ValueError("Invalid testCase string.")
 else:
@@ -203,7 +203,7 @@ t = 0.                                                        #initial time
 nTimesteps = np.int(np.round(tf / dt))                #number of time-steps
 x = np.linspace(left+dx/2, right-dx/2, nCol)        #array of x-coordinates
 
-#Initial hydrostatic background state functions of z (given by test case):
+#Initial hydrostatic background state functions of z (given in test case):
 potentialTemperature, potentialTemperatureDerivative \
 , exnerPressure, inverseExnerPressure \
 = common.hydrostaticProfiles(testCase, th0, g, Cp, N)
@@ -213,18 +213,23 @@ potentialTemperature, potentialTemperatureDerivative \
 #Print some info about the test case that the user might want to know:
 
 if verticallyLagrangian:
-    tmp = "Lagrangian"
+    vertically = "Lagrangian"
 else:
-    tmp = "Eulerian"
+    vertically = "Eulerian"
+if hydrostatic:
+    framework = "hydrostatic"
+else:
+    framework = "nonhydrostatic"
 print("\n\
-Test Case  : {0:s} \n\
-Vertically : {1:s}\n\
-Domain Box : [{2:g},{3:g},{4:g},{5:g}]\n\
-Delta x    : {6:g}\n\
-Levels     : {7:g}\n\
-Delta t    : {8:g}\n\
-Final time : {9:d}\n" \
-. format(testCase, tmp, left, right, bottom, top \
+Test Case  : {0:s}\n\
+Framework  : {1:s}\n\
+Vertically : {2:s}\n\
+Domain Box : [{3:g},{4:g},{5:g},{6:g}]\n\
+Delta x    : {7:g}\n\
+Levels     : {8:g}\n\
+Delta t    : {9:g}\n\
+Final time : {10:d}\n" \
+. format(testCase, vertically, framework, left, right, bottom, top \
 , dx, nLev, dt, np.int(tf)))
 
 ###########################################################################
@@ -299,7 +304,7 @@ s = np.linspace(sTop-ds/2, 1+ds/2, nLev+2)    #equally-spaced on mid-levels
 
 ###########################################################################
 
-#Prescribed functions for setting hybrid coordinate levels:
+#Prescribed functions A(s) and B(s) for setting hybrid coordinate levels:
 
 def A(s):
     return (1. - s) / (1. - sTop) * sTop
@@ -498,10 +503,10 @@ if verticallyLagrangian:
 
 ###########################################################################
 
-#This will be used inside the setGhostNodes() function to quickly find
+#This will be used inside the setGhostNodes() function to evaluate
 #background states on the moving vertical levels:
 
-def fastBackgroundStates(phi, dpids):
+def fastBackgroundStates(phi, pi):
     
     #Get thetaBar on mid-levels from the given background state function:
     tmp = (phi[:-1,:] + phi[1:,:]) / 2.
@@ -510,19 +515,11 @@ def fastBackgroundStates(phi, dpids):
     , 2.*phi[-1,:] - tmp[-1,:]))
     thetaBar = potentialTemperature(tmp/g)
 
-    #Integrate dpi/ds to get hydrostatic pressure pi at interfaces:
-    tmp = piTop * np.ones((nCol))
-    pi = np.zeros((nLev+1, nCol))
-    pi[0,:] = tmp.copy()
-    for i in range(nLev):
-        tmp = tmp + dpids[i,:] * ds
-        pi[i+1,:] = tmp.copy()
-
     #Get background state for pseudo-density dpi/ds on mid-levels:
     dpidsBar = Aprime(ss) * Po \
     + Bprime(ss) * np.tile(pi[-1,:], (nLev+2, 1))
 
-    #Integrate EOS to get background state for geopotential on interfaces:
+    #Integrate to get background state for geopotential on interfaces:
     tmp = phi[-1,:].copy()
     phiBar = np.zeros((nLev+1, nCol))
     phiBar[-1,:] = tmp.copy()
@@ -532,18 +529,34 @@ def fastBackgroundStates(phi, dpids):
         tmp = tmp + integrand[-(i+1),:] * ds
         phiBar[-(i+2),:] = tmp.copy()
 
-    return thetaBar, pi, dpidsBar, phiBar
+    return thetaBar, dpidsBar, phiBar
 
 ###########################################################################
 
 def setGhostNodes(U):
 
-    #Get background states:
-    thetaBar, pi, dpidsBar, phiBar \
-    = fastBackgroundStates(U[4,:-1,:], U[3,1:-1,:])
+    #Integrate dpi/ds to get hydrostatic pressure pi on interfaces:
+    tmp = piTop * np.ones((nCol))
+    pi = np.zeros((nLev+1, nCol))
+    pi[0,:] = tmp.copy()
+    for i in range(nLev):
+        tmp = tmp + U[3,i+1,:] * ds
+        pi[i+1,:] = tmp.copy()
 
     if hydrostatic:
-        U[4,:-1,:] = phiBar.copy()
+        #Integrate EOS to get diagnostic geopotential on interfaces:
+        tmp = U[4,-2,:].copy()
+        phi = np.zeros((nLev+1, nCol))
+        phi[-1,:] = tmp.copy()
+        integrand = Rd * U[2,1:-1,:] * U[3,1:-1,:] / Po**(Rd/Cp) \
+        / ((pi[:-1,:]+pi[1:,:])/2.)**(Cv/Cp)
+        for i in range(nLev):
+            tmp = tmp + integrand[-(i+1),:] * ds
+            phi[-(i+2),:] = tmp.copy()
+        U[4,:-1,:] = phi.copy()
+
+    #Get background states:
+    thetaBar, dpidsBar, phiBar = fastBackgroundStates(U[4,:-1,:], pi)
 
     #Extrapolate dpids to bottom ghost nodes:
     U[3,-1,:] = 2. * (U[3,-2,:]-dpidsBar[-2,:]) - (U[3,-3,:]-dpidsBar[-3,:]) \
@@ -569,7 +582,7 @@ def setGhostNodes(U):
 
     if not hydrostatic:
         dphida = Da(U[4,-2,:])
-        #Get pressure perturbation on mid-levels using equation of state:
+        #Use EOS to get pressure perturbation on mid-levels:
         U[5,1:-1,:] = (-U[3,1:-1,:] / ((U[4,1:-1,:]-U[4,0:-2,:])/ds) * Rd \
         * U[2,1:-1,:] / Po**(Rd/Cp)) ** (Cp/Cv) \
         - (pi[:-1,:]+pi[1:,:])/2.
@@ -667,11 +680,11 @@ def odefun(t, U, dUdt):
     + HVa(U[2,1:-1,:] - thetaBar[1:-1,:]) \
     + HVs(U[2,:,:] - thetaBar)                         #dth/dt (mid-levels)
 
-    tmp = sDot * dpidsInt                         #sDot*dpids on interfaces
-    tmp = (tmp[1:,:] - tmp[0:-1,:]) / ds    #d(sDot*dpids)/ds on mid-levels
+    tmp = sDot * dpidsInt                        #sDot*dpi/ds on interfaces
+    tmp = (tmp[1:,:] - tmp[0:-1,:]) / ds   #d(sDot*dpi/ds)/ds on mid-levels
     dUdt[3,1:-1,:] = -Da(U[3,1:-1,:] * U[0,1:-1,:]) - tmp \
     + HVa(U[3,1:-1,:] - dpidsBar[1:-1,:]) \
-    + HVs(U[3,:,:] - dpidsBar)                    #d(dpids)/dt (mid-levels)
+    + HVs(U[3,:,:] - dpidsBar)                   #d(dpi/ds)/dt (mid-levels)
 
     if not hydrostatic:
         tmp = (U[4,1:-1,:] - U[4,0:-2,:]) / ds       #dphi/ds on mid-levels
@@ -726,6 +739,7 @@ for i in np.arange(0, nTimesteps+1):
     
     #Vertical re-map:
     if verticallyLagrangian and not contourFromSaved \
+    and (testCase != "inertiaGravityWaves") \
     and (np.mod(i,3) == 0):
 
         U, thetaBar, pi, dpidsBar, phiBar = setGhostNodes(U)
