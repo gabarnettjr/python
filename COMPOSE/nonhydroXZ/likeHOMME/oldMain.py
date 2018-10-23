@@ -196,7 +196,7 @@ null = np.zeros((nLev+2, nCol))
 #Hydrostatic background state functions:
 potentialTemperature, potentialTemperatureDerivative \
 , exnerPressure, inverseExnerPressure \
-= common.hydrostaticProfiles(testCase, th0, g, Cp, N)
+= common.hydrostaticProfiles(testCase, th0, Po, g, Cp, Rd, N)
 
 ###########################################################################
 

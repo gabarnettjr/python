@@ -206,7 +206,7 @@ x = np.linspace(left+dx/2, right-dx/2, nCol)        #array of x-coordinates
 #Initial hydrostatic background state functions of z (given in test case):
 potentialTemperature, potentialTemperatureDerivative \
 , exnerPressure, inverseExnerPressure \
-= common.hydrostaticProfiles(testCase, th0, g, Cp, N)
+= common.hydrostaticProfiles(testCase, th0, Po, g, Cp, Rd, N)
 
 ###########################################################################
 
@@ -243,7 +243,8 @@ def Ds(U):
     V[-1,:] = (3./2.*U[-1,:] - 2.*U[-2,:] + 1./2.*U[-3,:]) / ds
     return V
 
-if (testCase == "inertiaGravityWaves") or (testCase == "tortureTest"):
+if (testCase == "inertiaGravityWaves") \
+or (testCase == "tortureTest"):
     def HVs(U):
         return np.zeros((np.shape(U)[0]-2, np.shape(U)[1]))
 else:
@@ -272,7 +273,8 @@ def Da(U):
         raise ValueError("U should have either one or two dimensions.")
     return U
 
-if (testCase == "inertiaGravityWaves") or (testCase == "tortureTest"):
+if (testCase == "inertiaGravityWaves") \
+or (testCase == "tortureTest"):
     def HVa(U):
         return np.zeros(np.shape(U))
 else:
@@ -704,7 +706,7 @@ def odefun(t, U, dUdt):
 
 def printMinAndMax(t, et, U, thetaBar, pi, dpidsBar, phiBar):
     
-    print("t = {0:5d},  et = {1:6.2f},  |massDiff| = {8:+.1e},  \
+    print("t = {0:6d},  et = {1:6.2f},  |massDiff| = {8:+.1e},  \
 MIN:  u = {2:+.2e},  \
 w = {3:+.2e},  th = {4:+.2e},  pi = {5:+.2e},  \
 phi = {6:+.2e},  P = {7:+.2e}" \
@@ -718,7 +720,7 @@ phi = {6:+.2e},  P = {7:+.2e}" \
     , np.min(U[5,1:-1,:]) \
     , np.abs(np.sum(U[3,1:-1,:] / g * ds * dx) - mass0) / mass0))
 
-    print("                                                  \
+    print("                                                   \
 MAX:  u = {0:+.2e},  \
 w = {1:+.2e},  th = {2:+.2e},  pi = {3:+.2e},  \
 phi = {4:+.2e},  P = {5:+.2e}\n" \
