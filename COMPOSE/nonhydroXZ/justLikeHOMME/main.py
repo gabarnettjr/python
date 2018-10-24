@@ -70,7 +70,8 @@ argument 5 (what to plot)\n\
     dpids\n\
     phi\n\
     P\n\
-    pi\n\n\
+    pi\n\
+    T\n\n\
 argument 6 (contour levels)\n\
     number of contours (integer)\n\
     range of contours (using np.arange or np.linspace for example)\n\n\
@@ -129,7 +130,10 @@ except:
 try:
     whatToPlot = sysArgv[5]
 except:
-    if testCase == "risingBubble":
+    if testCase == "steadyState":
+        whatToPlot = "u"
+        contours = np.arange(-205, 215, 10) * 1e-2
+    elif testCase == "risingBubble":
         whatToPlot = "theta"
         contours = np.arange(-.15, 2.25, .1)
     elif testCase == "densityCurrent":
@@ -140,10 +144,10 @@ except:
         contours = np.arange(-15, 37, 2) * 1e-4
     elif testCase == "tortureTest":
         whatToPlot = "u"
-        contours = np.arange(-525, 575, 50) * 1e-2
+        contours = np.arange(-105, 115, 10) * 1e-2
     elif testCase == "scharMountainWaves":
-        whatToPlot = "w"
-        contours = np.arange(-725, 775, 50) * 1e-3
+        whatToPlot = "u"
+        contours = np.arange(625, 1575, 50) * 1e-2
     else:
         raise ValueError("Invalid testCase string.")
 else:
@@ -243,8 +247,7 @@ def Ds(U):
     V[-1,:] = (3./2.*U[-1,:] - 2.*U[-2,:] + 1./2.*U[-3,:]) / ds
     return V
 
-if (testCase == "inertiaGravityWaves") \
-or (testCase == "tortureTest"):
+if (testCase == "inertiaGravityWaves") or (testCase == "tortureTest"):
     def HVs(U):
         return np.zeros((np.shape(U)[0]-2, np.shape(U)[1]))
 else:
@@ -273,8 +276,7 @@ def Da(U):
         raise ValueError("U should have either one or two dimensions.")
     return U
 
-if (testCase == "inertiaGravityWaves") \
-or (testCase == "tortureTest"):
+if (testCase == "inertiaGravityWaves") or (testCase == "tortureTest"):
     def HVa(U):
         return np.zeros(np.shape(U))
 else:
@@ -434,6 +436,9 @@ def contourSomething(U, t, thetaBar, pi, dpidsBar, phiBar):
             tmp = phiBar.copy()
         elif whatToPlot == "P":
             tmp = (pi[:-1,:] + pi[1:,:]) / 2.
+        elif whatToPlot == "T":
+            pi = (pi[:-1,:] + pi[1:,:]) / 2.
+            tmp = (pi / Po) ** (Rd/Cp) * thetaBar[1:-1,:]
         else:
             raise ValueError("Invalid whatToPlot string.  Choose theta" \
             + ", dpids, phi, or P.")
@@ -452,6 +457,10 @@ def contourSomething(U, t, thetaBar, pi, dpidsBar, phiBar):
             tmp = U[5,1:-1,:]
         elif whatToPlot == "pi":
             tmp = pi - pi0
+        elif whatToPlot == "T":
+            pi = (pi[:-1,:] + pi[1:,:]) / 2.
+            Tbar = (pi/Po)**(Rd/Cp) * thetaBar[1:-1,:]
+            tmp = ((pi+U[5,1:-1,:])/Po)**(Rd/Cp) * U[2,1:-1,:] - Tbar
         else:
             raise ValueError("Invalid whatToPlot string.  Choose u, " \
             + "w, theta, dpids, phi, P, or pi.")
@@ -481,11 +490,12 @@ def contourSomething(U, t, thetaBar, pi, dpidsBar, phiBar):
         plt.axis("image")
         plt.colorbar(orientation="vertical")
 
-    # if (testCase == "scharMountainWaves") and (whatToPlot == "w"):
-    #     plt.axis([-20000., 20000., np.min(zz[-1,:])-250., 10000.])
-    # else:
-    plt.axis([left-250., right+250. \
-    , np.min(zz[-1,:])-250., np.max(zz[0,:])+250.])
+    if (testCase == "scharMountainWaves") \
+    and ((whatToPlot == "u") or (whatToPlot == "w")):
+        plt.axis([-20000., 30000., np.min(zz[-1,:])-250., 20000.])
+    else:
+        plt.axis([left-250., right+250. \
+        , np.min(zz[-1,:])-250., np.max(zz[0,:])+250.])
 
     if plotBackgroundState:
         plt.title("min={0:g}, max={1:g}".format(np.min(tmp),np.max(tmp)))
