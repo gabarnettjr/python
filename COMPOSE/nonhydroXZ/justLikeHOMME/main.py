@@ -12,6 +12,8 @@ from gab.nonhydro import common
 
 #Switches that rarely need to be flipped:
 
+useHeightCoord = False
+
 saveArrays          = True
 saveContours        = True
 plotNodesAndExit    = False
@@ -47,6 +49,7 @@ argument 1 (atmospheric formulation)\n\
     hydrostatic\n\
     nonhydrostatic\n\n\
 argument 2 (name of test case)\n\
+    steadyState\n\
     risingBubble\n\
     densityCurrent\n\
     inertiaGravityWaves\n\
@@ -225,15 +228,15 @@ if hydrostatic:
 else:
     equations = "nonhydrostatic"
 print("\n\
-Test Case  : {0:s}\n\
-Equations  : {1:s}\n\
+Equations  : {0:s}\n\
+Test Case  : {1:s}\n\
 Vertically : {2:s}\n\
 Domain Box : [{3:g},{4:g},{5:g},{6:g}]\n\
 Delta x    : {7:g}\n\
 Levels     : {8:g}\n\
 Delta t    : {9:g}\n\
 Final time : {10:d}\n" \
-. format(testCase, equations, vertically, left, right, bottom, top \
+. format(equations, testCase, vertically, left, right, bottom, top \
 , dx, nLev, dt, np.int(tf)))
 
 ###########################################################################
@@ -247,7 +250,9 @@ def Ds(U):
     V[-1,:] = (3./2.*U[-1,:] - 2.*U[-2,:] + 1./2.*U[-3,:]) / ds
     return V
 
-if (testCase == "inertiaGravityWaves") or (testCase == "tortureTest"):
+if (testCase == "inertiaGravityWaves") \
+or (testCase == "tortureTest") \
+or (testCase == "steadyState"):
     def HVs(U):
         return np.zeros((np.shape(U)[0]-2, np.shape(U)[1]))
 else:
@@ -276,7 +281,8 @@ def Da(U):
         raise ValueError("U should have either one or two dimensions.")
     return U
 
-if (testCase == "inertiaGravityWaves") or (testCase == "tortureTest"):
+if (testCase == "inertiaGravityWaves") \
+or (testCase == "tortureTest"):
     def HVa(U):
         return np.zeros(np.shape(U))
 else:
@@ -352,7 +358,7 @@ pi = (pi[:-1,:] + pi[1:,:]) / 2.             #avg pi to interior mid-levels
 for j in range(10):
     zzMid = (zzInt[:-1,:] + zzInt[1:,:]) / 2.
     theta = potentialTemperature(zzMid) + thetaPtb(xxMid, zzMid)
-    integrand = dpids * Rd * (pi/Po)**(Rd/Cp) * theta / g / pi
+    integrand = dpids * Rd * theta / Po**(Rd/Cp) / pi**(Cv/Cp) / g
     tmp = zzInt[-1,:].copy()
     for i in range(nLev):
         tmp = tmp + integrand[-(i+1),:] * ds
@@ -420,7 +426,8 @@ if saveContours:
 
 #Create and save a contour plot of the field specified by whatToPlot:
 
-def contourSomething(U, t, pi, thetaBar, dpidsBar, phiBar):
+def contourSomething(U, t, pi, thetaBar, dpidsBar, phiBar \
+, whatToPlot, figName, contours):
 
     if plotBackgroundState:
         if whatToPlot == "theta":
@@ -434,6 +441,9 @@ def contourSomething(U, t, pi, thetaBar, dpidsBar, phiBar):
         elif whatToPlot == "T":
             pi = (pi[:-1,:] + pi[1:,:]) / 2.
             tmp = (pi / Po) ** (Rd/Cp) * thetaBar[1:-1,:]
+        elif whatToPlot == "rho":
+            pi = (pi[:-1,:] + pi[1:,:]) / 2.
+            tmp = pi / Rd / (pi/Po)**(Rd/Cp) / thetaBar[1:-1,:]
         else:
             raise ValueError("Invalid whatToPlot string.  Choose theta" \
             + ", dpids, phi, or P.")
@@ -456,6 +466,10 @@ def contourSomething(U, t, pi, thetaBar, dpidsBar, phiBar):
             pi = (pi[:-1,:] + pi[1:,:]) / 2.
             Tbar = (pi/Po)**(Rd/Cp) * thetaBar[1:-1,:]
             tmp = ((pi+U[5,1:-1,:])/Po)**(Rd/Cp) * U[2,1:-1,:] - Tbar
+        elif whatToPlot == "rho":
+            pi = (pi[:-1,:] + pi[1:,:]) / 2.
+            rhoBar = pi / Rd / (pi/Po)**(Rd/Cp) / thetaBar[1:-1,:]
+            tmp = -U[3,1:-1,:]/((U[4,1:-1,:]-U[4,0:-2,:])/ds) - rhoBar
         else:
             raise ValueError("Invalid whatToPlot string.  Choose u, " \
             + "w, theta, dpids, phi, P, or pi.")
@@ -485,20 +499,19 @@ def contourSomething(U, t, pi, thetaBar, dpidsBar, phiBar):
         plt.axis("image")
         plt.colorbar(orientation="vertical")
 
-    if (testCase == "scharMountainWaves") \
-    and ((whatToPlot == "u") or (whatToPlot == "w")):
-        plt.axis([-20000., 30000., np.min(zzInt[-1,:])-250., 20000.])
-    else:
-        plt.axis([left-250., right+250. \
-        , np.min(zzInt[-1,:])-250., np.max(zzInt[0,:])+250.])
+    # if (testCase == "scharMountainWaves") \
+    # and ((whatToPlot == "u") or (whatToPlot == "w")):
+    #     plt.axis([-20000., 30000., np.min(zzInt[-1,:])-250., 20000.])
+    # else:
+    plt.axis([left-250., right+250. \
+    , np.min(zzInt[-1,:])-250., np.max(zzInt[0,:])+250.])
 
-    if plotBackgroundState:
-        plt.title("min={0:g}, max={1:g}".format(np.min(tmp),np.max(tmp)))
-        plt.show()
-        sys.exit("\nDone plotting the requested background state.")
-    else:
-        fig.savefig( "{0:04d}.png".format(np.int(np.round(t)+1e-12)) \
-        , bbox_inches="tight" )                       #save figure as a png
+    # if plotBackgroundState:
+    #     plt.title("min={0:g}, max={1:g}".format(np.min(tmp),np.max(tmp)))
+    #     plt.show()
+    #     sys.exit("\nDone plotting the requested background state.")
+    # else:
+    fig.savefig(figName, bbox_inches="tight")   #save figure as a png
 
 ###########################################################################
 
@@ -530,7 +543,7 @@ def fastBackgroundStates(phi, pi):
     tmp = phi[-1,:].copy()
     phiBar = np.zeros((nLev+1, nCol))
     phiBar[-1,:] = tmp.copy()
-    integrand = Rd * thetaBar[1:-1,:] * dpidsBar[1:-1,:] / Po**(Rd/Cp) \
+    integrand = dpidsBar[1:-1,:] * Rd * thetaBar[1:-1,:] / Po**(Rd/Cp) \
     / ((pi[:-1,:]+pi[1:,:])/2.)**(Cv/Cp)
     for i in range(nLev):
         tmp = tmp + integrand[-(i+1),:] * ds
@@ -555,7 +568,7 @@ def setGhostNodes(U):
         tmp = U[4,-2,:].copy()
         phi = np.zeros((nLev+1, nCol))
         phi[-1,:] = tmp.copy()
-        integrand = Rd * U[2,1:-1,:] * U[3,1:-1,:] / Po**(Rd/Cp) \
+        integrand = U[3,1:-1,:] * Rd * U[2,1:-1,:] / Po**(Rd/Cp) \
         / ((pi[:-1,:]+pi[1:,:])/2.)**(Cv/Cp)
         for i in range(nLev):
             tmp = tmp + integrand[-(i+1),:] * ds
@@ -640,20 +653,23 @@ def odefun(t, U, dUdt):
     if verticallyLagrangian:
         sDot = np.zeros((nLev+1, nCol))
     else:
-        #please see this overleaf document for a complete derivation,
-        #starting from the governing equation for pseudo-density dpids:
-        #https://www.overleaf.com/read/gcfkprynxvkw
-        integrand = Da(U[3,1:-1,:] * U[0,1:-1,:])
-        sDot = B(ssInt) * np.tile(np.sum(integrand*ds,0), (nLev+1,1))
-        tmp = np.zeros((nCol))
-        for j in range(nLev):
-            tmp = tmp + integrand[j,:] * ds
-            sDot[j+1,:] = sDot[j+1,:] - tmp
-        sDot = sDot / dpidsInt
-        # maxTop = np.max(np.abs(sDot[0,:]))
-        # maxBot = np.max(np.abs(sDot[-1,:]))
-        # if max(maxTop,maxBot) > 1e-15:
-        #     raise ValueError("nonzero sDot on boundary.")
+        if useHeightCoord:
+            sDot = (-uInt * Da(U[4,:-1,:]) + g * U[1,:-1,:]) / Ds(U[4,:-1,:])
+        else:
+            #please see this overleaf document for a complete derivation,
+            #starting from the governing equation for pseudo-density dpids:
+            #https://www.overleaf.com/read/gcfkprynxvkw
+            integrand = Da(U[3,1:-1,:] * U[0,1:-1,:])
+            sDot = B(ssInt) * np.tile(np.sum(integrand*ds,0), (nLev+1,1))
+            tmp = np.zeros((nCol))
+            for j in range(nLev):
+                tmp = tmp + integrand[j,:] * ds
+                sDot[j+1,:] = sDot[j+1,:] - tmp
+            sDot = sDot / dpidsInt
+            # maxTop = np.max(np.abs(sDot[0,:]))
+            # maxBot = np.max(np.abs(sDot[-1,:]))
+            # if max(maxTop,maxBot) > 1e-15:
+            #     raise ValueError("nonzero sDot on boundary.")
     
     #Main part:
 
@@ -746,19 +762,19 @@ for i in np.arange(0, nTimesteps+1):
     
     #Vertical re-map:
     if verticallyLagrangian and not contourFromSaved \
-    and (testCase != "inertiaGravityWaves") \
     and (np.mod(i,3) == 0):
 
         U, pi, thetaBar, dpidsBar, phiBar = setGhostNodes(U)
         piSurf = pi[-1,:].copy()
 
-        #New coordinate on interfaces:
-        piNew = A(ssInt) * Po \
-        + B(ssInt) * np.tile(piSurf, (nLev+1, 1))
+        if not hydrostatic:
 
-        #Re-map w and phi:
-        U[[1,4],0:-1,:] = common.verticalRemap(U[[1,4],0:-1,:] \
-        , pi, piNew, Vinterfaces)
+            #New coordinate on interfaces:
+            piNew = A(ssInt) * Po + B(ssInt) * np.tile(piSurf, (nLev+1, 1))
+
+            #Re-map w and phi:
+            U[[1,4],0:-1,:] = common.verticalRemap(U[[1,4],0:-1,:] \
+            , pi, piNew, Vinterfaces)
         
         #Avg pi to mid-levels:
         pi = (pi[0:-1,:] + pi[1:,:])/2.
@@ -767,8 +783,7 @@ for i in np.arange(0, nTimesteps+1):
         , 2.*piSurf - pi[-1,:]))
 
         #New coordinate on mid-levels:
-        piNew = A(ssMid) * Po \
-        + B(ssMid) * np.tile(piSurf, (nLev+2, 1))
+        piNew = A(ssMid) * Po + B(ssMid) * np.tile(piSurf, (nLev+2, 1))
 
         #Re-map u and theta:
         U[[0,2],:,:] = common.verticalRemap(U[[0,2],:,:] \
@@ -779,7 +794,7 @@ for i in np.arange(0, nTimesteps+1):
     
     if np.mod(i, np.int(np.round(saveDel/dt))) == 0:
         
-        if contourFromSaved :
+        if contourFromSaved:
             U[0:5,:,:] = np.load(saveString \
             + '{0:04d}'.format(np.int(np.round(t))) + '.npy')
         
@@ -794,7 +809,14 @@ for i in np.arange(0, nTimesteps+1):
             + '{0:04d}'.format(np.int(np.round(t))) + '.npy', U[0:5,:,:])
         
         if saveContours or plotBackgroundState:
-            contourSomething(U, t, pi, thetaBar, dpidsBar, phiBar)
+            figName = "{0:04d}.png" . format(np.int(np.round(t) + 1e-12))
+            contourSomething(U, t, pi, thetaBar, dpidsBar, phiBar \
+            , whatToPlot, figName, contours)
+            if (i == nTimesteps) and (not plotBackgroundState):
+                #Save contour plots of variables at final time:
+                for v in ["u","w","theta","dpids","phi","P","pi","T","rho"]:
+                    contourSomething(U, t, pi, thetaBar, dpidsBar, phiBar \
+                    , v, v+".png", 20)
     
     if contourFromSaved:
         t = t + dt
