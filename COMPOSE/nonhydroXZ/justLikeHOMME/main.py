@@ -221,19 +221,19 @@ if verticallyLagrangian:
 else:
     vertically = "Eulerian"
 if hydrostatic:
-    framework = "hydrostatic"
+    equations = "hydrostatic"
 else:
-    framework = "nonhydrostatic"
+    equations = "nonhydrostatic"
 print("\n\
 Test Case  : {0:s}\n\
-Framework  : {1:s}\n\
+Equations  : {1:s}\n\
 Vertically : {2:s}\n\
 Domain Box : [{3:g},{4:g},{5:g},{6:g}]\n\
 Delta x    : {7:g}\n\
 Levels     : {8:g}\n\
 Delta t    : {9:g}\n\
 Final time : {10:d}\n" \
-. format(testCase, vertically, framework, left, right, bottom, top \
+. format(testCase, equations, vertically, left, right, bottom, top \
 , dx, nLev, dt, np.int(tf)))
 
 ###########################################################################
@@ -260,7 +260,7 @@ else:
 
 wd1 = np.array([-1./60., .15, -.75,   0., .75, -.15, 1./60.]) / dx
 wd6 = np.array([     1., -6.,  15., -20., 15.,  -6.,     1.]) / dx**6.
-whv = 2.**-1.*dx**5. * wd6            #multiply by hyperviscosity parameter
+whv = 2.**-1.*dx**5. * wd6               #multiply by dissipation parameter
 
 def Da(U):
     d = len(np.shape(U))
@@ -298,7 +298,7 @@ else:
 
 ###########################################################################
 
-#Equally spaced array of vertical coordinate values (s):
+#Equally spaced array of vertical coordinate values (s) on mid-levels:
 
 piTop  = Po * exnerPressure(top)  ** (Cp/Rd)            #HS pressure at top
 piSurf = Po * exnerPressure(zSurf(x)) ** (Cp/Rd)    #HS pressure at surface
@@ -322,45 +322,43 @@ def Aprime(s):
 def Bprime(s):
     return 1. / (1. - sTop)
 
-ss = np.tile(s, (nCol, 1)).T                          #s-mesh on mid-levels
-ssInt = (ss[0:-1,:] + ss[1:,:]) / 2.                  #s-mesh on interfaces
+ssMid = np.tile(s, (nCol, 1)).T                       #s-mesh on mid-levels
+ssInt = (ssMid[0:-1,:] + ssMid[1:,:]) / 2.            #s-mesh on interfaces
 
 ###########################################################################
 
-#Iterate to get initial vertical height levels zz:
+#Iterate to get initial vertical height levels on interfaces (zzInt):
 
 #dpi/ds defined using vertical coordinate on interior mid-levels:
-dpids = Aprime(ss[1:-1,:]) * Po \
-+ Bprime(ss[1:-1,:]) * np.tile(piSurf, (nLev,1))
+dpids = Aprime(ssMid[1:-1,:]) * Po \
++ Bprime(ssMid[1:-1,:]) * np.tile(piSurf, (nLev,1))
 
-#integrate dpids to get HS pressure, as will be done during time-stepping:
+#integrate dpi/ds to get HS pressure, as will be done during time-stepping:
 tmp = piTop * np.ones((nCol))
 pi = np.zeros((nLev+1, nCol))
 pi[0,:] = tmp.copy()
 for i in range(nLev):
     tmp = tmp + dpids[i,:] * ds
     pi[i+1,:] = tmp.copy()
-
 pi0 = pi.copy()
 
-zz = inverseExnerPressure((pi/Po) ** (Rd/Cp))                #initial guess
-zz0 = zz.copy()
-xx = np.tile(x, (nLev+1,1))
+zzInt = inverseExnerPressure((pi/Po) ** (Rd/Cp))             #initial guess
+zzInt0 = zzInt.copy()
+xxInt = np.tile(x, (nLev+1,1))
+xxMid = np.tile(x, (nLev, 1))
 
 pi = (pi[:-1,:] + pi[1:,:]) / 2.             #avg pi to interior mid-levels
 
-xxMid = np.tile(x, (nLev, 1))
-
 for j in range(10):
-    zzMid = (zz[:-1,:] + zz[1:,:]) / 2.
+    zzMid = (zzInt[:-1,:] + zzInt[1:,:]) / 2.
     theta = potentialTemperature(zzMid) + thetaPtb(xxMid, zzMid)
     integrand = dpids * Rd * (pi/Po)**(Rd/Cp) * theta / g / pi
-    tmp = zz[-1,:].copy()
+    tmp = zzInt[-1,:].copy()
     for i in range(nLev):
         tmp = tmp + integrand[-(i+1),:] * ds
-        zz[-(i+2),:] = tmp.copy()
+        zzInt[-(i+2),:] = tmp.copy()
     # plt.figure()
-    # plt.contourf(xx, zz0, zz-zz0, 20)
+    # plt.contourf(xxInt, zzInt0, zzInt-zzInt0, 20)
     # plt.colorbar()
     # plt.show()
 
@@ -371,7 +369,7 @@ if plotNodesAndExit:
     plt.plot(xxMid.flatten(), zzMid.flatten(), marker=".", color="black" \
     , linestyle="none")
     for i in range(nLev+1):
-        plt.plot(x, zz[i,:], color="red", linestyle="-")
+        plt.plot(x, zzInt[i,:], color="red", linestyle="-")
     plt.plot([left,left], [zSurf(left),top], color="red" \
     , linestyle="-")
     plt.plot([right,right], [zSurf(right),top], color="red" \
@@ -385,8 +383,9 @@ if plotNodesAndExit:
 #Assignment of initial conditions:
 
 theta0 = potentialTemperature(zzMid) + thetaPtb(xxMid, zzMid)
-dpids0 = Aprime(ss) * Po + Bprime(ss) * np.tile(piSurf, (nLev+2,1))
-phi0   = g * zz
+dpids0 = Aprime(ssMid) * Po + Bprime(ssMid) * np.tile(piSurf, (nLev+2,1))
+phi0   = g * zzInt
+mass0 = np.sum(dpids0[1:-1,:] / g * ds * dx)                  #initial mass
 
 U = np.zeros((6, nLev+2, nCol))                  #Main 3D array of unknowns
 
@@ -409,10 +408,6 @@ U[5,:,:] = np.zeros((nLev+2, nCol))   #pressure perturbation P (mid-levels)
 
 ###########################################################################
 
-mass0 = np.sum(U[3,1:-1,:] / g * ds * dx)                     #initial mass
-
-###########################################################################
-
 #Initialize a figure of the appropriate size:
 
 if saveContours:
@@ -425,7 +420,7 @@ if saveContours:
 
 #Create and save a contour plot of the field specified by whatToPlot:
 
-def contourSomething(U, t, thetaBar, pi, dpidsBar, phiBar):
+def contourSomething(U, t, pi, thetaBar, dpidsBar, phiBar):
 
     if plotBackgroundState:
         if whatToPlot == "theta":
@@ -466,7 +461,7 @@ def contourSomething(U, t, thetaBar, pi, dpidsBar, phiBar):
             + "w, theta, dpids, phi, P, or pi.")
 
     if (whatToPlot == "phi") | (whatToPlot == "w") | (whatToPlot == "pi"):
-        xxTmp = xx
+        xxTmp = xxInt
         zzTmp = U[4,0:-1,:] / g                          #changing z-levels
     else:
         xxTmp = xxMid
@@ -492,10 +487,10 @@ def contourSomething(U, t, thetaBar, pi, dpidsBar, phiBar):
 
     if (testCase == "scharMountainWaves") \
     and ((whatToPlot == "u") or (whatToPlot == "w")):
-        plt.axis([-20000., 30000., np.min(zz[-1,:])-250., 20000.])
+        plt.axis([-20000., 30000., np.min(zzInt[-1,:])-250., 20000.])
     else:
         plt.axis([left-250., right+250. \
-        , np.min(zz[-1,:])-250., np.max(zz[0,:])+250.])
+        , np.min(zzInt[-1,:])-250., np.max(zzInt[0,:])+250.])
 
     if plotBackgroundState:
         plt.title("min={0:g}, max={1:g}".format(np.min(tmp),np.max(tmp)))
@@ -528,8 +523,8 @@ def fastBackgroundStates(phi, pi):
     thetaBar = potentialTemperature(tmp/g)
 
     #Get background state for pseudo-density dpi/ds on mid-levels:
-    dpidsBar = Aprime(ss) * Po \
-    + Bprime(ss) * np.tile(pi[-1,:], (nLev+2, 1))
+    dpidsBar = Aprime(ssMid) * Po \
+    + Bprime(ssMid) * np.tile(pi[-1,:], (nLev+2, 1))
 
     #Integrate to get background state for geopotential on interfaces:
     tmp = phi[-1,:].copy()
@@ -610,7 +605,7 @@ def setGhostNodes(U):
         #get w on bottom boundary nodes:
         U[1,-2,:] = (U[0,-1,:]+U[0,-2,:])/2. / g * dphida
 
-    return U, thetaBar, pi, dpidsBar, phiBar
+    return U, pi, thetaBar, dpidsBar, phiBar
 
 ###########################################################################
 
@@ -635,7 +630,7 @@ if rks == 4:
 def odefun(t, U, dUdt):
     
     #Get some ghost node values and background states:
-    U, thetaBar, pi, dpidsBar, phiBar = setGhostNodes(U)
+    U, pi, thetaBar, dpidsBar, phiBar = setGhostNodes(U)
 
     uInt = (U[0,:-1,:] + U[0,1:,:]) / 2.                   #u on interfaces
     dpidsInt = (U[3,:-1,:] + U[3,1:,:]) / 2.          #dpi/ds on interfaces
@@ -714,7 +709,7 @@ def odefun(t, U, dUdt):
 
 ###########################################################################
 
-def printMinAndMax(t, et, U, thetaBar, pi, dpidsBar, phiBar):
+def printMinAndMax(t, et, U, pi, thetaBar, dpidsBar, phiBar):
     
     print("t = {0:6d},  et = {1:6.2f},  |massDiff| = {8:+.1e},  \
 MIN:  u = {2:+.2e},  \
@@ -754,7 +749,7 @@ for i in np.arange(0, nTimesteps+1):
     and (testCase != "inertiaGravityWaves") \
     and (np.mod(i,3) == 0):
 
-        U, thetaBar, pi, dpidsBar, phiBar = setGhostNodes(U)
+        U, pi, thetaBar, dpidsBar, phiBar = setGhostNodes(U)
         piSurf = pi[-1,:].copy()
 
         #New coordinate on interfaces:
@@ -772,8 +767,8 @@ for i in np.arange(0, nTimesteps+1):
         , 2.*piSurf - pi[-1,:]))
 
         #New coordinate on mid-levels:
-        piNew = A(ss) * Po \
-        + B(ss) * np.tile(piSurf, (nLev+2, 1))
+        piNew = A(ssMid) * Po \
+        + B(ssMid) * np.tile(piSurf, (nLev+2, 1))
 
         #Re-map u and theta:
         U[[0,2],:,:] = common.verticalRemap(U[[0,2],:,:] \
@@ -788,9 +783,9 @@ for i in np.arange(0, nTimesteps+1):
             U[0:5,:,:] = np.load(saveString \
             + '{0:04d}'.format(np.int(np.round(t))) + '.npy')
         
-        U, thetaBar, pi, dpidsBar, phiBar = setGhostNodes(U)
+        U, pi, thetaBar, dpidsBar, phiBar = setGhostNodes(U)
 
-        printMinAndMax(t, time.time()-et, U, thetaBar, pi, dpidsBar, phiBar)
+        printMinAndMax(t, time.time()-et, U, pi, thetaBar, dpidsBar, phiBar)
 
         et = time.time()
         
@@ -799,7 +794,7 @@ for i in np.arange(0, nTimesteps+1):
             + '{0:04d}'.format(np.int(np.round(t))) + '.npy', U[0:5,:,:])
         
         if saveContours or plotBackgroundState:
-            contourSomething(U, t, thetaBar, pi, dpidsBar, phiBar)
+            contourSomething(U, t, pi, thetaBar, dpidsBar, phiBar)
     
     if contourFromSaved:
         t = t + dt
