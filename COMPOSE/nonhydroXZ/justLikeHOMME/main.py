@@ -12,7 +12,7 @@ from gab.nonhydro import common
 
 #Switches that rarely need to be flipped:
 
-heightCoord = True
+heightCoord = False
 
 saveArrays          = True
 saveContours        = True
@@ -601,14 +601,14 @@ def setGhostNodes(U):
     thetaBar, dpidsBar, phiBar = fastBackgroundStates(U[4,:-1,:], pi)
 
     #Extrapolate dpids to bottom ghost nodes:
-    U[3,-1,:] = U[3,-2,:]
-    # U[3,-1,:] = 2. * (U[3,-2,:]-dpidsBar[-2,:]) - (U[3,-3,:]-dpidsBar[-3,:]) \
-    # + dpidsBar[-1,:]
+    # U[3,-1,:] = U[3,-2,:]
+    U[3,-1,:] = 2. * (U[3,-2,:]-dpidsBar[-2,:]) - (U[3,-3,:]-dpidsBar[-3,:]) \
+    + dpidsBar[-1,:]
 
     #Extrapolate dpids to top ghost nodes:
-    U[3,0,:] = U[3,1,:]
-    # U[3,0,:] = 2. * (U[3,1,:]-dpidsBar[1,:]) - (U[3,2,:]-dpidsBar[2,:]) \
-    # + dpidsBar[0,:]
+    # U[3,0,:] = U[3,1,:]
+    U[3,0,:] = 2. * (U[3,1,:]-dpidsBar[1,:]) - (U[3,2,:]-dpidsBar[2,:]) \
+    + dpidsBar[0,:]
 
     #Extrapolate theta to bottom ghost nodes:
     U[2,-1,:] = 2. * (U[2,-2,:]-thetaBar[-2,:]) - (U[2,-3,:]-thetaBar[-3,:]) \
@@ -629,16 +629,16 @@ def setGhostNodes(U):
         U[5,1:-1,:] = (-U[3,1:-1,:] / ((U[4,1:-1,:]-U[4,0:-2,:])/ds) * Rd \
         * U[2,1:-1,:] / Po**(Rd/Cp)) ** (Cp/Cv) \
         - (pi[:-1,:]+pi[1:,:])/2.
-        #Set pressure perturbation on top ghost nodes using Neumann BC:
-        dphida = Da(U[4,0,:])
-        dPda = Da(pi[0,:] + 3./2.*U[5,1,:] - 1./2.*U[5,2,:])
-        dpids = 3./2.*U[3,1,:] - 1./2.*U[3,2,:]
-        dphids = (-3./2.*U[4,0,:] + 2.*U[4,1,:] - 1./2.*U[4,2,:]) / ds
-        RHS = (dPda * dphids - dphida * dpids) * dphida
-        RHS = RHS / (g**2. + dphida**2.)
-        U[5,0,:] = U[5,1,:] - ds * RHS
-        # #Set pressure perturbation on top ghost nodes using Dirichlet BC:
-        # U[5,0,:] = -U[5,1,:]
+        # #Set pressure perturbation on top ghost nodes using Neumann BC:
+        # dphida = Da(U[4,0,:])
+        # dPda = Da(pi[0,:] + 3./2.*U[5,1,:] - 1./2.*U[5,2,:])
+        # dpids = 3./2.*U[3,1,:] - 1./2.*U[3,2,:]
+        # dphids = (-3./2.*U[4,0,:] + 2.*U[4,1,:] - 1./2.*U[4,2,:]) / ds
+        # RHS = (dPda * dphids - dphida * dpids) * dphida
+        # RHS = RHS / (g**2. + dphida**2.)
+        # U[5,0,:] = U[5,1,:] - ds * RHS
+        #Set pressure perturbation on top ghost nodes using Dirichlet BC:
+        U[5,0,:] = -U[5,1,:]
         #Set pressure perturbation on bottom ghost nodes using Neumann BC:
         dphida = Da(U[4,-2,:])
         dPda = Da(pi[-1,:] + 3./2.*U[5,-2,:] - 1./2.*U[5,-3,:])
@@ -800,8 +800,6 @@ for i in np.arange(0, nTimesteps+1):
     
     #Vertical re-map:
     if verticallyLagrangian and not contourFromSaved \
-    and (testCase != "steadyState") \
-    and (testCase != "inertiaGravityWaves") \
     and (np.mod(i,3) == 0):
 
         U, pi, thetaBar, dpidsBar, phiBar = setGhostNodes(U)
