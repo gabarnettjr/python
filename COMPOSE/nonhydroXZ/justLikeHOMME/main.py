@@ -202,12 +202,13 @@ Cp, Cv, Rd, g, Po, th0, N = common.constants(testCase)
 
 #Test-specific parameters describing domain and initial perturbation:
 left, right, bottom, top, dx, nLev, dt, tf, saveDel, zSurf, thetaPtb \
-= common.domainParameters(testCase, hydrostatic, refinementLevel, g, Cp, th0)
+= common.domainParameters(testCase, hydrostatic, refinementLevel \
+, g, Cp, th0)
 
 #Some other important parameters:
-nCol = np.int(np.round((right - left) / dx))             #number of columns
 t = 0.                                                        #initial time
 nTimesteps = np.int(np.round(tf / dt))                #number of time-steps
+nCol = np.int(np.round((right - left) / dx))             #number of columns
 x = np.linspace(left+dx/2, right-dx/2, nCol)        #array of x-coordinates
 
 #Initial hydrostatic background state functions of z (given in test case):
@@ -390,8 +391,14 @@ if plotNodesAndExit:
 
 theta0 = potentialTemperature(zzMid) + thetaPtb(xxMid, zzMid)
 dpids0 = Aprime(ssMid) * Po + Bprime(ssMid) * np.tile(piSurf, (nLev+2,1))
-phi0   = g * zzInt
 mass0 = np.sum(dpids0[1:-1,:] / g * ds * dx)                  #initial mass
+
+phi0 = g * zzInt
+phi0mid = g * zzMid
+# phi0mid = (phi0[0:-1,:] + phi0[1:,:]) / 2.
+phi0mid = np.vstack((2.*phi0[0,:] - phi0mid[0,:] \
+, phi0mid \
+, 2.*phi0[-1,:] - phi0mid[-1,:]))
 
 U = np.zeros((6, nLev+2, nCol))                  #Main 3D array of unknowns
 
@@ -542,12 +549,12 @@ def fastBackgroundStates(phi, pi):
         dpidsBar = -((pi[:-1,:]+pi[1:,:])/2)**(Cv/Cp) \
         * ((phiBar[1:,:]-phiBar[:-1,:])/ds) * Po**(Rd/Cp) / Rd \
         / thetaBar[1:-1,:]
-        dpidsBar = np.vstack((dpidsBar[0,:] \
-        , dpidsBar \
-        , dpidsBar[-1,:]))
-        # dpidsBar = np.vstack((2.*dpidsBar[0,:] - dpidsBar[1,:] \
+        # dpidsBar = np.vstack((dpidsBar[0,:] \
         # , dpidsBar \
-        # , 2.*dpidsBar[-1,:] - dpidsBar[-2,:]))
+        # , dpidsBar[-1,:]))
+        dpidsBar = np.vstack((2.*dpidsBar[0,:] - dpidsBar[1,:] \
+        , dpidsBar \
+        , 2.*dpidsBar[-1,:] - dpidsBar[-2,:]))
     else:
         #Get background state for pseudo-density dpi/ds on mid-levels:
         dpidsBar = Aprime(ssMid) * Po \
@@ -569,11 +576,10 @@ def fastBackgroundStates(phi, pi):
 def setGhostNodes(U):
 
     if heightCoord:
-        dpidsTop = 3./2.*U[3,1,:] - 1./2.*U[3,2,:]
-        thetaTop = 3./2.*U[2,1,:] - 1./2.*U[2,2,:]
-        dphidsTop = (-3./2.*U[4,0,:] + 2.*U[4,1,:] - 1./2.*U[4,2,:]) / ds
-        pTop = (-dpidsTop * Rd * thetaTop / dphidsTop / Po**(Rd/Cp)) \
-        ** (Cp/Cv)
+        dpids = 3./2.*U[3,1,:] - 1./2.*U[3,2,:]
+        theta = 3./2.*U[2,1,:] - 1./2.*U[2,2,:]
+        dphids = (-3./2.*U[4,0,:] + 2.*U[4,1,:] - 1./2.*U[4,2,:]) / ds
+        pTop = (-dpids * Rd * theta / dphids / Po**(Rd/Cp)) ** (Cp/Cv)
     else:
         pTop = piTop * np.ones((nCol))
 
@@ -629,16 +635,18 @@ def setGhostNodes(U):
         U[5,1:-1,:] = (-U[3,1:-1,:] / ((U[4,1:-1,:]-U[4,0:-2,:])/ds) * Rd \
         * U[2,1:-1,:] / Po**(Rd/Cp)) ** (Cp/Cv) \
         - (pi[:-1,:]+pi[1:,:])/2.
-        # #Set pressure perturbation on top ghost nodes using Neumann BC:
-        # dphida = Da(U[4,0,:])
-        # dPda = Da(pi[0,:] + 3./2.*U[5,1,:] - 1./2.*U[5,2,:])
-        # dpids = 3./2.*U[3,1,:] - 1./2.*U[3,2,:]
-        # dphids = (-3./2.*U[4,0,:] + 2.*U[4,1,:] - 1./2.*U[4,2,:]) / ds
-        # RHS = (dPda * dphids - dphida * dpids) * dphida
-        # RHS = RHS / (g**2. + dphida**2.)
-        # U[5,0,:] = U[5,1,:] - ds * RHS
-        #Set pressure perturbation on top ghost nodes using Dirichlet BC:
-        U[5,0,:] = -U[5,1,:]
+        if heightCoord:
+            #Set pressure perturbation on top ghost nodes (Neumann BC):
+            dphida = Da(U[4,0,:])
+            dPda = Da(pi[0,:] + 3./2.*U[5,1,:] - 1./2.*U[5,2,:])
+            dpids = 3./2.*U[3,1,:] - 1./2.*U[3,2,:]
+            dphids = (-3./2.*U[4,0,:] + 2.*U[4,1,:] - 1./2.*U[4,2,:]) / ds
+            RHS = (dPda * dphids - dphida * dpids) * dphida
+            RHS = RHS / (g**2. + dphida**2.)
+            U[5,0,:] = U[5,1,:] - ds * RHS
+        else:
+            #Set pressure perturbation on top ghost nodes (Dirichlet BC):
+            U[5,0,:] = -U[5,1,:]
         #Set pressure perturbation on bottom ghost nodes using Neumann BC:
         dphida = Da(U[4,-2,:])
         dPda = Da(pi[-1,:] + 3./2.*U[5,-2,:] - 1./2.*U[5,-3,:])
@@ -804,29 +812,40 @@ for i in np.arange(0, nTimesteps+1):
 
         U, pi, thetaBar, dpidsBar, phiBar = setGhostNodes(U)
         piSurf = pi[-1,:].copy()
-
-        #New coordinate on interfaces:
-        piNew = A(ssInt) * Po + B(ssInt) * np.tile(piSurf, (nLev+1, 1))
-
-        #Re-map w and phi:
-        U[[1,4],0:-1,:] = common.verticalRemap(U[[1,4],0:-1,:] \
-        , pi, piNew, Vinterfaces)
         
-        #Avg pi to mid-levels:
-        pi = (pi[0:-1,:] + pi[1:,:])/2.
-        pi = np.vstack((2.*piTop - pi[0,:] \
-        , pi \
-        , 2.*piSurf - pi[-1,:]))
-
-        #New coordinate on mid-levels:
-        piNew = A(ssMid) * Po + B(ssMid) * np.tile(piSurf, (nLev+2, 1))
-
-        #Re-map u and theta:
-        U[[0,2],:,:] = common.verticalRemap(U[[0,2],:,:] \
-        , pi, piNew, Vmidlevels)
-        
-        #Re-set the pseudo-density:
-        U[3,:,:] = dpidsBar.copy()
+        if heightCoord:
+            #Re-map w and phi:
+            tmp = U[4,0:-1,:].copy()
+            U[[1,4],0:-1,:] = common.verticalRemap(U[[1,4],0:-1,:] \
+            , tmp, phi0, Vinterfaces)
+            #Re-set geopotential:
+            U[4,0:-1,:] = phi0.copy()
+            #Avg phi to mid-levels:
+            phi = (tmp[0:-1,:] + tmp[1:,:])/2.
+            phi = np.vstack((2.*tmp[0,:] - phi[0,:] \
+            , phi \
+            , 2.*tmp[-1,:] - phi[-1,:]))
+            #Re-map u and theta and dpi/ds:
+            U[[0,2,3],:,:] = common.verticalRemap(U[[0,2,3],:,:] \
+            , phi, phi0mid, np.zeros((3,nLev+2,nCol)))
+        else:
+            #New coordinate on interfaces:
+            piNew = A(ssInt) * Po + B(ssInt) * np.tile(piSurf, (nLev+1, 1))
+            #Re-map w and phi:
+            U[[1,4],0:-1,:] = common.verticalRemap(U[[1,4],0:-1,:] \
+            , pi, piNew, Vinterfaces)
+            #Avg pi to mid-levels:
+            pi = (pi[0:-1,:] + pi[1:,:])/2.
+            pi = np.vstack((2.*piTop - pi[0,:] \
+            , pi \
+            , 2.*piSurf - pi[-1,:]))
+            #New coordinate on mid-levels:
+            piNew = A(ssMid) * Po + B(ssMid) * np.tile(piSurf, (nLev+2, 1))
+            #Re-map u and theta:
+            U[[0,2],:,:] = common.verticalRemap(U[[0,2],:,:] \
+            , pi, piNew, Vmidlevels)
+            #Re-set the pseudo-density:
+            U[3,:,:] = dpidsBar.copy()
     
     if np.mod(i, np.int(np.round(saveDel/dt))) == 0:
         
