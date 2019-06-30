@@ -30,17 +30,17 @@ if plotFromSaved :
 rSurf, rSurfPrime \
 = common.getTopoFunc( innerRadius, outerRadius, "trig", amp, frq, 0, 0 )
 
-ang1 = eval(ang1)                                  #convert string to float
-xc1 = (rSurf(ang1)+outerRadius)/2.*np.cos(ang1)         #x-coord of GA bell
-yc1 = (rSurf(ang1)+outerRadius)/2.*np.sin(ang1)         #y-coord of GA bell
+tmp = eval(ang1)                                   #convert string to float
+xc1 = (rSurf(tmp)+outerRadius)/2.*np.cos(tmp)           #x-coord of GA bell
+yc1 = (rSurf(tmp)+outerRadius)/2.*np.sin(tmp)           #y-coord of GA bell
 if ang2 :
-    ang2 = eval(ang2)                              #convert string to float
-    xc2 = (rSurf(ang2)+outerRadius)/2.*np.cos(ang2)     #x-coord of GA bell
-    yc2 = (rSurf(ang2)+outerRadius)/2.*np.sin(ang2)     #y-coord of GA bell
+    tmp = eval(ang2)                               #convert string to float
+    xc2 = (rSurf(tmp)+outerRadius)/2.*np.cos(tmp)       #x-coord of GA bell
+    yc2 = (rSurf(tmp)+outerRadius)/2.*np.sin(tmp)       #y-coord of GA bell
     if ang3 :
-        ang3 = eval(ang3)                          #convert string to float
-        xc3 = (rSurf(ang3)+outerRadius)/2.*np.cos(ang3) #x-coord of GA bell
-        yc3 = (rSurf(ang3)+outerRadius)/2.*np.sin(ang3) #y-coord of GA bell
+        tmp = eval(ang3)                           #convert string to float
+        xc3 = (rSurf(tmp)+outerRadius)/2.*np.cos(tmp)   #x-coord of GA bell
+        yc3 = (rSurf(tmp)+outerRadius)/2.*np.sin(tmp)   #y-coord of GA bell
 
 def initialCondition( x, y ) :
     #Gaussian:
