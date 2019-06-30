@@ -28,7 +28,8 @@ if plotFromSaved :
 ###########################################################################
 
 rSurf, rSurfPrime \
-= common.getTopoFunc( innerRadius, outerRadius, "trig", amp, frq, 0, 0 )
+= common.getTopoFunc( innerRadius, outerRadius, "GA", amp, frq \
+, 4, np.pi )
 
 tmp = eval(ang1)                                   #convert string to float
 xc1 = (rSurf(tmp)+outerRadius)/2.*np.cos(tmp)           #x-coord of GA bell
