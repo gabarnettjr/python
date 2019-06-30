@@ -28,7 +28,7 @@ if plotFromSaved :
 ###########################################################################
 
 rSurf, rSurfPrime \
-= common.getTopoFunc( innerRadius, outerRadius, amp, frq )
+= common.getTopoFunc( innerRadius, outerRadius, "trig", amp, frq, 0, 0 )
 
 ang1 = eval(ang1)                                  #convert string to float
 xc1 = (rSurf(ang1)+outerRadius)/2.*np.cos(ang1)         #x-coord of GA bell
@@ -133,7 +133,7 @@ ds  = ( s[2:nlv] - s[0:nlv-2] ) / 2.                  #non-constant delta s
 #Get computational mesh and mesh for contour plotting:
 
 thth, ss = np.meshgrid( th, s )      #mesh of perturbed s values and angles
-rr = common.getRadii( thth, ss \
+rr = common.getRadiiOnHeightCoordinateLevels( thth, ss \
 , innerRadius, outerRadius, rSurf )                #mesh of perturbed radii
 xx = rr * np.cos(thth)                               #mesh of x-coordinates
 yy = rr * np.sin(thth)                               #mesh of y-coordinates
@@ -153,7 +153,7 @@ dthdyAll =  np.cos(thth)/rr
 dthdxAll = -np.sin(thth)/rr
 
 thth0, ss0 = np.meshgrid( th0, s0[1:-1] )        #regular mesh for plotting
-rr0 = common.getRadii( thth0, ss0 \
+rr0 = common.getRadiiOnHeightCoordinateLevels( thth0, ss0 \
 , innerRadius, outerRadius, rSurf )                  #mesh of regular radii
 xx0 = rr0 * np.cos(thth0)                         #mesh of regular x-coords
 yy0 = rr0 * np.sin(thth0)                         #mesh of regular x-coords
@@ -352,20 +352,18 @@ stcB = stc                  #stencil-size for enforcing boundary conditions
 
 NxBot, NyBot, NxTop, NyTop \
 , TxBot, TyBot, TxTop, TyTop \
-, someFactor \
-= common.getTangentsAndNormals( th, stcB, rSurf, dsdr, dsdth )
+, someFactor, bottomFactor, topFactor \
+= common.getTangentsAndNormals( th, stcB, rSurf, dsdr, dsdth, 9.8 )
 
 ###########################################################################
 
 #Radial PHS-FD weights arranged in a differentiation matrix:
 
 #Matrix for approximating first derivative in radial direction:
-Ws = phs1.getDM( x=s, X=s, m=1 \
-, phsDegree=phs, polyDegree=pol, stencilSize=stc )
+Ws = phs1.getDM( z=s, x=s, m=1, phs=phs, pol=pol, stc=stc )
 
 #Simple (but still correct with dsdr multiplier) radial HV:
-Whvs = phs1.getDM( x=s, X=s[1:-1], m=phs-1 \
-, phsDegree=phs, polyDegree=pol, stencilSize=stc )
+Whvs = phs1.getDM( z=s[1:-1], x=s, m=phs-1, phs=phs, pol=pol, stc=stc )
 Whvs = alp * ds0**(phs-2) * Whvs                   #scaled radial HV matrix
 # dsPol = spdiags( ds**(phs-2), np.array([0]), len(ds), len(ds) )
 # Whvs = alp * dsPol.dot(Whvs)
@@ -383,12 +381,12 @@ Whvs = alp * ds0**(phs-2) * Whvs                   #scaled radial HV matrix
 #Angular PHS-FD weights arranged in a differentiation matrix:
 
 #Matrix for approximating first derivative in angular direction:
-Wlam = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th, m=1 \
-, phsDegree=phsA, polyDegree=polA, stencilSize=stcA )
+Wlam = phs1.getPeriodicDM( z=th, x=th, m=1 \
+, phs=phsA, pol=polA, stc=stcA, period=2*np.pi )
 
 #Simple (and technically incorrect) angular HV:
-Whvlam = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th, m=phsA-1 \
-, phsDegree=phsA, polyDegree=polA, stencilSize=stcA )
+Whvlam = phs1.getPeriodicDM( z=th, x=th, m=phsA-1 \
+, phs=phsA, pol=polA, stc=stcA, period=2*np.pi )
 Whvlam = alpA * dth0**(phsA-2) * Whvlam           #scaled angular HV matrix
 # dthPol = spdiags( dth**polA, np.array([0]), len(dth), len(dth) )
 # Whvlam = alpA * dthPol.dot(Whvlam)
@@ -415,11 +413,10 @@ wDouter = phs1.getWeights( outerRadius, s[-1:-stcB-1:-1], 1, phs, pol )
 
 #Weights to interpolate from perturbed mesh to regular mesh for plotting:
 
-Wradial = phs1.getDM( x=s, X=s0[1:-1], m=0 \
-, phsDegree=phs, polyDegree=pol, stencilSize=stc )
+Wradial = phs1.getDM( z=s0[1:-1], x=s, m=0, phs=phs, pol=pol, stc=stc )
 
-Wangular = phs1.getPeriodicDM( period=2*np.pi, x=th, X=th0, m=0 \
-, phsDegree=phsA, polyDegree=polA, stencilSize=stcA )
+Wangular = phs1.getPeriodicDM( z=th0, x=th, m=0 \
+, phs=phsA, pol=polA, stc=stcA, period=2*np.pi )
 
 ###########################################################################
 
