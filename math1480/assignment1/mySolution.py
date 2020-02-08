@@ -6,8 +6,8 @@ import matplotlib.pyplot as plt          #import the plotting library
 # The two input vectors, x and y.  These define the known data that
 # must be matched by the quadratic approximation:
 
-x = np.array([-1., 0., 1.])
-y = np.array([1., 3., 2.])
+x = np.array([-1., 0., 1.])                            #x-coordinates
+y = np.array([1., 3., 2.])                             #y-coordinates
 
 #####################################################################
 
