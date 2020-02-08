@@ -23,7 +23,7 @@ def quadratic(X):
 # A dense set of x-coordinates where we  will plot both of the
 # approximations to see what they look like:
 
-X = np.linspace(-1., 1., 201)
+X = np.linspace(x[0], x[-1], 200)
 
 #####################################################################
 
@@ -45,7 +45,7 @@ Q = B.dot(lam)
 
 # Plot the two quadratic functions at all of the x-coordinates
 # in the vector X, and make sure that the two methods give the same
-# result:
+# result.  Also, plot the original data on the same graph:
 
 plt.figure()
 plt.plot(X, quadratic(X), '-')
