@@ -57,7 +57,8 @@ window, with the known data points plotted as well.
 # and overleaf link at the beginning of the assignment.
 
 def quadratic(X):
-    
+    q = 
+    return q
 
 #####################################################################
 
@@ -106,8 +107,6 @@ def quadratic(X):
 #           by straight line segments.
 #       plt.show() renders the figure at the end so can see it.
 
-plt.figure()
-plt.plot()
-plt.show()
+
 
 #####################################################################
