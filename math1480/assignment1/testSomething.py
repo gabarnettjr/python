@@ -21,7 +21,7 @@ def quadratic(X):
 #####################################################################
 
 # A dense set of x-coordinates where we  will plot both of the
-# approximations:
+# approximations to see what they look like:
 
 X = np.linspace(-1., 1., 201)
 
@@ -34,7 +34,7 @@ A = np.vstack((e, x, x**2)).T                     #Vandermonde matrix
 
 # The column vector "lam" tells you how much of each basis function
 # that you need in order to match the known data.  This line solves
-# the linear system A*y=lam for y:
+# the linear system A*lam=y for lam:
 lam = np.linalg.solve(A, y)
 
 E = np.ones(np.shape(X))        #long row-vector containing only ones
