@@ -19,20 +19,20 @@ PRELIMINARY INFORMATION
 
 How to use this python script: In the code-block labeled
 USER INPUT, enter the desired x and y coordinates of three known
-data points, as arrays.
+points, as arrays.
 
 Result: The script will come up with a quadratic function that
-passes through all three data points, and two different
-methods will be used to come up with this quadratic function.
+passes through all three points, and two different methods will be
+used to come up with this quadratic function.
 
 In Method 1 the quadratic function is constructed directly by
-using the Lagrange interpolating polynomial:
-https://www.overleaf.com/read/rccncxhyfvky
+using the Lagrange interpolating polynomial.
+More information:  https://www.overleaf.com/read/rccncxhyfvky
 
 In Method 2 we assume that the interpolant is of the form
-Q(X) = lam[0] + lam[1]*X + lam[2]*X**2, and solves for the three
-unknown quantities lam[0], lam[1], and lam[2]:
-https://www.overleaf.com/read/qhtygvjbxccd
+Q(X) = lam[0] + lam[1]*X + lam[2]*X**2, and then solve for the three
+unknown quantities lam[0], lam[1], and lam[2].
+More information:  https://www.overleaf.com/read/qhtygvjbxccd
 
 After the quadratic interpolant has been calculated using the two
 methods, the results are plotted for comparison in a single viewing
