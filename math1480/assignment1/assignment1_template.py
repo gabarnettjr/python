@@ -94,6 +94,7 @@ def quadratic(X):
 
 # Evaluate the approximation at each coordinate in X.
 
+
 #####################################################################
 
 # Plot the two quadratic functions at all of the x-coordinates
