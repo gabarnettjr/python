@@ -47,7 +47,7 @@ window, with the known data points plotted as well.
 # Hint: x = np.array([])
 #       y = np.array([])
 
-x = np.array([-1., 0., 1.])                            #x-coordinates
+x = np.array([-2., 0., 5.])                            #x-coordinates
 y = np.array([1., 3., 0.])                             #y-coordinates
 
 #####################################################################
@@ -57,9 +57,9 @@ y = np.array([1., 3., 0.])                             #y-coordinates
 # and overleaf link at the beginning of the assignment.
 
 def quadratic(X):
-    q = (X-x[1]) * (X-x[2]) / (x[0]-x[1]) / (x[0]-x[2]) * y[0] \
-      + (X-x[0]) * (X-x[2]) / (x[1]-x[0]) / (x[1]-x[2]) * y[1] \
-      + (X-x[0]) * (X-x[1]) / (x[2]-x[0]) / (x[2]-x[1]) * y[2]
+    q = (X-x[1]) * (X-x[2]) / (x[0]-x[1]) / (x[0]-x[2]) * y[0] + \
+        (X-x[0]) * (X-x[2]) / (x[1]-x[0]) / (x[1]-x[2]) * y[1] + \
+        (X-x[0]) * (X-x[1]) / (x[2]-x[0]) / (x[2]-x[1]) * y[2]
     return q
 
 #####################################################################
@@ -71,7 +71,7 @@ def quadratic(X):
 # equally spaced values in between.
 # Hint: X = np.linspace()
 
-X = np.linspace(x[0], x[-1], 200)
+X = np.linspace(x[0], x[-1], 500)
 
 #####################################################################
 
@@ -111,9 +111,10 @@ Q = lam[0] + lam[1]*X + lam[2]*X**2
 #       plt.show() renders the figure at the end so can see it.
 
 plt.figure()
-plt.plot(X, quadratic(X), '-')
-plt.plot(X, Q, '--')
-plt.plot(x, y, '*')
+plt.plot(X, quadratic(X), "-", linewidth=3, color="red")
+plt.plot(X, Q, "--", linewidth=3, color="green")
+plt.plot(x, y, ".", markersize=10, color="black")
+plt.legend(["Method 1", "Method 2", "Original Points"])
 plt.show()
 
 #####################################################################
