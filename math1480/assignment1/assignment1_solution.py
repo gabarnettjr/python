@@ -107,7 +107,7 @@ Q = lam[0] + lam[1]*X + lam[2]*X**2
 # using a solid line, and plot the second one using a dashed line.
 # Also, plot the original data on the same graph.
 # Hint: plt.figure() initializes a figure
-#       plt.plot(a, b, '-') plots points with x-coordinate in vector
+#       plt.plot(a, b, '-') plots points with x-coordinates in vector
 #           a and y-coordinates in vector b, connecting the points
 #           by straight line segments.
 #       plt.show() renders the figure at the end so can see it.
