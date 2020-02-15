@@ -96,6 +96,8 @@ lam = np.linalg.solve(A, y)
 
 # Evaluate the approximation at each coordinate in X.
 Q = lam[0] + lam[1]*X + lam[2]*X**2
+# B = np.vstack((np.ones(np.shape(X)), X, X**2)).T
+# Q = B.dot(lam)
 
 #####################################################################
 
