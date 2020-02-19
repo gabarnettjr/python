@@ -1,12 +1,13 @@
 #main.py
 
+import sys
 import numpy as np
 import scipy as sp
 import matplotlib.pyplot as plt
 import scipy.interpolate as interpolate
 import time
-from scipy import spatial
-from gab import phs
+sys.path.append('../site-packages')
+from gab import phs2
 
 k = 10;
 def trueFunction( x, y ) :
@@ -66,14 +67,14 @@ if useGlobalRbfs == 1 :
     
 elif useLocalRbfs == 1 :
 
-    stencils = phs.getStencils( x, y, X.flatten(), Y.flatten(), stencilSize )
+    stencils = phs2.getStencils( x, y, X.flatten(), Y.flatten(), stencilSize )
 
     # pts = np.transpose( np.vstack((x,y)) )
     # tree = spatial.cKDTree(pts)
     # X = X.flatten()
     # Y = Y.flatten()
     
-    mn = phs.getMN()
+    mn = phs2.getMN()
     numPoly = np.int( ( polyorder + 1 ) * ( polyorder + 2 ) / 2 )
     
     # PTS = np.transpose( np.vstack((X,Y)) )
@@ -96,7 +97,7 @@ elif useLocalRbfs == 1 :
         for i in range(stencilSize) :
             tmpX = np.transpose( np.tile( Xn[:,i], (stencilSize,1) ) )
             tmpY = np.transpose( np.tile( Yn[:,i], (stencilSize,1) ) )
-            A[ :, i, 0:stencilSize ] = phs.phi( rad, tmpX-Xn, tmpY-Yn, rbfParam )
+            A[ :, i, 0:stencilSize ] = phs2.phi( rad, tmpX-Xn, tmpY-Yn, rbfParam )
             tmp = tmpX[:,0:numPoly]**mn0 * tmpY[:,0:numPoly]**mn1 / rad[:,0:numPoly]**(mn0+mn1)
             A[ :, i, stencilSize:stencilSize+numPoly ] = tmp
             A[ :, stencilSize:stencilSize+numPoly, i ] = tmp
@@ -104,12 +105,12 @@ elif useLocalRbfs == 1 :
         # #The double-for-loop way (but not looping over very much (seems a little faster)):
         # for i in range(stencilSize) :
             # for j in range(numPoly) :
-                # A[:,i,j] = phs.phi( rad, Xn[:,i]-Xn[:,j], Yn[:,i]-Yn[:,j], rbfParam )
+                # A[:,i,j] = phs2.phi( rad, Xn[:,i]-Xn[:,j], Yn[:,i]-Yn[:,j], rbfParam )
                 # tmp = Xn[:,i]**mn[j,0] * Yn[:,i]**mn[j,1] / rad**(mn[j,0]+mn[j,1])
                 # A[ :, i, stencilSize+j ] = tmp
                 # A[ :, stencilSize+j, i ] = tmp
             # for j in range(numPoly,stencilSize) :
-                # A[:,i,j] = phs.phi( rad, Xn[:,i]-Xn[:,j], Yn[:,i]-Yn[:,j], rbfParam )
+                # A[:,i,j] = phs2.phi( rad, Xn[:,i]-Xn[:,j], Yn[:,i]-Yn[:,j], rbfParam )
         # rad = np.transpose( np.tile( rad, (stencilSize,1) ) )
         
         f = np.zeros(( len(X), stencilSize+numPoly, 1 ))
@@ -119,24 +120,24 @@ elif useLocalRbfs == 1 :
         #for interpolation:
         b = np.zeros(( len(X), stencilSize+numPoly ))
         b[:,stencilSize] = 1
-        b[:,0:stencilSize] = phs.phi( rad, 0-Xn, 0-Yn, rbfParam )
+        b[:,0:stencilSize] = phs2.phi( rad, 0-Xn, 0-Yn, rbfParam )
         Z = np.sum( b*lam, axis=1 )
         Z = np.reshape( Z, (N,N) )
         if approximateDerivatives == 1 :
             #for first derivative in x:
             b_x = np.zeros(( len(X), stencilSize+numPoly ))
             b_x[:,stencilSize+1] = 1/rad[:,0]
-            b_x[:,0:stencilSize] = phs.phi_x( rad, 0-Xn, 0-Yn, rbfParam )
+            b_x[:,0:stencilSize] = phs2.phi_x( rad, 0-Xn, 0-Yn, rbfParam )
             #for first derivative in y:
             b_y = np.zeros(( len(X), stencilSize+numPoly ))
             b_y[:,stencilSize+2] = 1/rad[:,0]
-            b_y[:,0:stencilSize] = phs.phi_y( rad, 0-Xn, 0-Yn, rbfParam )
+            b_y[:,0:stencilSize] = phs2.phi_y( rad, 0-Xn, 0-Yn, rbfParam )
             #for Laplacian:
             bL = np.zeros(( len(X), stencilSize+numPoly ))
             if numPoly > 3 :
                 bL[:,stencilSize+3] = 2/rad[:,0]**2
                 bL[:,stencilSize+5] = 2/rad[:,0]**2
-            bL[:,0:stencilSize] = phs.phiHV( rad, 0-Xn, 0-Yn, rbfParam, 1 )
+            bL[:,0:stencilSize] = phs2.phiHV( rad, 0-Xn, 0-Yn, rbfParam, 1 )
             #get derivative approximations:
             Z_x = np.sum( b_x*lam, axis=1 )
             Z_x = np.reshape( Z_x, (N,N) )
@@ -162,7 +163,7 @@ elif useLocalRbfs == 1 :
             yn = Yn[i,:] - Y[i]
             xx,xx = np.meshgrid( xn, xn )
             yy,yy = np.meshgrid( yn, yn )
-            A[0:stencilSize,0:stencilSize] = phs.phi( rad[i], np.transpose(xx)-xx \
+            A[0:stencilSize,0:stencilSize] = phs2.phi( rad[i], np.transpose(xx)-xx \
             , np.transpose(yy)-yy, rbfParam )
             for j in range(numPoly) :
                 tmp = xn**mn[j,0] * yn**mn[j,1] / rad[i]**(mn[j,0]+mn[j,1])
@@ -170,7 +171,7 @@ elif useLocalRbfs == 1 :
                 A[ stencilSize+j, 0:stencilSize ] = tmp
             f[0:stencilSize] = Zn[i,:]
             lam = np.linalg.solve( A, f )
-            b[0:stencilSize] = phs.phi(rad[i],0-xn,0-yn,rbfParam)
+            b[0:stencilSize] = phs2.phi(rad[i],0-xn,0-yn,rbfParam)
             Z[i] = np.dot( b, lam )
         X = np.reshape( X, (N,N) )
         Y = np.reshape( Y, (N,N) )
