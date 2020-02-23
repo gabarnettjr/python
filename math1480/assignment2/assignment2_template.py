@@ -1,112 +1,125 @@
-                                      #import the numpy library as np
-                                  #import the plotting library as plt
+# import the numpy library as np:
+import 
+
+# import the plotting library as plt:
+import 
 
 #####################################################################
 """
 ASSIGNMENT 2
 MATH 1480
 Spring 2020
-Due Friday, February 28th at 4:00 PM
+Due Friday, March 6th at 3:00 PM
 
 What to do:  Fill in this template with python code.  At the end of
 your script, your code should produce the correct plot, showing the
-graph of the least squares polynomial approximation for the data
-supplied by the user.
+graph of the numerical solution to the initial value problem, as well
+as the graph of the exact solution (if known).  Also, if the exact
+solution is available, a plot of the difference between the numerical
+and the exact solution will be displayed in a subfigure.
 
 ---------------------------------------------------------------------
 
 PRELIMINARY INFORMATION
 
 How to use this python script: In the code-block labeled
-USER INPUT, enter the desired x and y coordinates of n known
-points, as arrays.
+USER INPUT, enter these six things:
+initial time           t0
+final time             tf
+number of time steps   N
+ODE function           f(t,y)
+initial condition      y0
+True or False boolean  exactSolutionKnown
+exact solution         Y(t)
 
-Result: The script will come up with the least squares polynomial
-function of degree d for the data, where d is also specified by the
-user.
+Result: The script will apply Euler's Method to come up with an
+approximate solution at each of the equally-spaced times in the
+time interval.  After computing the approximate solution, at the end
+of the script, a plot will be displayed with t on the horizontal
+axis and y on the vertical axis.
 
-In Method 1 the quadratic function is constructed directly by
-using the Lagrange interpolating polynomial.
-More information:  https://www.overleaf.com/read/rccncxhyfvky
+Please have a look at this Overleaf document for an overview of
+initial value problems and Euler's Method:
 
-In Method 2 we assume that the interpolant is of the form
-Q(X) = lam[0] + lam[1]*X + lam[2]*X**2, and then solve for the three
-unknown quantities lam[0], lam[1], and lam[2].
-More information:  https://www.overleaf.com/read/qhtygvjbxccd
-
-After the Polynomial function has been calculated, plot it, and also
-plot the original data as discrete points, to see how close the
-polynomial function is to each point.
+https://www.overleaf.com/read/pfqfsdjzqjty
 """
 #####################################################################
 
 # USER INPUT
 
-# The two input vectors, x and y.  These define the known data that
-# will be approximated by the least squares polynomial function.
-                                                       #x-coordinates
-                                                       #y-coordinates
+# initial time:
+t0 = 
 
-# The desired degree d of the polynomial function.
+# final time:
+tf = 
 
-#####################################################################
+# total number of sub-intervals (time-steps):
+N = 
 
-# Method 1 (build the quadratic function directly)
-# Hint: Refer to the description of Method 1 in the block comments
-# and overleaf link at the beginning of the assignment.
+# ODE function (RHS):
+def f(t,y):
+    
 
-def quadratic(X):
-    q = 
-    return q
+# initial condition:
+y0 = 
 
-#####################################################################
+# True or False boolean variable:
+exactSolutionKnown = 
 
-# A dense set of x-coordinates where we  will plot both of the
-# approximations to see what they look like.  This row-vector should
-# begin at the first value of the vector x, and should end at the
-# last value of the vector x, but should also include at least 25
-# equally spaced values in between.
-# Hint: X = np.linspace()
-
-
+# exact solution:
+if exactSolutionKnown:
+    def Y(t):
+        
 
 #####################################################################
 
-# Method 2 (indirect but more flexible and generalizable)
-# Hint: Refer to the description of Method 2 in the block comments
-# and overleaf link at the beginning of the assignment.
+# Initialize arrays t and y, and set first element of y equal to
+# the initial value.  Keep in mind that if there are N time-steps,
+# then the arrays t and y should have N+1 elements.
 
-# Make a row-vector of ones that is the same length as x.
-# Hint: e = np.ones(np.shape())
-
-
-# Make the 3-column Vandermonde matrix (columns are 1, x, and x**2).
-# Hint: A = np.vstack(()).T
-# The ".T" at the end takes the transpose of a matrix.
-
-
-# The column vector "lam" (short for lambda) tells you how much of
-# each basis function (1, x, x**2) that you need in order to match
-# the known data.  Solve the linear system A*lam=y for lam.
-# Hint: lam = np.linalg.solve()
-
-
-# Evaluate the approximation at each coordinate in X.
-
+t = 
+y = 
+y[0] = 
 
 #####################################################################
 
-# Plot the two quadratic functions at all of the x-coordinates
-# in the vector X, and make sure that the two methods give the same
-# result.  In order to not mix up the two graphs, plot the first one
-# using a solid line, and plot the second one using a dashed line.
-# Also, plot the original data on the same graph.
-# Hint: plt.figure() initializes a figure
-#       plt.plot(a, b, '-') plots points with x-coordinate in vector
-#           a and y-coordinates in vector b, connecting the points
-#           by straight line segments.
-#       plt.show() renders the figure at the end so can see it.
+# Define the time-step h by taking the width of the full time
+# interval and dividing by the total number of time-steps N:
 
+h = 
 
+#####################################################################
+
+# Main time-stepping loop (for-loop)
+# This is where the elements of the array y will be "filled in" using
+# Euler's Method.
+
+for n in range(N):
+    
+
+#####################################################################
+
+# Plot the numerical solution and the exact solution (if available)
+# on the same set of axes.  If the exact solution is available, then
+# plot the difference between numerical and exact in a subplot.
+
+plt.figure()
+
+if exactSolutionKnown:
+    
+    # Plot numerical and exact on same axes in 1st subfigure:
+    plt.subplot(1,2,1)
+    
+    
+    # Plot difference of numerical and exact in 2nd subfigure:
+    plt.subplot(1,2,2)
+    
+    
+else:
+
+    # Plot the numerical solution (no exact solution available):
+    
+
+plt.show()
 
 #####################################################################
