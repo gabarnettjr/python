@@ -1,8 +1,8 @@
 # import the numpy library as np:
-import 
+import numpy as np
 
 # import the plotting library as plt:
-import 
+import matplotlib.pyplot as plt
 
 #####################################################################
 """
@@ -48,28 +48,28 @@ https://www.overleaf.com/read/pfqfsdjzqjty
 # USER INPUT
 
 # initial time:
-t0 = 
+t0 = 0
 
 # final time:
-tf = 
+tf = 2
 
 # total number of sub-intervals (time-steps):
-N = 
+N = 10
 
 # ODE function (RHS):
 def f(t,y):
-    
+    return -y
 
 # initial condition:
-y0 = 
+y0 = 1
 
 # True or False boolean variable:
-exactSolutionKnown = 
+exactSolutionKnown = True
 
 # exact solution:
 if exactSolutionKnown:
     def Y(t):
-        
+        return np.exp(-t)
 
 #####################################################################
 
@@ -77,16 +77,16 @@ if exactSolutionKnown:
 # the initial value.  Keep in mind that if there are N time-steps,
 # then the arrays t and y should have N+1 elements.
 
-t = 
-y = 
-y[0] = 
+t = np.linspace(t0, tf, N+1)
+y = np.zeros(N+1)
+y[0] = y0
 
 #####################################################################
 
 # Define the time-step h by taking the width of the full time
 # interval and dividing by the total number of time-steps N:
 
-h = 
+h = (tf - t0) / N
 
 #####################################################################
 
@@ -95,7 +95,7 @@ h =
 # Euler's Method.
 
 for n in range(N):
-    
+    y[n+1] = y[n] + h * f(t[n], y[n])
 
 #####################################################################
 
@@ -109,16 +109,17 @@ if exactSolutionKnown:
     
     # Plot numerical and exact on same axes in 1st subfigure:
     plt.subplot(1,2,1)
-    
+    plt.plot(t, y)
+    plt.plot(t, Y(t))
     
     # Plot difference of numerical and exact in 2nd subfigure:
     plt.subplot(1,2,2)
-    
+    plt.plot(t, y-Y(t))
     
 else:
 
     # Plot the numerical solution (no exact solution available):
-    
+    plt.plot(t, y)
 
 plt.show()
 

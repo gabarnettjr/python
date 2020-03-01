@@ -1,45 +1,50 @@
 # import the numpy library as np:
-import numpy as np
+
 
 # import the plotting library as plt:
-import matplotlib.pyplot as plt
+
+
+# import the Runge-Kutta library (written by you):
+
 
 #####################################################################
 """
-ASSIGNMENT 2
+ASSIGNMENT 3
 MATH 1480
 Spring 2020
-Due Friday, March 6th at 3:00 PM
+Due Friday, March 13th at 3:00 PM
 
-What to do:  Fill in this template with python code.  At the end of
-your script, your code should produce the correct plot, showing the
-graph of the numerical solution to the initial value problem, as well
-as the graph of the exact solution (if known).  Also, if the exact
-solution is available, a plot of the difference between the numerical
-and the exact solution will be displayed in a subfigure.
+What to do:  Fill in this template with python code, and write a
+separate library called "rungeKutta.py" to be imported.  At the end
+of your script, your code should produce the correct plot, showing
+the graph of the numerical solution of the initial value problem, as
+well as the graph of the exact solution (if known).  Also, if the
+exact solution is available, a plot of the difference between the
+numerical and the exact solution will be displayed in a subfigure.
 
 ---------------------------------------------------------------------
 
 PRELIMINARY INFORMATION
 
 How to use this python script: In the code-block labeled
-USER INPUT, enter these six things:
-initial time           t0
-final time             tf
-number of time steps   N
-ODE function           f(t,y)
-initial condition      y0
-True or False boolean  exactSolutionKnown
-exact solution         Y(t)
+USER INPUT, enter these eight things:
+initial time                  t0
+final time                    tf
+total number of time steps    N
+ODE function                  f(t,y)
+initial condition             y0
+True or False boolean         exactSolutionKnown
+exact solution                Y(t)
+number of Runge-Kutta stages  rkStages [1, 2, 3, or 4]
 
-Result: The script will apply Euler's Method to come up with an
-approximate solution at each of the equally-spaced times in the
+Result: The script will apply the Runge-Kutta method to come up with
+an approximate solution at each of the equally-spaced times in the
 time interval.  After computing the approximate solution, at the end
 of the script, a plot will be displayed with t on the horizontal
 axis and y on the vertical axis.
 
 Please have a look at this Overleaf document for an overview of
-initial value problems and Euler's Method:
+initial value problems, Euler's Method, and Runge-Kutta methods:
 
 https://www.overleaf.com/read/pfqfsdjzqjty
 """
@@ -47,29 +52,32 @@ https://www.overleaf.com/read/pfqfsdjzqjty
 
 # USER INPUT
 
-# initial time:
-t0 = 0
+# Initial time:
+t0 = 
 
-# final time:
-tf = 6 * np.pi
+# Final time:
+tf = 
 
-# total number of sub-intervals (time-steps):
-N = 100
+# Total number of sub-intervals (time-steps):
+N = 
 
 # ODE function (RHS):
 def f(t,y):
-    return np.cos(t)
+    
 
-# initial condition:
-y0 = 0
+# Initial condition:
+y0 = 
 
 # True or False boolean variable:
-exactSolutionKnown = True
+exactSolutionKnown = 
 
-# exact solution:
+# Exact solution:
 if exactSolutionKnown:
     def Y(t):
-        return np.sin(t)
+        
+
+# Number of Runge-Kutta stages to use (1, 2, 3, or 4):
+rkStages = 
 
 #####################################################################
 
@@ -77,25 +85,34 @@ if exactSolutionKnown:
 # the initial value.  Keep in mind that if there are N time-steps,
 # then the arrays t and y should have N+1 elements.
 
-t = np.linspace(t0, tf, N+1)
-y = np.zeros(np.shape(t))
-y[0] = y0
+
 
 #####################################################################
 
 # Define the time-step h by taking the width of the full time
 # interval and dividing by the total number of time-steps N:
 
-h = (tf - t0) / N
+
+
+#####################################################################
+
+# Define the Runge-Kutta method that will be used based on the user
+# input of the variable rkStages.  This is where your "rungeKutta"
+# library will be used, and you will need if-elif statements.  If the
+# user entered something other than 1, 2, 3, or 4 for the variable
+# rkStages, then you should catch it here, print an error statement,
+# and exit from the program.
+
+
 
 #####################################################################
 
 # Main time-stepping loop (for-loop)
 # This is where the elements of the array y will be "filled in" using
-# Euler's Method.
+# the Runge-Kutta method:
 
 for n in range(N):
-    y[n+1] = y[n] + h * f(t[n], y[n])
+    
 
 #####################################################################
 
@@ -109,27 +126,16 @@ if exactSolutionKnown:
     
     # Plot numerical and exact on same axes in 1st subfigure:
     plt.subplot(1,2,1)
-    plt.plot(t, y)
-    plt.plot(t, Y(t))
-    plt.legend(['numerical solution', 'exact solution'])
-    plt.title('Numerical and Exact Solution')
-    plt.xlabel('t')
-    plt.ylabel('y')
+    
     
     # Plot difference of numerical and exact in 2nd subfigure:
     plt.subplot(1,2,2)
-    plt.plot(t, y-Y(t))
-    plt.title('Numerical minus Exact')
-    plt.xlabel('t')
-    plt.ylabel('difference')
+    
     
 else:
 
     # Plot the numerical solution (no exact solution available):
-    plt.plot(t, y)
-    plt.title('Numerical Solution')
-    plt.xlabel('t')
-    plt.ylabel('y')
+    
 
 plt.show()
 
