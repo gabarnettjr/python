@@ -1,0 +1,1 @@
+DOSKEY np=Notepad++

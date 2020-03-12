@@ -18,17 +18,29 @@ set /a "x = 0"
 :while1
 if %x% leq 5 (
     echo %x%
-    set /a "x = %x% + 1"
+    set /a "x = x + 1"
     goto :while1
 )
 
 echo.
 
-REM a for loop:
-for /l %%i in (1,1,5) do (
-    echo i = %%i
-    set /a "x = %x% - 1"
-    echo x = %x%
+REM another while loop:
+:while2
+if %x% geq 0 (
+	echo %x%
+	set /a "x = x - 1"
+	goto :while2
 )
+
+REM echo.
+
+REM a for loop:
+REM The for loop is not working, so commenting it out.
+REM for /l %%i in (1,1,5) do (
+    REM echo i = %%i
+    REM set /a "x = %x% - 1"
+    REM echo x = %x%
+	REM echo.
+REM )
 
 endlocal
