@@ -6,8 +6,8 @@ setlocal enableextensions enabledelayedexpansion
 
 set /a "x = %1"
 set /a "y = %2"
-set /a "z = %x% + %y%"
-set /a "w = %x% * %y%"
+set /a "z = x + y"
+set /a "w = x * y"
 echo.
 echo The sum of %x% and %y% is %z%, and the product is %w%.
 
