@@ -12,9 +12,9 @@ with open(st + 'npts.txt') as f:
         npts = np.int(line)
 
 # Load the integer which is the number of saves
-with open(st + 'numsaves.txt') as f:
+with open(st + 'nsaves.txt') as f:
     for line in f:
-        numsaves = np.int(line)
+        nsaves = np.int(line)
 
 # Load the x-coordinates of the points
 x = np.zeros((npts,))
@@ -42,7 +42,7 @@ triang = mtri.Triangulation(x, y)
 
 rho = np.zeros((npts,))
 
-for i in range(numsaves):
+for i in range(nsaves):
 
     k = 0
     with open(st + "rho_{0:04d}.txt".format(i+1)) as f:
@@ -50,10 +50,10 @@ for i in range(numsaves):
             rho[k] = np.float(line)
             k = k + 1
     
-    fig = plt.figure()
+    fig = plt.figure(figsize = (12, 10))
     ax = fig.add_subplot(111)
-    ax.tricontourf(triang, rho, levels=np.linspace(-.5,.5,21))
-    # plt.colorbar()
+    cs = ax.tricontourf(triang, rho, levels=np.linspace(-.5,.5,41))
+    fig.colorbar(cs)
     plt.axis('equal')
     plt.axis([-1,1,-1,1])
 
@@ -65,8 +65,7 @@ for i in range(numsaves):
     # ax.set_zlim3d(-1,1)
     # plt.show()
 
-    fig.savefig( '{0:04d}'.format(np.int(np.round(i)+1e-12)) \
-    + '.png', bbox_inches = 'tight' )
+    fig.savefig( '{0:04d}'.format(i) + '.png', bbox_inches = 'tight' )
 
     plt.close()
 
