@@ -116,7 +116,7 @@ def bvp(a, b, c, f, yL, yR, x, stc):
 
 #######################################
 
-def test_bvp(testCase=1, N=17, stc=5, ptb = 0):
+def test_bvp(testCase = 1, N = 17, stc = 5, ptb = 0):
     
     if testCase == 1:
         def a(x):
@@ -164,18 +164,20 @@ def test_bvp(testCase=1, N=17, stc=5, ptb = 0):
         raise ValueError("testCase should be 1, 2, or 3 please.")
     
     # Perturb the nodes by the fraction ptb
-    x[1:-1] = x[1:-1] + (-ptb+2*ptb*np.random.rand(N-2)) \
-        * (x[-1]-x[1])/(N-1)
+    x[1:-1] = x[1:-1] + (-ptb+2*ptb*np.random.rand(N-2)) * (x[1]-x[0])
     
     y = bvp(a, b, c, f, yL, yR, x, stc)
     
     plt.figure()
     plt.clf()
-    plt.subplot(1,2,1)
+    plt.subplot(1,3,1)
+    plt.plot(x, np.zeros(np.shape(x)), '.')
+    plt.title("Nodes")
+    plt.subplot(1,3,2)
     plt.plot(x, yExact(x), x, y)
     plt.title("exact and approximate")
     plt.legend(["exact", "approximate"])
-    plt.subplot(1,2,2)
+    plt.subplot(1,3,3)
     plt.plot(x, y-yExact(x))
     plt.title("difference")
     plt.show()
