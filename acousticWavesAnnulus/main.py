@@ -75,17 +75,18 @@ if ( saveArrays ) & ( not plotFromSaved ) :
         os.makedirs( saveString )                     #make new directories
 
 if saveContours :
-    tmp = os.listdir( os.getcwd() )
-    for item in tmp :
+    figDir = os.curdir + os.sep + ".." + os.sep + ".." + os.sep + ".." \
+    + os.sep + "figures"
+    for item in os.listdir( figDir ) :
         if item.endswith(".png") :
-            os.remove( os.path.join( os.getcwd(), item ) )
+            os.remove( figDir + os.sep + item )
 
 ###########################################################################
 
 #Get th and s vectors and save them (randomly perturbed):
 
 t = 0.                                                       #starting time
-nTimesteps = np.int(np.round( tf / dt ))         #total number of timesteps
+nTimesteps = int(np.round( tf / dt ))            #total number of timesteps
 
 nth = common.getNth( innerRadius, outerRadius, nlv )#nmbr of angular levels
 dth0 = 2.*np.pi / nth                                 #constant delta theta
@@ -452,7 +453,7 @@ def Dy(U) :                    #du/dy = (du/dr)*(dr/dy) + (du/dth)*(dth/dy)
 #     +rrInv2 * ( Uth@Wlam + (Ws@Uth)*dsdthAll )
 # 
 # def HV(U) :
-#     for i in range(np.int(np.round((phs-1)/2))) :
+#     for i in range(int(np.round((phs-1)/2))) :
 #         U = L(U)
 #     return alpDrPol * U[1:-1,:]
 
@@ -518,7 +519,7 @@ def plotSomething( U, t ) :
     , Dx, Dy \
     , whatToPlot, xx, yy, xx0, yy0, Wradial, Wangular \
     , c, xB, yB, xT, yT, outerRadius, fig \
-    , dynamicColorbar, noInterp )
+    , dynamicColorbar, noInterp, figDir )
 
 ###########################################################################
 
@@ -528,17 +529,17 @@ et = time.time()
 
 for i in np.arange( 0, nTimesteps+1 ) :
     
-    if np.mod( i, np.int(np.round(saveDel/dt)) ) == 0 :
+    if np.mod( i, int(np.round(saveDel/dt)) ) == 0 :
         
-        print( "t =", np.int(np.round(t)), ",  et =", time.time()-et )
+        print( "t =", int(np.round(t)), ",  et =", time.time()-et )
         et = time.time()
         
         if plotFromSaved :
             U = np.load( saveString \
-            + '{0:04d}'.format(np.int(np.round(t))) + '.npy' )
+            + '{0:04d}'.format(int(np.round(t))) + '.npy' )
         elif saveArrays :
             np.save( saveString \
-            + '{0:04d}'.format(np.int(np.round(t))) + '.npy', setGhostNodes(U) )
+            + '{0:04d}'.format(int(np.round(t))) + '.npy', setGhostNodes(U) )
         
         if saveContours :
             plotSomething( setGhostNodes(U), t )
