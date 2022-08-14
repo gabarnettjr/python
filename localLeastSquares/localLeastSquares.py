@@ -11,13 +11,13 @@ import halton
 
 ################################################################################
 
-seeNodes = 0
+seeNodes = 1
 
 # Main approximation parameters
 useRbfs = 0
 interpolate = 0
-rbfParam = 5
-pd = 4
+rbfParam = 7
+pd = 5
 
 # Number of subregions going across the domain in each direction
 n = 8
@@ -32,15 +32,30 @@ c = 0
 d = 1
 
 # Define the scattered locations where the function values are known
-N = 1000
+N = 500
+sc = -1/3/np.sqrt(N)
 pts = halton.halton(2, N)
 # pts = np.random.rand(N, 2)
+pts[:,0] = a - sc*(b-a) + (1+2*sc)*(b-a) * pts[:,0]
+pts[:,1] = c - sc*(d-c) + (1+2*sc)*(d-c) * pts[:,1]
+
+# Add some boundary points
+sN = int(np.sqrt(N))
+tmpx = np.linspace(a, b, sN)
+tmpy = np.linspace(c, d, sN)
+bottom = np.vstack((tmpx, c*np.ones(np.shape(tmpx))))[:,:-1]
+right = np.vstack((b*np.ones(np.shape(tmpy)), tmpy))[:,:-1]
+top = np.vstack((tmpx, d*np.ones(np.shape(tmpx))))[:,1:]
+left = np.vstack((a*np.ones(np.shape(tmpy)), tmpy))[:,1:]
+pts = np.vstack((pts, bottom.T, right.T, top.T, left.T))
+
+#Separate into x and y arrays for convenience
 x = pts[:,0]
 y = pts[:,1]
 
 # Define the regular mesh where you WANT to know the function values
-X = np.linspace(a, b, 64)
-Y = np.linspace(c, d, 64)
+X = np.linspace(a, b, 128)
+Y = np.linspace(c, d, 128)
 X, Y = np.meshgrid(X, Y)
 X = X.flatten()
 Y = Y.flatten()
@@ -50,6 +65,7 @@ aRandom = -alp + 2 * alp * np.random.rand(21**2)
 
 # The true function to use for this test
 def func(x, y):
+    # return x**2*y + y**3
     # return x*y - y**2
     # return x - y
     # return 2 * np.ones(len(x))
@@ -238,7 +254,7 @@ for i in range(m*n):
 
 # Plot the approximation and compare to the true function
 
-clevels = np.arange(-.45, 1.55, .1)
+clevels = np.arange(-.5, 1.7, .2)
 
 triang = mtri.Triangulation(X, Y)
 fig = plt.figure()
@@ -247,7 +263,7 @@ ax = fig.add_subplot(121)
 cs = ax.tricontourf(triang, approx, clevels)
 plt.title('Approximation')
 fig.colorbar(cs)
-# plotQuadMesh(xm, ym)
+plotQuadMesh(xm, ym)
 plt.axis('image')
 
 ax = fig.add_subplot(122)
@@ -258,7 +274,7 @@ else:
     cs = ax.tricontourf(triang, func(X,Y), clevels)
     plt.title('Exact Function')
 fig.colorbar(cs)
-# plotQuadMesh(xm, ym)
+plotQuadMesh(xm, ym)
 plt.axis('image')
 
 plt.show()
