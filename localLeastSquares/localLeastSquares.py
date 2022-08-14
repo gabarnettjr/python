@@ -129,7 +129,7 @@ def poly(x, y, pd):
         p[:,26] = x * y**5
         p[:,27] = y**6
     if pd >= 7:
-        sys.exit("Please use smaller polynomial degree (<= 6).")
+        sys.exit("Please use a smaller polynomial degree (<= 6).")
     return p
 
 ################################################################################
