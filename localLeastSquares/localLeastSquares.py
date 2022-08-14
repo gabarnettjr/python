@@ -141,7 +141,7 @@ def phs(x, y, rbfParam):
 
 ################################################################################
 
-#Construct a matrix with RBF columns
+# Construct a matrix with RBF columns
 
 def rbf(x, y, xc, yc, rbfParam):
     A = np.zeros((len(x), len(xc)), float)
@@ -155,7 +155,7 @@ def rbf(x, y, xc, yc, rbfParam):
 # The vector of all known function values
 f = func(x, y)
 
-#Get the length and width of the two rectangles of interest, small and large.
+# Get the length and width of the two rectangles of interest, small and large.
 w = (b - a) / n / 2
 W = 3 * w
 ell = (d - c) / m / 2
@@ -228,6 +228,10 @@ for i in range(m*n):
         IND = inSquare(X, Y, xmc[i], ymc[i], ell, w)
         b = poly(X[IND], Y[IND], pd)
     approx[IND] = b.dot(lam).flatten()
+
+################################################################################
+
+# Plot the approximation and compare to the true function
 
 clevels = np.arange(-.05, 1.15, .1)
 
