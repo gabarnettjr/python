@@ -78,7 +78,7 @@ def plotQuadMesh(xm, ym):
 
 ################################################################################
 
-#Determine the index of the nodes in the square centered at [xmci, ymci]
+# Determine the index of the nodes in the square centered at [xmci, ymci]
 
 def inSquare(x, y, xmci, ymci, ell, w):
     ind = np.array([], int)
