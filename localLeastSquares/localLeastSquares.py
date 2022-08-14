@@ -195,7 +195,7 @@ if seeNodes:
         plt.draw()
         plt.waitforbuttonpress()
 
-# Loop through the subdomains and solve for the RBF/poly coefficients
+# Loop through the subdomains, solve for the RBF/poly coefficients and evaluate.
 approx = np.zeros(len(X), float)
 for i in range(m*n):
     IND = inSquare(x, y, xmc[i], ymc[i], ELL, W)
