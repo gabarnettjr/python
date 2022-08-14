@@ -16,12 +16,12 @@ seeNodes = 0
 # Main approximation parameters
 useRbfs = 0
 interpolate = 0
-rbfParam = 3
-pd = 3
+rbfParam = 5
+pd = 4
 
 # Number of subregions going across the domain in each direction
-n = 16
-m = 16
+n = 8
+m = 8
 
 ################################################################################
 
@@ -39,25 +39,30 @@ x = pts[:,0]
 y = pts[:,1]
 
 # Define the regular mesh where you WANT to know the function values
-X = np.linspace(a, b, 50)
-Y = np.linspace(c, d, 50)
+X = np.linspace(a, b, 64)
+Y = np.linspace(c, d, 64)
 X, Y = np.meshgrid(X, Y)
 X = X.flatten()
 Y = Y.flatten()
 
-alp = .1
+alp = .5
+aRandom = -alp + 2 * alp * np.random.rand(21**2)
 
 # The true function to use for this test
 def func(x, y):
     # return x*y - y**2
     # return x - y
     # return 2 * np.ones(len(x))
-    z = np.exp(-100. * ((x - .6)**2 + (y - .4)**2))
-    z = z + np.exp(-400. * ((x - .2)**2 + (y - .8)**2))
-    z = z + alp * np.exp(-1600. * ((x - .8)**2 + (y - .9)**2))
-    z = z + alp * np.exp(-1600. * ((x - .7)**2 + (y - .8)**2))
-    z = z - alp * np.exp(-1600. * ((x - .7)**2 + (y - .9)**2))
-    z = z - alp * np.exp(-1600. * ((x - .8)**2 + (y - .8)**2))
+    z = np.exp(-100. * ((x - .5)**2 + (y - .5)**2))
+    z = z + np.exp(-100. * ((x - .8)**2 + (y - .8)**2))
+    z = z + np.exp(-100. * ((x - .2)**2 + (y - .8)**2))
+    z = z + np.exp(-100. * ((x - .2)**2 + (y - .2)**2))
+    z = z + np.exp(-100. * ((x - .8)**2 + (y - .2)**2))
+    count = 0
+    for xi in np.linspace(a, b, 21):
+        for yi in np.linspace(c, d, 21):
+            z = z + aRandom[count] * np.exp(-1600. * ((x - xi)**2 + (y - yi)**2))
+            count = count + 1
     return z
 
 ################################################################################
@@ -128,8 +133,8 @@ def poly(x, y, pd):
         p[:,25] = x**2 * y**4
         p[:,26] = x * y**5
         p[:,27] = y**6
-    if pd >= 7:
-        sys.exit("Please use a smaller polynomial degree (<= 6).")
+    if (pd < 0) or (pd > 6):
+        sys.exit("Please choose a better polynomial degree (0 <= pd <= 6).")
     return p
 
 ################################################################################
@@ -221,19 +226,19 @@ for i in range(m*n):
             lam = np.linalg.lstsq(A, f[IND], rcond=None)[0]
         IND = inSquare(X, Y, xmc[i], ymc[i], ell, w)
         A = rbf(X[IND], Y[IND], xc, yc, rbfParam)
-        b = poly(X[IND], Y[IND], pd)
-        b = np.hstack((A, b))
+        B = poly(X[IND], Y[IND], pd)
+        B = np.hstack((A, B))
     else:
         lam = np.linalg.lstsq(p, f[IND], rcond=None)[0]
         IND = inSquare(X, Y, xmc[i], ymc[i], ell, w)
-        b = poly(X[IND], Y[IND], pd)
-    approx[IND] = b.dot(lam).flatten()
+        B = poly(X[IND], Y[IND], pd)
+    approx[IND] = B.dot(lam).flatten()
 
 ################################################################################
 
 # Plot the approximation and compare to the true function
 
-clevels = np.arange(-.05, 1.15, .1)
+clevels = np.arange(-.45, 1.55, .1)
 
 triang = mtri.Triangulation(X, Y)
 fig = plt.figure()
@@ -242,7 +247,7 @@ ax = fig.add_subplot(121)
 cs = ax.tricontourf(triang, approx, clevels)
 plt.title('Approximation')
 fig.colorbar(cs)
-plotQuadMesh(xm, ym)
+# plotQuadMesh(xm, ym)
 plt.axis('image')
 
 ax = fig.add_subplot(122)
@@ -253,7 +258,7 @@ else:
     cs = ax.tricontourf(triang, func(X,Y), clevels)
     plt.title('Exact Function')
 fig.colorbar(cs)
-plotQuadMesh(xm, ym)
+# plotQuadMesh(xm, ym)
 plt.axis('image')
 
 plt.show()
