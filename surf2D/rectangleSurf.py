@@ -7,7 +7,7 @@ To approximate locally, the user breaks the original rectangular domain into
 many smaller rectangular subdomains.  A local approximation in a given subdomain
 attempts to match all data in the subdomain plus adjacent subdomains.
 
-Greg Barnett (gregorybarne)
+Greg Barnett
 August 2022
 """
 ################################################################################
