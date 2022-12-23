@@ -17,7 +17,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib import tri as mtri
 
-path.append("\\\\mpmfs01b\\maskdata\\Litho\\code\\surf2d")
+path.append("C:\\Users\\gabarne\\OneDrive\\python\\surf2d")
 import rectangleSurf
 
 ################################################################################
@@ -43,7 +43,7 @@ nSubd = mSubd                                # number of horizontal subdivisions
 # OPTIONAL COMMAND-LINE PARAMETER (working directory where text files are saved)
 # x.txt, y.txt, errX.txt, errY.txt, xe.txt, ye.txt, errXe.txt, errYe.txt
 # NOTE: Type the directory using "windows style", like this:
-#       \\mpmfs01b\maskdata\Litho\code\surf2d\cdInterp\smoothData
+#       C:\Users\gabarne\cdInterpData\smoothData
 if len(argv) == 2 :
     wdir = argv[1]
     tmp = wdir.split("\\")
@@ -51,7 +51,7 @@ if len(argv) == 2 :
     while tmp :
         wdir = tmp.pop() + "\\" + wdir
 else :
-    wdir = "\\\\mpmfs01b\\maskdata\\Litho\\code\\surf2d\\cdInterp\\actualData\\"
+    wdir = "C:\\Users\\gabarne\\cdInterpData\\smoothData\\"
 
 ################################################################################
 
