@@ -29,40 +29,6 @@ def getContourLevels(vals, useMeanOf = (), minDiff = 2, nColors = 64) :
 
 ################################################################################
 
-def getLotids(sys_argv) :
-    """
-    Check and retrieve input arguments from the user.  Call this from inside of
-    a script that can accept command-line arguments.
-    """
-    def getInteractively() :
-        print()
-        print("Enter Lot numbers one at a time (or copy and paste from Excel).")
-        print("Push <Enter> when you are done.\n")
-        lotIDvec = np.array( ["-99"] )
-        while lotIDvec[-1] != "" :
-            lotIDvec = np.hstack(( lotIDvec, input() ))
-        lotIDvec = lotIDvec[1:-1]
-        return  lotIDvec
-    deg = ""
-    lotIDvec = []
-    if len(sys_argv) <= 1 :
-        lotIDvec = getInteractively()
-    elif len(sys_argv) == 2 :
-        lotIDvec = sys_argv[1:]
-    elif len(sys_argv) >= 3 :
-        if (sys_argv[1] == "-pd") or (sys_argv[1] == "-deg") \
-        or (sys_argv[1] == "--polynomial-degree") :
-            deg = int(sys_argv[2])
-            lotIDvec = sys_argv[3:]
-        else :
-            lotIDvec = sys_argv[1:]
-        if len(lotIDvec) == 0 :
-           lotIDvec = getInteractively()
-    
-    return deg, lotIDvec
-
-################################################################################
-
 def printPolyCoeffs(lam) :
     """
     Print polynomial coefficients, hopefully in a format that can be easily
